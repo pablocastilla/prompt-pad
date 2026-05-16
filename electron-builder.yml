@@ -1,5 +1,5 @@
 appId: com.prompt-pad.app
-productName: Prompt Pad
+productName: Prompt-Pad
 directories:
   output: release
   buildResources: resources
