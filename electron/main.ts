@@ -199,26 +199,31 @@ function spawnTerminalLinux(cmds: Array<[string, string[]]>, idx = 0): void {
 
 let mainWindow: BrowserWindow | null = null;
 
-function getWindowIconPath(): string {
-  if (process.platform === 'win32') {
-    const devIco = path.join(__dirname, '../resources/icon.ico');
-    if (fs.existsSync(devIco)) return devIco;
-    if (app.isPackaged) {
-      const packagedIco = path.join(process.resourcesPath, 'icon.ico');
-      if (fs.existsSync(packagedIco)) return packagedIco;
+function getWindowIcon(): Electron.NativeImage | null {
+  const candidates: string[] = [];
+
+  // 1. Development: resources/ next to project root
+  const projectRoot = path.join(__dirname, '..');
+  candidates.push(path.join(projectRoot, 'resources', 'icon.ico'));
+  candidates.push(path.join(projectRoot, 'resources', 'icon.png'));
+
+  // 2. Packaged: embedded in resourcesPath
+  if (app.isPackaged) {
+    candidates.push(path.join(process.resourcesPath, 'icon.ico'));
+    candidates.push(path.join(process.resourcesPath, 'icon.png'));
+  }
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      const img = nativeImage.createFromPath(p);
+      if (!img.isEmpty()) return img;
     }
   }
-  const devPng = path.join(__dirname, '../resources/icon.png');
-  if (fs.existsSync(devPng)) return devPng;
-  if (app.isPackaged) {
-    const packagedPng = path.join(process.resourcesPath, 'icon.png');
-    if (fs.existsSync(packagedPng)) return packagedPng;
-  }
-  return '';
+  return null;
 }
 
 function createWindow() {
-  const iconPath = getWindowIconPath();
+  const icon = getWindowIcon();
   const winOptions: Electron.BrowserWindowConstructorOptions = {
     width: 1200, height: 800, minWidth: 700, minHeight: 500,
     title: '',
@@ -229,14 +234,16 @@ function createWindow() {
       nodeIntegration: false,
     },
   };
-  if (iconPath) {
-    if (process.platform === 'win32') {
-      winOptions.icon = nativeImage.createFromPath(iconPath);
-    } else {
-      winOptions.icon = iconPath;
-    }
+  if (icon) {
+    winOptions.icon = icon;
   }
   mainWindow = new BrowserWindow(winOptions);
+
+  // Explicitly set the icon after creation for reliable taskbar display on Windows
+  if (icon) {
+    mainWindow.setIcon(icon);
+  }
+
   mainWindow.setMenuBarVisibility(false);
   mainWindow.removeMenu();
   mainWindow.on('page-title-updated', (e) => { e.preventDefault(); mainWindow?.setTitle(''); });
