@@ -1,4 +1,4 @@
-import { dialog, ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 
@@ -56,25 +56,30 @@ export function setupAutoUpdater(mainWindow: Electron.BrowserWindow | null) {
 
 export function checkForUpdatesManually(mainWindow: Electron.BrowserWindow | null) {
   log.info('Manual update check requested.');
+  autoUpdater.once('update-available', (info) => {
+    log.info('Update available (manual check).', info.version);
+    dialog.showMessageBox(mainWindow ?? BrowserWindow.getFocusedWindow() ?? undefined as any, {
+      type: 'info',
+      title: 'Update Available',
+      message: `A new version (${info.version}) is available. It will be downloaded in the background.`,
+    });
+  });
   autoUpdater.once('update-not-available', () => {
-    if (mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'No Updates',
-        message: 'You are running the latest version.',
-      });
-    }
+    log.info('No updates found.');
+    dialog.showMessageBox(mainWindow ?? BrowserWindow.getFocusedWindow() ?? undefined as any, {
+      type: 'info',
+      title: 'No Updates',
+      message: 'You are running the latest version.',
+    });
   });
   autoUpdater.once('error', (err) => {
     log.error('Manual update check failed.', err);
-    if (mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'error',
-        title: 'Update Check Failed',
-        message: 'Could not check for updates. Please try again later.',
-        detail: err.message,
-      });
-    }
+    dialog.showMessageBox(mainWindow ?? BrowserWindow.getFocusedWindow() ?? undefined as any, {
+      type: 'error',
+      title: 'Update Check Failed',
+      message: 'Could not check for updates. Please try again later.',
+      detail: err.message,
+    });
   });
   void autoUpdater.checkForUpdatesAndNotify();
 }
@@ -82,7 +87,7 @@ export function checkForUpdatesManually(mainWindow: Electron.BrowserWindow | nul
 // IPC handler for manual update check
 export function registerUpdateIPC() {
   ipcMain.handle('updater:check', () => {
-    checkForUpdatesManually(null);
+    checkForUpdatesManually(BrowserWindow.getFocusedWindow());
     return true;
   });
 }
