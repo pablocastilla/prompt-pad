@@ -4,6 +4,61 @@ A native desktop app (Electron + React) for writing, organising, and firing AI p
 
 ---
 
+## How to Use It (The Prompt Pad Way)
+
+### The Philosophy: One Launcher Per Folder + CLI
+
+Prompt Pad was built for people who don't want to juggle terminal tabs, `cd` into the right directory, remember which flags to pass, and then forget which model they were using. Instead:
+
+1. **Write your prompt** in the editor.
+2. **Press `Ctrl+Shift+1`** (or whatever number your launcher is).
+3. **Pick a model** from the picker.
+4. **Done** — a terminal window opens and runs the CLI with your prompt.
+
+That's it. No terminals to manage. No context switching. Just write, fire, and go back to what you were doing.
+
+### The Multi-Folder Trick: Run Multiple CLIs in Parallel
+
+Here's the secret sauce: **duplicate your project folder**.
+
+```
+my-project/
+my-project_1/
+my-project_2/
+my-project_3/
+```
+
+Yes, really. Git worktrees exist, but let's be honest — half of us still look up the syntax every time. Copying a folder is free, works everywhere, and your brain already understands it.
+
+Create one launcher per folder copy, each pointing to a different `_N` directory. Now you can:
+
+| Launcher | Task | What happens |
+|---|---|---|
+| `#1` → `my-project/` | "Refactor the auth module" | CLI works on the main copy |
+| `#2` → `my-project_1/` | "Write tests for the API" | Tests run in parallel, no conflicts |
+| `#3` → `my-project_2/` | "Create a PR for the feature" | PR gets created while you keep working |
+| `#4` → `my-project_3/` | "Review the PR and suggest fixes" | Code review happens independently |
+
+**The workflow:**
+1. Write your prompt: *"Create a PR for the new feature branch"*
+2. Hit `Ctrl+Shift+3` → model picker → Enter
+3. Go back to writing prompts for launcher #1 and #2
+4. Come back later — the PR is ready. Review it. Done.
+
+You're essentially running a tiny AI dev team, each working in their own sandbox. No merge conflicts until you want them. No waiting for one task to finish before starting the next. Just write, fire, repeat.
+
+### Why This Beats Terminal Tabs
+
+| Terminal Tabs | Prompt Pad |
+|---|---|
+| Open 4 terminals, `cd` 4 times | One window, one editor |
+| Remember which flags each CLI needs | Launchers store everything |
+| Lose track of which model you picked | Model picker every time, fresh choice |
+| Scroll back through walls of output | Each CLI gets its own terminal window |
+| Accidentally run command in wrong dir | Each launcher locks to its folder |
+
+---
+
 ## Screenshots
 
 ### Editor — write your prompt in a distraction-free multi-tab editor
@@ -47,7 +102,6 @@ A native desktop app (Electron + React) for writing, organising, and firing AI p
 - **Search**: filter phrases by name or content with the search bar.
 
 ### Launch Configurations
-- **One launcher per folder + CLI**: the idea is simple — create one launch config for each project folder and each AI tool you use. Working on `my-react-app` with Copilot? One launcher. Same folder but want to try OpenCode? Another launcher. Different project? Yet another. It's like git worktrees, but for people who find worktrees confusing (which is to say, most of us). Instead of juggling terminal tabs, `cd`-ing to the right directory, remembering which flags to pass, and then forgetting which model you were using — you just click 🚀. Your future self, drowning in `cd ../../oops-wrong-dir`, will thank you.
 - **Pre-configured runs**: each config stores a name, working folder, `--yolo` flag, tool (Copilot CLI or OpenCode), and interactive / non-interactive mode.
 - **Model chosen at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **model picker** appears — navigate with `↑ ↓`, confirm with `Enter`, cancel with `Esc`.
 - **Drag-to-reorder**: drag the ⠿ handle to reprioritise configs. The `Ctrl+Shift+N` shortcuts follow the list order and are auto-saved.
