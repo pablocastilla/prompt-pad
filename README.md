@@ -47,6 +47,48 @@ Create one launcher per folder copy, each pointing to a different `_N` directory
 
 You're essentially running a tiny AI dev team, each working in their own sandbox. No merge conflicts until you want them. No waiting for one task to finish before starting the next. Just write, fire, repeat.
 
+### The Phrase Catalog: Type Once, Reuse Forever
+
+Here's where you really save time. The **Phrase Catalog** lets you store text templates and insert them into your prompt with a single keyboard shortcut (`Ctrl+1` through `Ctrl+0`).
+
+The idea: **build your prompt from reusable blocks** instead of typing the same thing over and over.
+
+#### A Typical Phrase Catalog
+
+| # | Shortcut | Phrase | What it does |
+|---|---|---|---|
+| 1 | `Ctrl+1` | *"You are an expert Python developer with 15 years of experience. Write clean, PEP-8 compliant code with type hints and docstrings."* | Sets the AI's persona — the foundation of every prompt |
+| 2 | `Ctrl+2` | *"Use pytest for testing. Include edge cases and parametrized tests."* | Your standard testing instructions |
+| 3 | `Ctrl+3` | *"Add type hints to all functions and classes. Use `typing` module imports."* | Type annotation reminder |
+| 4 | `Ctrl+4` | *"Follow the repository's existing code style. Match the patterns in the surrounding files."* | Style consistency guard |
+| 5 | `Ctrl+5` | *"Write a README section explaining the new feature with usage examples."* | Documentation template |
+| ... | ... | *(your own phrases)* | *(add whatever you repeat the most)* |
+| 10 | `Ctrl+0` | *"Review all tests, update documentation, create a feature branch, and open a pull request with a descriptive title and body."* | The grand finale — the "do everything and ship it" phrase |
+
+#### The Full Workflow
+
+1. **Open a new tab** (`Ctrl+T`) for your next task.
+2. **Hit `Ctrl+1`** — *"You are an expert Python developer..."* — your prompt now has a persona.
+3. **Type your specific task** — *"Refactor the database module to use async/await"*.
+4. **Hit `Ctrl+2`** — testing instructions appended.
+5. **Hit `Ctrl+5`** — documentation request appended.
+6. **Hit `Ctrl+0`** — the closer: review, branch, PR.
+7. **Hit `Ctrl+Shift+3`** — fire it at your launcher.
+8. **Go make coffee.** By the time you're back, the PR is waiting for your review.
+
+Your prompt went from *"Refactor the database module"* (5 words) to a comprehensive, multi-paragraph instruction with persona, testing standards, documentation, and delivery — all in **6 keystrokes**.
+
+#### Why This Saves Hours
+
+| Without Phrases | With Phrases |
+|---|---|
+| Type 200+ words of boilerplate every time | Type the task, insert phrases with `Ctrl+N` |
+| Forget to mention testing standards | Always included, never forgotten |
+| Inconsistent persona descriptions | Same expert persona, every time |
+| Spend 5 minutes crafting each prompt | Spend 5 seconds |
+
+The phrases you set up once pay dividends forever. It's like having a macro keyboard for your AI prompts — but the macros are smart, editable, and reorderable with drag-and-drop.
+
 ### Why This Beats Terminal Tabs
 
 | Terminal Tabs | Prompt Pad |
