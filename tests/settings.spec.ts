@@ -4,163 +4,195 @@ import * as fs from 'fs';
 import * as os from 'os';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
-const APP_DIR = path.join(os.homedir(), '.prompt-pad');
 
-function ensureAppDir() {
-  if (!fs.existsSync(APP_DIR)) fs.mkdirSync(APP_DIR, { recursive: true });
+function getTestDir(): string {
+  const dir = path.join(os.tmpdir(), `pp-test-${crypto.randomUUID()}`);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
-function getSettingsPath(): string {
-  ensureAppDir();
-  return path.join(APP_DIR, 'settings.json');
+function getSettingsPath(testDir: string): string {
+  return path.join(testDir, 'settings.json');
 }
 
-function cleanSettings() {
-  const p = getSettingsPath();
+function cleanSettings(testDir: string) {
+  const p = getSettingsPath(testDir);
   if (fs.existsSync(p)) fs.rmSync(p, { force: true });
 }
 
 test.describe('Settings panel', () => {
-  test.beforeEach(() => {
-    cleanSettings();
-  });
-
   test('Settings panel renders theme cards and language selector', async () => {
-    const app = await electron.launch({ args: [MAIN_JS] });
-    const page = await app.firstWindow();
-    await page.waitForLoadState('domcontentloaded');
+    const testDir = getTestDir();
+    try {
+      cleanSettings(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
 
-    // Open settings panel
-    await page.locator('.activity-btn').nth(2).click();
-    await expect(page.locator('.settings-panel')).toBeVisible();
+      // Open settings panel
+      await page.locator('.activity-btn').nth(2).click();
+      await expect(page.locator('.settings-panel')).toBeVisible();
 
-    // Theme cards
-    await expect(page.locator('.theme-card')).toHaveCount(4);
-    await expect(page.locator('.theme-card').first()).toContainText(/Light|Claro/i);
+      // Theme cards
+      await expect(page.locator('.theme-card')).toHaveCount(4);
+      await expect(page.locator('.theme-card').first()).toContainText(/Light|Claro/i);
 
-    // Language selector
-    const langSelect = page.locator('.settings-select');
-    await expect(langSelect).toBeVisible();
-    const options = langSelect.locator('option');
-    await expect(options).toHaveCount(3);
+      // Language selector
+      const langSelect = page.locator('.settings-select');
+      await expect(langSelect).toBeVisible();
+      const options = langSelect.locator('option');
+      await expect(options).toHaveCount(3);
 
-    await app.close();
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   test('Language selection: selecting English sets language to en', async () => {
-    const app = await electron.launch({ args: [MAIN_JS] });
-    const page = await app.firstWindow();
-    await page.waitForLoadState('domcontentloaded');
+    const testDir = getTestDir();
+    try {
+      cleanSettings(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
 
-    // Open settings
-    await page.locator('.activity-btn').nth(2).click();
-    await expect(page.locator('.settings-panel')).toBeVisible();
+      // Open settings
+      await page.locator('.activity-btn').nth(2).click();
+      await expect(page.locator('.settings-panel')).toBeVisible();
 
-    // Select English
-    const langSelect = page.locator('.settings-select');
-    await langSelect.selectOption('en');
+      // Select English
+      const langSelect = page.locator('.settings-select');
+      await langSelect.selectOption('en');
 
-    // Verify settings were saved
-    await page.waitForTimeout(200);
-    const settings = await page.evaluate(() => {
-      return (window as unknown as { electronAPI: { loadSettings: () => Promise<{ language: string }> } })
-        .electronAPI.loadSettings();
-    });
-    expect(settings.language).toBe('en');
+      // Verify settings were saved
+      await page.waitForTimeout(200);
+      const settings = await page.evaluate(() => {
+        return (window as unknown as { electronAPI: { loadSettings: () => Promise<{ language: string }> } })
+          .electronAPI.loadSettings();
+      });
+      expect(settings.language).toBe('en');
 
-    await app.close();
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   test('Language selection: selecting Spanish sets language to es', async () => {
-    const app = await electron.launch({ args: [MAIN_JS] });
-    const page = await app.firstWindow();
-    await page.waitForLoadState('domcontentloaded');
+    const testDir = getTestDir();
+    try {
+      cleanSettings(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
 
-    // Open settings
-    await page.locator('.activity-btn').nth(2).click();
-    await expect(page.locator('.settings-panel')).toBeVisible();
+      // Open settings
+      await page.locator('.activity-btn').nth(2).click();
+      await expect(page.locator('.settings-panel')).toBeVisible();
 
-    // Select Spanish
-    const langSelect = page.locator('.settings-select');
-    await langSelect.selectOption('es');
+      // Select Spanish
+      const langSelect = page.locator('.settings-select');
+      await langSelect.selectOption('es');
 
-    // Verify settings were saved
-    await page.waitForTimeout(200);
-    const settings = await page.evaluate(() => {
-      return (window as unknown as { electronAPI: { loadSettings: () => Promise<{ language: string }> } })
-        .electronAPI.loadSettings();
-    });
-    expect(settings.language).toBe('es');
+      // Verify settings were saved
+      await page.waitForTimeout(200);
+      const settings = await page.evaluate(() => {
+        return (window as unknown as { electronAPI: { loadSettings: () => Promise<{ language: string }> } })
+          .electronAPI.loadSettings();
+      });
+      expect(settings.language).toBe('es');
 
-    await app.close();
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   test('Check for updates button is present and clickable', async () => {
-    const app = await electron.launch({ args: [MAIN_JS] });
-    const page = await app.firstWindow();
-    await page.waitForLoadState('domcontentloaded');
+    const testDir = getTestDir();
+    try {
+      cleanSettings(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
 
-    // Open settings
-    await page.locator('.activity-btn').nth(2).click();
-    await expect(page.locator('.settings-panel')).toBeVisible();
+      // Open settings
+      await page.locator('.activity-btn').nth(2).click();
+      await expect(page.locator('.settings-panel')).toBeVisible();
 
-    // Check for updates button
-    const updateBtn = page.locator('.settings-update-btn');
-    await expect(updateBtn).toBeVisible();
-    await expect(updateBtn).toBeEnabled();
-    await expect(updateBtn).toContainText(/Check for updates|Buscar actualizaciones/i);
+      // Check for updates button
+      const updateBtn = page.locator('.settings-update-btn');
+      await expect(updateBtn).toBeVisible();
+      await expect(updateBtn).toBeEnabled();
+      await expect(updateBtn).toContainText(/Check for updates|Buscar actualizaciones/i);
 
-    // Click it - should not throw
-    await updateBtn.click();
+      // Click it - should not throw
+      await updateBtn.click();
 
-    await app.close();
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   test('Theme switching works', async () => {
-    const app = await electron.launch({ args: [MAIN_JS] });
-    const page = await app.firstWindow();
-    await page.waitForLoadState('domcontentloaded');
+    const testDir = getTestDir();
+    try {
+      cleanSettings(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
 
-    // Open settings
-    await page.locator('.activity-btn').nth(2).click();
-    await expect(page.locator('.settings-panel')).toBeVisible();
+      // Open settings
+      await page.locator('.activity-btn').nth(2).click();
+      await expect(page.locator('.settings-panel')).toBeVisible();
 
-    // Switch to dark theme
-    const darkCard = page.locator('.theme-card').nth(1);
-    await darkCard.click();
+      // Switch to dark theme
+      const darkCard = page.locator('.theme-card').nth(1);
+      await darkCard.click();
 
-    await page.waitForTimeout(100);
-    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-    expect(theme).toBe('dark');
+      await page.waitForTimeout(100);
+      const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+      expect(theme).toBe('dark');
 
-    // Switch to gaudy theme
-    const gaudyCard = page.locator('.theme-card').nth(2);
-    await gaudyCard.click();
+      // Switch to gaudy theme
+      const gaudyCard = page.locator('.theme-card').nth(2);
+      await gaudyCard.click();
 
-    await page.waitForTimeout(100);
-    const theme2 = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-    expect(theme2).toBe('gaudy');
+      await page.waitForTimeout(100);
+      const theme2 = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+      expect(theme2).toBe('gaudy');
 
-    await app.close();
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   test('Version is displayed in settings', async () => {
-    const app = await electron.launch({ args: [MAIN_JS] });
-    const page = await app.firstWindow();
-    await page.waitForLoadState('domcontentloaded');
+    const testDir = getTestDir();
+    try {
+      cleanSettings(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
 
-    // Open settings
-    await page.locator('.activity-btn').nth(2).click();
-    await expect(page.locator('.settings-panel')).toBeVisible();
+      // Open settings
+      await page.locator('.activity-btn').nth(2).click();
+      await expect(page.locator('.settings-panel')).toBeVisible();
 
-    // Version element should be visible
-    const versionEl = page.locator('.settings-version');
-    await expect(versionEl).toBeVisible();
+      // Version element should be visible
+      const versionEl = page.locator('.settings-version');
+      await expect(versionEl).toBeVisible();
 
-    // In dev mode it may show "...", in packaged builds it shows version
-    const text = await versionEl.textContent();
-    expect(text).toBeTruthy();
+      // In dev mode it may show "...", in packaged builds it shows version
+      const text = await versionEl.textContent();
+      expect(text).toBeTruthy();
 
-    await app.close();
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 });

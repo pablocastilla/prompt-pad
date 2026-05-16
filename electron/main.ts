@@ -5,7 +5,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { spawn } from 'child_process';
 
-const APP_DIR    = path.join(os.homedir(), '.prompt-pad');
+const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
+const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
 const FALLBACK_COPILOT_MODELS = [
   { id: 'auto', label: 'auto' },
@@ -57,6 +58,7 @@ function detectOneDrivePath(): string | null {
 let useOneDrive = true;
 
 function getSyncDir(): string {
+  if (TEST_DIR) return APP_DIR; // Never use OneDrive in test mode
   if (!useOneDrive) return APP_DIR;
   const odPath = detectOneDrivePath();
   if (odPath) {
@@ -273,12 +275,18 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(
 // Settings
 ipcMain.handle('settings:load', () => {
   const settings = readJson(getSettingsPath(), { theme: 'light', language: 'auto', useOneDrive: true });
+  if (TEST_DIR) return settings; // Never force OneDrive in test mode
   if (detectOneDrivePath()) {
     return { ...settings, useOneDrive: true };
   }
   return settings;
 });
 ipcMain.handle('settings:save', (_e, s: Record<string, unknown>) => {
+  if (TEST_DIR) {
+    useOneDrive = false;
+    safeWrite(getSettingsPath(), JSON.stringify(s, null, 2));
+    return;
+  }
   const persisted = { ...s, useOneDrive: detectOneDrivePath() ? true : s.useOneDrive === true };
   useOneDrive = persisted.useOneDrive === true;
   safeWrite(getSettingsPath(), JSON.stringify(persisted, null, 2));
