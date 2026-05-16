@@ -1,0 +1,289 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useStore } from '../store';
+import { modelsForTool } from '../types';
+import { t } from '../i18n';
+import type { LaunchTool, ModelOption, Settings } from '../types';
+
+export function ModelPicker() {
+  const pendingLaunch    = useStore(s => s.pendingLaunch);
+  const setPendingLaunch = useStore(s => s.setPendingLaunch);
+  const addToast         = useStore(s => s.addToast);
+  const settings         = useStore(s => s.settings);
+  const setSettings      = useStore(s => s.setSettings);
+
+  const [modelCache, setModelCache] = useState<{ copilot: ModelOption[] | null; opencode: ModelOption[] | null }>({
+    copilot: null,
+    opencode: null,
+  });
+  const [loadingModels, setLoadingModels] = useState<{ copilot: boolean; opencode: boolean }>({
+    copilot: false,
+    opencode: false,
+  });
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [dragPinnedIdx, setDragPinnedIdx] = useState<number | null>(null);
+  const [dropPinnedIdx, setDropPinnedIdx] = useState<number | null>(null);
+
+  const tool: LaunchTool = pendingLaunch?.launch.tool ?? 'copilot';
+  const fallbackModels = modelsForTool(tool);
+  const availableModels = modelCache[tool] ?? fallbackModels;
+  const pinnedIds = settings.pinnedModels?.[tool] ?? [];
+
+  const pinnedModels = useMemo(
+    () => pinnedIds.map(id => availableModels.find(m => m.id === id)).filter((m): m is ModelOption => !!m),
+    [pinnedIds, availableModels]
+  );
+  const unpinnedModels = useMemo(
+    () => availableModels.filter(m => !pinnedIds.includes(m.id)),
+    [availableModels, pinnedIds]
+  );
+  const allModels = useMemo(() => [...pinnedModels, ...unpinnedModels], [pinnedModels, unpinnedModels]);
+
+  const defaultIdx = pendingLaunch
+    ? Math.max(0, allModels.findIndex(m => m.id === pendingLaunch.launch.model))
+    : 0;
+
+  const [selectedIdx, setSelectedIdx] = useState(defaultIdx);
+
+  const setPinnedForTool = async (nextIds: string[]) => {
+    const nextSettings: Settings = {
+      ...settings,
+      pinnedModels: {
+        copilot: settings.pinnedModels?.copilot ?? [],
+        opencode: settings.pinnedModels?.opencode ?? [],
+        [tool]: nextIds,
+      },
+    };
+    setSettings(nextSettings);
+    await window.electronAPI.saveSettings(nextSettings);
+  };
+
+  const togglePin = (modelId: string) => {
+    if (pinnedIds.includes(modelId)) {
+      void setPinnedForTool(pinnedIds.filter(id => id !== modelId));
+      return;
+    }
+    void setPinnedForTool([...pinnedIds, modelId]);
+  };
+
+  const reorderPinned = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    const visibleIds = pinnedModels.map(m => m.id);
+    if (!visibleIds[fromIdx] || !visibleIds[toIdx]) return;
+
+    const reorderedVisible = [...visibleIds];
+    const [moved] = reorderedVisible.splice(fromIdx, 1);
+    reorderedVisible.splice(toIdx, 0, moved);
+
+    const hiddenIds = pinnedIds.filter(id => !visibleIds.includes(id));
+    void setPinnedForTool([...reorderedVisible, ...hiddenIds]);
+  };
+
+  const loadModels = async (selectedTool: LaunchTool) => {
+    if (modelCache[selectedTool] || loadingModels[selectedTool]) return;
+    setLoadingModels(prev => ({ ...prev, [selectedTool]: true }));
+    const fallback = modelsForTool(selectedTool);
+    try {
+      const fetched = selectedTool === 'opencode'
+        ? await window.electronAPI.getOpenCodeModels()
+        : await window.electronAPI.getCopilotModels();
+      if (!Array.isArray(fetched) || fetched.length === 0) {
+        setModelCache(prev => ({ ...prev, [selectedTool]: fallback }));
+        return;
+      }
+
+      const unique = new Map<string, ModelOption>();
+      for (const item of fetched) {
+        if (!item?.id) continue;
+        unique.set(item.id, { id: item.id, label: item.label || item.id });
+      }
+      const list = [...unique.values()];
+      const normalized = selectedTool === 'copilot'
+        ? [{ id: 'auto', label: 'auto' }, ...list.filter(m => m.id !== 'auto')]
+        : list;
+
+      setModelCache(prev => ({ ...prev, [selectedTool]: normalized }));
+    } catch {
+      setModelCache(prev => ({ ...prev, [selectedTool]: fallback }));
+    } finally {
+      setLoadingModels(prev => ({ ...prev, [selectedTool]: false }));
+    }
+  };
+
+  // Reset selection when a new pending launch arrives
+  useEffect(() => {
+    if (pendingLaunch && allModels.length > 0) {
+      void loadModels(tool);
+      const ms = allModels;
+      const idx = Math.max(0, ms.findIndex(m => m.id === pendingLaunch.launch.model));
+      setSelectedIdx(idx);
+    }
+  }, [pendingLaunch?.launch.id, tool, allModels.length]);
+
+  useEffect(() => {
+    if (!pendingLaunch) return;
+    const listEl = listRef.current;
+    if (!listEl) return;
+    const selected = listEl.querySelector<HTMLElement>(`[data-model-index="${selectedIdx}"]`);
+    if (!selected) return;
+    selected.scrollIntoView({ block: 'nearest' });
+  }, [pendingLaunch, selectedIdx, allModels.length, tool]);
+
+  const execute = async (idx: number) => {
+    if (!pendingLaunch) return;
+    const ms = allModels;
+    if (!ms[idx]) return;
+    const model = ms[idx].id;
+    setPendingLaunch(null);
+    await window.electronAPI.executeLaunch({
+      tool: pendingLaunch.launch.tool ?? 'copilot',
+      model,
+      folder: pendingLaunch.launch.folder,
+      yolo: pendingLaunch.launch.yolo,
+      prompt: pendingLaunch.prompt,
+      mode: pendingLaunch.launch.mode,
+      attachedFilePaths: pendingLaunch.attachedFilePaths,
+    });
+    if (settings.theme === 'gaudy') addToast(t('gaudyLaunch'));
+  };
+
+  useEffect(() => {
+    if (!pendingLaunch) return;
+    const ms = allModels;
+    if (!ms.length) return;
+    const digitByCode: Record<string, number> = {
+      Digit1: 0,
+      Digit2: 1,
+      Digit3: 2,
+      Digit4: 3,
+      Digit5: 4,
+      Digit6: 5,
+      Digit7: 6,
+      Digit8: 7,
+      Digit9: 8,
+      Digit0: 9,
+    };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIdx(i => (i + 1) % ms.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIdx(i => (i - 1 + ms.length) % ms.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        execute(selectedIdx);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setPendingLaunch(null);
+      } else if (e.ctrlKey && !e.altKey && !e.shiftKey) {
+        const idx = digitByCode[e.code];
+        if (idx === undefined || !ms[idx]) return;
+        e.preventDefault();
+        togglePin(ms[idx].id);
+      } else if (!e.ctrlKey && !e.altKey && !e.shiftKey) {
+        const idx = digitByCode[e.code];
+        if (idx === undefined || idx >= pinnedModels.length) return;
+        e.preventDefault();
+        execute(idx);
+      }
+    };
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
+  }, [pendingLaunch, selectedIdx, allModels, pinnedModels.length, pinnedIds]);
+
+  if (!pendingLaunch) return null;
+
+  const toolLabel = tool === 'opencode' ? '⚡ OpenCode' : '🤖 GitHub Copilot';
+  const isLoading = loadingModels[tool];
+  const getShortcutLabel = (idx: number): string => `${(idx + 1) % 10}`;
+
+  return (
+    <div className="model-picker-overlay" onClick={() => setPendingLaunch(null)}>
+      <div className="model-picker-card" onClick={e => e.stopPropagation()}>
+        <div className="model-picker-header">
+          <div className="model-picker-title">{t('selectModelToLaunch')}</div>
+          <div className="model-picker-launch-name">{pendingLaunch.launch.name}</div>
+          <div className="model-picker-tool-badge">{toolLabel}</div>
+        </div>
+        <div className="model-picker-list" ref={listRef}>
+          {isLoading && <div className="model-picker-loading"><span className="model-picker-loading-dot" />{t('loadingModels')}</div>}
+          {allModels.length === 0 ? (
+            <div className="model-picker-loading">{t('loadingModels')}</div>
+          ) : (
+            <>
+              {pinnedModels.length > 0 && <div className="model-picker-section-header">{t('pinnedModelsTitle')}</div>}
+              {pinnedModels.map((m, idx) => (
+                <div
+                  key={`pinned-${m.id}`}
+                  data-model-index={idx}
+                  draggable
+                  className={
+                    'model-picker-item pinned' +
+                    (idx === selectedIdx ? ' selected' : '') +
+                    (dragPinnedIdx === idx ? ' dragging' : '') +
+                    (dropPinnedIdx === idx && dragPinnedIdx !== idx ? ' drop-target' : '')
+                  }
+                  onClick={() => execute(idx)}
+                  onMouseEnter={() => setSelectedIdx(idx)}
+                  onDragStart={(e) => {
+                    setDragPinnedIdx(idx);
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    setDropPinnedIdx(idx);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragPinnedIdx !== null) reorderPinned(dragPinnedIdx, idx);
+                    setDragPinnedIdx(null);
+                    setDropPinnedIdx(null);
+                  }}
+                  onDragEnd={() => {
+                    setDragPinnedIdx(null);
+                    setDropPinnedIdx(null);
+                  }}
+                >
+                  <span className="model-picker-drag-handle" title={t('dragHandleTitle')}>⠿</span>
+                  <span className="model-picker-item-dot" />
+                  <span className="model-picker-item-label">{m.label}</span>
+                  <span className="model-picker-shortcut">{getShortcutLabel(idx)}</span>
+                  <button
+                    className="model-picker-pin-btn pinned"
+                    onClick={e => { e.stopPropagation(); togglePin(m.id); }}
+                    title={t('unpinModel')}
+                  >📌</button>
+                </div>
+              ))}
+              {unpinnedModels.length > 0 && <div className="model-picker-section-header">{t('availableModelsTitle')}</div>}
+              {unpinnedModels.map((m, idx) => {
+                const absoluteIdx = pinnedModels.length + idx;
+                return (
+                  <div
+                    key={m.id}
+                    data-model-index={absoluteIdx}
+                    className={'model-picker-item' + (absoluteIdx === selectedIdx ? ' selected' : '')}
+                    onClick={() => execute(absoluteIdx)}
+                    onMouseEnter={() => setSelectedIdx(absoluteIdx)}
+                  >
+                    <span className="model-picker-item-dot" />
+                    <span className="model-picker-item-label">{m.label}</span>
+                    <button
+                      className="model-picker-pin-btn"
+                      onClick={e => { e.stopPropagation(); togglePin(m.id); }}
+                      title={t('pinModel')}
+                    >📍</button>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+        <div className="model-picker-hint">
+          {pinnedModels.length > 0 ? t('modelPickerHintPinned') : t('modelPickerHint')}
+        </div>
+      </div>
+    </div>
+  );
+}
