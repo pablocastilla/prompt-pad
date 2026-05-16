@@ -36,7 +36,7 @@ test.describe('Model picker behavior', () => {
     try {
       writeLaunches(testDir, 'opencode');
 
-      const app = await electron.launch({ args: [MAIN_JS] });
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
 
@@ -81,7 +81,7 @@ test.describe('Model picker behavior', () => {
     try {
       writeLaunches(testDir, 'copilot');
 
-      const app = await electron.launch({ args: [MAIN_JS] });
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
 

@@ -173,16 +173,8 @@ function atomicWrite(filePath: string, data: string) {
   fs.renameSync(tmp, filePath);
 }
 
-// Safe write that NEVER overwrites existing OneDrive files
+// Safe write that always writes to the correct location (OneDrive or local)
 function safeWrite(filePath: string, data: string) {
-  const odPath = detectOneDrivePath();
-  if (odPath && filePath.startsWith(odPath) && fs.existsSync(filePath)) {
-    // OneDrive file exists – do NOT overwrite. Save a local copy instead.
-    const localPath = path.join(APP_DIR, path.basename(filePath));
-    console.log(`[PromptPad] OneDrive file exists, skipping overwrite. Saving locally to ${localPath}`);
-    atomicWrite(localPath, data);
-    return;
-  }
   atomicWrite(filePath, data);
 }
 

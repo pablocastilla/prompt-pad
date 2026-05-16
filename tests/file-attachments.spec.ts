@@ -201,6 +201,8 @@ test.describe('File Attachment feature', () => {
         clipboard.writeImage(nativeImage.createFromDataURL(dataUrl));
       }, RED_PIXEL_PNG_DATA_URL);
 
+      await page.waitForTimeout(1000);
+
       const clipboardHasImage = await page.evaluate(() => {
         return (window as unknown as { electronAPI: { clipboardHasImage: () => boolean } })
           .electronAPI.clipboardHasImage();
