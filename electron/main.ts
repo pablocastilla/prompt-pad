@@ -188,19 +188,23 @@ let mainWindow: BrowserWindow | null = null;
 function getWindowIconPath(): string {
   if (process.platform === 'win32') {
     const devIco = path.join(__dirname, '../resources/icon.ico');
-    const packagedIco = path.join(process.resourcesPath, 'icon.ico');
-    if (app.isPackaged && fs.existsSync(packagedIco)) return packagedIco;
     if (fs.existsSync(devIco)) return devIco;
+    if (app.isPackaged) {
+      const packagedIco = path.join(process.resourcesPath, 'icon.ico');
+      if (fs.existsSync(packagedIco)) return packagedIco;
+    }
   }
   const devPng = path.join(__dirname, '../resources/icon.png');
-  const packagedPng = path.join(process.resourcesPath, 'icon.png');
-  if (app.isPackaged && fs.existsSync(packagedPng)) return packagedPng;
-  return devPng;
+  if (fs.existsSync(devPng)) return devPng;
+  if (app.isPackaged) {
+    const packagedPng = path.join(process.resourcesPath, 'icon.png');
+    if (fs.existsSync(packagedPng)) return packagedPng;
+  }
+  return '';
 }
 
-const iconPath = getWindowIconPath();
-
 function createWindow() {
+  const iconPath = getWindowIconPath();
   mainWindow = new BrowserWindow({
     width: 1200, height: 800, minWidth: 700, minHeight: 500,
     title: '',

@@ -47,6 +47,7 @@ A native desktop app (Electron + React) for writing, organising, and firing AI p
 - **Search**: filter phrases by name or content with the search bar.
 
 ### Launch Configurations
+- **One launcher per folder + CLI**: the idea is simple — create one launch config for each project folder and each AI tool you use. Working on `my-react-app` with Copilot? One launcher. Same folder but want to try OpenCode? Another launcher. Different project? Yet another. It's like git worktrees, but for people who find worktrees confusing (which is to say, most of us). Instead of juggling terminal tabs, `cd`-ing to the right directory, remembering which flags to pass, and then forgetting which model you were using — you just click 🚀. Your future self, drowning in `cd ../../oops-wrong-dir`, will thank you.
 - **Pre-configured runs**: each config stores a name, working folder, `--yolo` flag, tool (Copilot CLI or OpenCode), and interactive / non-interactive mode.
 - **Model chosen at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **model picker** appears — navigate with `↑ ↓`, confirm with `Enter`, cancel with `Esc`.
 - **Drag-to-reorder**: drag the ⠿ handle to reprioritise configs. The `Ctrl+Shift+N` shortcuts follow the list order and are auto-saved.
