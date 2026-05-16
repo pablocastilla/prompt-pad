@@ -262,6 +262,61 @@ html, body, #root {
 }
 .tab-add:hover { background: var(--chrome-a); color: var(--chrome-t); }
 
+/* ── TAB CONTEXT MENU ──────────────────────────── */
+
+.tab-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 220px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  animation: context-menu-in .12s ease-out;
+}
+
+@keyframes context-menu-in {
+  from { opacity: 0; transform: scale(.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.tab-context-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .1s, color .1s;
+}
+
+.tab-context-item:hover:not(.disabled) {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.tab-context-item.disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.tab-context-item.danger:hover {
+  background: rgba(239, 68, 68, .12);
+  color: var(--danger);
+}
+
+.tab-context-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 8px;
+}
+
 .header-actions {
   display: flex; align-items: center; gap: 2px;
   padding: 0 10px; flex-shrink: 0;

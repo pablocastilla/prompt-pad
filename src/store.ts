@@ -15,6 +15,10 @@ interface AppState {
   activeTabId: string;
   addTab: () => void;
   closeTab: (id: string) => void;
+  closeTabsLeft: (id: string) => void;
+  closeTabsRight: (id: string) => void;
+  closeAllTabs: (id: string) => void;
+  closeOtherTabs: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabContent: (id: string, content: string) => void;
   markTabSaved: (id: string, path: string | null, title: string) => void;
@@ -65,6 +69,31 @@ export const useStore = create<AppState>((set, get) => ({
     const idx = tabs.findIndex(t => t.id === id);
     const next = tabs.filter(t => t.id !== id);
     set({ tabs: next, activeTabId: activeTabId === id ? next[Math.min(idx, next.length - 1)].id : activeTabId });
+  },
+  closeTabsLeft: (id) => {
+    const { tabs, activeTabId } = get();
+    const idx = tabs.findIndex(t => t.id === id);
+    if (idx <= 0) return;
+    const keep = tabs.slice(idx);
+    set({ tabs: keep, activeTabId: id });
+  },
+  closeTabsRight: (id) => {
+    const { tabs, activeTabId } = get();
+    const idx = tabs.findIndex(t => t.id === id);
+    if (idx >= tabs.length - 1) return;
+    const keep = tabs.slice(0, idx + 1);
+    set({ tabs: keep, activeTabId: activeTabId === id || idx < tabs.findIndex(t => t.id === activeTabId) ? id : activeTabId });
+  },
+  closeAllTabs: (id) => {
+    const { tabs } = get();
+    const keep = tabs.filter(t => t.id === id);
+    set({ tabs: keep.length > 0 ? keep : [createTab()], activeTabId: id });
+  },
+  closeOtherTabs: (id) => {
+    const { tabs } = get();
+    const keep = tabs.filter(t => t.id === id);
+    if (keep.length === 0) return;
+    set({ tabs: keep, activeTabId: id });
   },
   setActiveTab: (id) => set({ activeTabId: id }),
   updateTabContent: (id, content) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, content, dirty: true } : t) })),

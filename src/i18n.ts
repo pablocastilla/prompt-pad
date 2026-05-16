@@ -46,6 +46,11 @@ const translations = {
     gaudyAttach: '📎 FILE JACKED INTO THE GRID',
     checkForUpdates: 'Check for updates',
     checkingUpdates: 'Checking…',
+    closeTab: 'Close',
+    closeTabsLeft: 'Close tabs to the left',
+    closeTabsRight: 'Close tabs to the right',
+    closeAllTabs: 'Close all tabs',
+    closeOtherTabs: 'Close other tabs',
   },
   es: {
     launch: 'Lanzar', selectLaunch: 'Seleccionar lanzamiento…', noLaunches: 'Sin configuraciones aún.',
@@ -94,6 +99,11 @@ const translations = {
     gaudyAttach: '📎 ARCHIVO CONECTADO AL GRID',
     checkForUpdates: 'Buscar actualizaciones',
     checkingUpdates: 'Buscando…',
+    closeTab: 'Cerrar pestaña',
+    closeTabsLeft: 'Cerrar pestañas a la izquierda',
+    closeTabsRight: 'Cerrar pestañas a la derecha',
+    closeAllTabs: 'Cerrar todas las pestañas',
+    closeOtherTabs: 'Cerrar las demás pestañas',
   },
 } as const;
 

@@ -1,4 +1,4 @@
-﻿import { app, BrowserWindow, ipcMain, dialog, Menu, clipboard } from 'electron';
+﻿import { app, BrowserWindow, ipcMain, dialog, Menu, clipboard, nativeImage } from 'electron';
 import { setupAutoUpdater, registerUpdateIPC } from './updater';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -205,17 +205,24 @@ function getWindowIconPath(): string {
 
 function createWindow() {
   const iconPath = getWindowIconPath();
-  mainWindow = new BrowserWindow({
+  const winOptions: Electron.BrowserWindowConstructorOptions = {
     width: 1200, height: 800, minWidth: 700, minHeight: 500,
     title: '',
-    icon: iconPath,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
-  });
+  };
+  if (iconPath) {
+    if (process.platform === 'win32') {
+      winOptions.icon = nativeImage.createFromPath(iconPath);
+    } else {
+      winOptions.icon = iconPath;
+    }
+  }
+  mainWindow = new BrowserWindow(winOptions);
   mainWindow.setMenuBarVisibility(false);
   mainWindow.removeMenu();
   mainWindow.on('page-title-updated', (e) => { e.preventDefault(); mainWindow?.setTitle(''); });
