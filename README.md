@@ -121,9 +121,24 @@ The phrases you set up once pay dividends forever. It's like having a macro keyb
 
 ### Themes
 
-| Dark | Cyberpunk | Gaudy |
+| Light | Dark | Cyberpunk |
 |---|---|---|
-| ![Dark theme](docs/screenshots/05-dark-theme.png) | ![Cyberpunk theme](docs/screenshots/06-cyberpunk.png) | 💥 Burst particles on every keystroke |
+| ![Light theme](docs/screenshots/01-editor-light.png) | ![Dark theme](docs/screenshots/05-dark-theme.png) | ![Cyberpunk theme](docs/screenshots/06-cyberpunk.png) |
+
+### Gaudy Theme — The Extra One
+
+The Gaudy theme is best experienced live. It features:
+- **Burst particles** on every keystroke — colours explode from your cursor
+- **Converging particles** when you delete text — particles rush back to the deletion point
+- **Floating background particles** — ambient ambient ambient
+- **Scanline overlay** — CRT monitor vibes
+- **Typing glow effect** — your text pulses with energy
+- **Pulsing fire button** — the launch button breathes with intensity
+- **Themed toast notifications** — even your toasts are extra
+
+![Gaudy theme](docs/screenshots/07-gaudy.png)
+
+*Screenshot doesn't do it justice — you need to see the particles in motion!*
 
 ---
 
@@ -153,18 +168,10 @@ The phrases you set up once pay dividends forever. It's like having a macro keyb
 ### Model Picker
 - **Dynamic model lists**: fetches available models from both Copilot CLI (`copilot help config`) and OpenCode (`opencode models`) at runtime.
 - **Dual tool support**: automatically shows the correct model list based on whether the launch config uses Copilot or OpenCode.
-- **Pinned models**: pin your most-used models to the top for instant keyboard access (`Ctrl+1-0` to pin/unpin, `1-0` to launch pinned).
-- **Drag-to-reorder pinned**: reorder pinned models by dragging.
-
-### Themes
-Four themes controlled by `data-theme` on `<html>`: `light`, `dark`, `gaudy`, `cyberpunk`.
-
-| Theme | Description |
-|---|---|
-| **Light** | Clean, minimal white editor |
-| **Dark** | Pure black OLED-friendly |
-| **Gaudy** | Deep purple/magenta with gold accents. Burst particles on typing, converging particles on deletion, floating background particles, scanline overlay, typing glow effect, pulsing fire button, and themed toast notifications |
-| **Cyberpunk** | Neon cyan/pink grid, glowing accents |
+- **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
+- **Pin favourite models**: press `Ctrl+1` through `Ctrl+0` while hovering a model to pin it to the top. Pinned models appear first and can be launched instantly with `1` through `0`. Press the same shortcut again to unpin.
+- **Drag-to-reorder pinned**: drag the  handle on pinned models to reorder them.
+- **CLI sync**: pinned models are saved to `settings.json` and sync via OneDrive when enabled. The model list is always fresh from the CLI — pins just give you quick access to your favourites.
 
 ### Settings
 - **Language**: auto-detect (from system locale), English, or Spanish.

@@ -22,6 +22,7 @@ export function ModelPicker() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [dragPinnedIdx, setDragPinnedIdx] = useState<number | null>(null);
   const [dropPinnedIdx, setDropPinnedIdx] = useState<number | null>(null);
+  const userScrolledRef = useRef(false);
 
   const tool: LaunchTool = pendingLaunch?.launch.tool ?? 'copilot';
   const fallbackModels = modelsForTool(tool);
@@ -119,14 +120,13 @@ export function ModelPicker() {
     }
   }, [pendingLaunch?.launch.id, tool, allModels.length]);
 
+  // Never auto-scroll; keep list at top. User scrolls manually if needed.
   useEffect(() => {
     if (!pendingLaunch) return;
     const listEl = listRef.current;
     if (!listEl) return;
-    const selected = listEl.querySelector<HTMLElement>(`[data-model-index="${selectedIdx}"]`);
-    if (!selected) return;
-    selected.scrollIntoView({ block: 'nearest' });
-  }, [pendingLaunch, selectedIdx, allModels.length, tool]);
+    listEl.scrollTop = 0;
+  }, [pendingLaunch, allModels.length, tool]);
 
   const execute = async (idx: number) => {
     if (!pendingLaunch) return;

@@ -57,6 +57,7 @@ function detectOneDrivePath(): string | null {
 let useOneDrive = true;
 
 function getSyncDir(): string {
+  if (!useOneDrive) return APP_DIR;
   const odPath = detectOneDrivePath();
   if (odPath) {
     if (!fs.existsSync(odPath)) fs.mkdirSync(odPath, { recursive: true });
@@ -170,6 +171,19 @@ function atomicWrite(filePath: string, data: string) {
   fs.renameSync(tmp, filePath);
 }
 
+// Safe write that NEVER overwrites existing OneDrive files
+function safeWrite(filePath: string, data: string) {
+  const odPath = detectOneDrivePath();
+  if (odPath && filePath.startsWith(odPath) && fs.existsSync(filePath)) {
+    // OneDrive file exists – do NOT overwrite. Save a local copy instead.
+    const localPath = path.join(APP_DIR, path.basename(filePath));
+    console.log(`[PromptPad] OneDrive file exists, skipping overwrite. Saving locally to ${localPath}`);
+    atomicWrite(localPath, data);
+    return;
+  }
+  atomicWrite(filePath, data);
+}
+
 function readJson<T>(filePath: string, fallback: T): T {
   try { return JSON.parse(fs.readFileSync(filePath, 'utf-8')); }
   catch { return fallback; }
@@ -260,7 +274,7 @@ ipcMain.handle('settings:load', () => {
 ipcMain.handle('settings:save', (_e, s: Record<string, unknown>) => {
   const persisted = { ...s, useOneDrive: detectOneDrivePath() ? true : s.useOneDrive === true };
   useOneDrive = persisted.useOneDrive === true;
-  atomicWrite(getSettingsPath(), JSON.stringify(persisted, null, 2));
+  safeWrite(getSettingsPath(), JSON.stringify(persisted, null, 2));
 });
 
 // Phrases
@@ -274,7 +288,7 @@ ipcMain.handle('phrases:load', () => {
   return readJson(primary, []);
 });
 ipcMain.handle('phrases:save', (_e, p: unknown[]) => {
-  atomicWrite(path.join(getSyncDir(), 'phrases.json'), JSON.stringify(p, null, 2));
+  safeWrite(path.join(getSyncDir(), 'phrases.json'), JSON.stringify(p, null, 2));
 });
 
 // Launches
@@ -288,7 +302,7 @@ ipcMain.handle('launches:load', () => {
 });
 ipcMain.handle('launches:save', (_e, l: unknown[]) => {
   const sanitized = sanitizeLaunches(Array.isArray(l) ? l : []);
-  atomicWrite(path.join(getSyncDir(), 'launches.json'), JSON.stringify(sanitized, null, 2));
+  safeWrite(path.join(getSyncDir(), 'launches.json'), JSON.stringify(sanitized, null, 2));
 });
 
 // Session – persists open tabs across restarts

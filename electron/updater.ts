@@ -21,6 +21,21 @@ export function setupAutoUpdater(mainWindow: Electron.BrowserWindow | null) {
   });
   autoUpdater.on('error', (err) => {
     log.error('Error in auto-updater.', err);
+    // Show user-friendly error for common issues
+    let detail = 'Please try again later.';
+    const msg = err?.message?.toLowerCase() ?? '';
+    if (msg.includes('404') || msg.includes('not found')) {
+      detail = 'This version has not been released yet. You are running the latest available version.';
+    } else if (msg.includes('net::') || msg.includes('network') || msg.includes('fetch')) {
+      detail = 'A network error occurred. Check your internet connection and try again.';
+    } else if (msg.includes('permission') || msg.includes('access')) {
+      detail = 'Permission denied. Try running the app as administrator.';
+    } else if (msg.includes('certificate') || msg.includes('ssl') || msg.includes('tls')) {
+      detail = 'A security certificate error occurred. Check your network configuration.';
+    }
+    if (mainWindow) {
+      mainWindow.webContents.send('update:error', { message: err.message, detail });
+    }
   });
   autoUpdater.on('download-progress', (progressObj) => {
     log.info('Download progress...', progressObj.percent.toFixed(1) + '%');
@@ -74,11 +89,22 @@ export function checkForUpdatesManually(mainWindow: Electron.BrowserWindow | nul
   });
   autoUpdater.once('error', (err) => {
     log.error('Manual update check failed.', err);
+    let detail = 'Please try again later.';
+    const msg = err?.message?.toLowerCase() ?? '';
+    if (msg.includes('404') || msg.includes('not found')) {
+      detail = 'This version has not been released yet. You are running the latest available version.';
+    } else if (msg.includes('net::') || msg.includes('network') || msg.includes('fetch')) {
+      detail = 'A network error occurred. Check your internet connection.';
+    } else if (msg.includes('permission') || msg.includes('access')) {
+      detail = 'Permission denied. Try running as administrator.';
+    } else if (msg.includes('certificate') || msg.includes('ssl')) {
+      detail = 'Certificate error. Check your network configuration.';
+    }
     dialog.showMessageBox(mainWindow ?? BrowserWindow.getFocusedWindow() ?? undefined as any, {
       type: 'error',
       title: 'Update Check Failed',
-      message: 'Could not check for updates. Please try again later.',
-      detail: err.message,
+      message: 'Could not check for updates.',
+      detail: `${err.message}\n\n${detail}`,
     });
   });
   void autoUpdater.checkForUpdatesAndNotify();
