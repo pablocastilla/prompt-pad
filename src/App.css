@@ -1523,6 +1523,182 @@ html, body, #root {
   100% { transform: rotate(-1.5deg) scale(1); }
 }
 
+/* ── MODEL PICKER CONFIRMATION ──────────────────── */
+
+.model-picker-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  animation: model-picker-fade-in .12s ease-out;
+}
+
+.model-picker-confirm-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 20px 16px;
+  width: 260px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  animation: model-picker-slide-in .18s cubic-bezier(.34,1.56,.64,1);
+}
+
+.model-picker-confirm-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.model-picker-confirm-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.model-picker-confirm-model {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  margin-bottom: 16px;
+  padding: 4px 12px;
+  background: var(--accent-dim);
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.model-picker-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.model-picker-confirm-btn {
+  padding: 7px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.model-picker-confirm-cancel {
+  background: var(--btn-bg);
+  color: var(--text2);
+}
+
+.model-picker-confirm-cancel:hover {
+  background: var(--btn-h);
+  color: var(--text);
+}
+
+.model-picker-confirm-launch {
+  background: var(--danger);
+  color: #fff;
+  border-color: transparent;
+}
+
+.model-picker-confirm-launch:hover {
+  opacity: .85;
+}
+
+/* ── GAUDY CONFIRMATION ─────────────────────────── */
+
+[data-theme="gaudy"] .model-picker-confirm-overlay {
+  background: rgba(20, 4, 24, .7);
+  backdrop-filter: blur(2px);
+}
+
+[data-theme="gaudy"] .model-picker-confirm-card {
+  background: linear-gradient(135deg, #2c0835, #5d1461 55%, #3b132c);
+  border-color: rgba(255, 120, 200, .35);
+  box-shadow: 0 0 24px rgba(255, 80, 80, .2), 0 0 40px rgba(255, 120, 200, .12);
+}
+
+[data-theme="gaudy"] .model-picker-confirm-icon {
+  text-shadow: 0 0 14px rgba(255, 226, 138, .5);
+}
+
+[data-theme="gaudy"] .model-picker-confirm-text {
+  color: #fff4d2;
+  text-shadow: 0 0 8px rgba(255, 226, 138, .18);
+}
+
+[data-theme="gaudy"] .model-picker-confirm-model {
+  color: #ffe28a;
+  background: rgba(255, 120, 200, .14);
+  border: 1px solid rgba(255, 196, 228, .16);
+  text-shadow: 0 0 6px rgba(255, 226, 138, .15);
+}
+
+[data-theme="gaudy"] .model-picker-confirm-cancel {
+  background: rgba(255, 255, 255, .06);
+  color: #ffd2ec;
+  border-color: rgba(255, 196, 228, .18);
+}
+
+[data-theme="gaudy"] .model-picker-confirm-cancel:hover {
+  background: rgba(255, 120, 200, .14);
+  color: #fff4d2;
+}
+
+[data-theme="gaudy"] .model-picker-confirm-launch {
+  background: linear-gradient(135deg, #ff597d, #ff78c8 55%, #ffe28a);
+  color: #3b132c;
+  border: 1px solid rgba(255, 226, 138, .28);
+  box-shadow: 0 0 16px rgba(255, 89, 125, .2);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+[data-theme="gaudy"] .model-picker-confirm-launch:hover {
+  opacity: unset;
+  background: linear-gradient(135deg, #ff7a99, #ffa0db 55%, #ffedb0);
+  box-shadow: 0 0 22px rgba(255, 89, 125, .3);
+}
+
+/* ── CYBERPUNK CONFIRMATION ─────────────────────── */
+
+[data-theme="cyberpunk"] .model-picker-confirm-overlay {
+  background: rgba(6, 9, 19, .7);
+  backdrop-filter: blur(2px);
+}
+
+[data-theme="cyberpunk"] .model-picker-confirm-card {
+  background: linear-gradient(135deg, #060913, #101a2e);
+  border-color: rgba(255, 79, 216, .3);
+  box-shadow: 0 0 20px rgba(255, 79, 216, .12), 0 0 36px rgba(71, 233, 255, .06);
+}
+
+[data-theme="cyberpunk"] .model-picker-confirm-text {
+  color: #dff8ff;
+}
+
+[data-theme="cyberpunk"] .model-picker-confirm-model {
+  color: #ff4fd8;
+  background: rgba(255, 79, 216, .08);
+  border: 1px solid rgba(255, 79, 216, .16);
+}
+
+[data-theme="cyberpunk"] .model-picker-confirm-launch {
+  background: linear-gradient(135deg, #ff4d8f, #ff4fd8 55%, #47e9ff);
+  color: #041019;
+  border: 1px solid rgba(255, 79, 216, .18);
+  box-shadow: 0 0 16px rgba(255, 77, 143, .18);
+}
+
+[data-theme="cyberpunk"] .model-picker-confirm-launch:hover {
+  opacity: unset;
+  box-shadow: 0 0 24px rgba(255, 77, 143, .25);
+}
+
 /* ── GAUDY DELETE ANIMATION ──────────────────────── */
 [data-theme="gaudy"] .editor.deleting {
   box-shadow: inset 0 0 0 1px rgba(255, 80, 80, .1), 0 0 12px rgba(255, 80, 80, .07);

@@ -60,85 +60,165 @@ export interface ModelOption {
   label: string;
 }
 
-export const MODEL_COST_MAP: Record<string, ModelCostInfo> = {
-  // ── Zen free models ──
-  'opencode/big-pickle':              { tier: 'free', tooltip: 'Free (all costs $0)' },
-  'opencode/deepseek-v4-flash-free':  { tier: 'free', tooltip: 'Free (all costs $0)' },
-  'opencode/minimax-m2.5-free':       { tier: 'free', tooltip: 'Free (all costs $0)' },
-  'opencode/nemotron-3-super-free':   { tier: 'free', tooltip: 'Free (all costs $0)' },
-
-  // ── Zen tier 1 (output ≤ $2/1M) ──
-  'opencode/gpt-5-nano':              { tier: 1, tooltip: '$0.05 in · $0.40 out / 1M tokens' },
-  'opencode/qwen3.5-plus':            { tier: 1, tooltip: '$0.20 in · $1.20 out / 1M tokens' },
-  'opencode/gpt-5.4-nano':            { tier: 1, tooltip: '$0.20 in · $1.25 out / 1M tokens' },
-  'opencode/gpt-5.1-codex-mini':      { tier: 1, tooltip: '$0.25 in · $2.00 out / 1M tokens' },
-  'opencode/minimax-m2.7':            { tier: 1, tooltip: '$0.30 in · $1.20 out / 1M tokens' },
-  'opencode/minimax-m2.5':            { tier: 1, tooltip: '$0.30 in · $1.20 out / 1M tokens' },
-
-  // ── Zen tier 2 (output $2.01–$5/1M) ──
-  'opencode/gemini-3-flash':          { tier: 2, tooltip: '$0.50 in · $3.00 out / 1M tokens' },
-  'opencode/qwen3.6-plus':            { tier: 2, tooltip: '$0.50 in · $3.00 out / 1M tokens' },
-  'opencode/kimi-k2.5':               { tier: 2, tooltip: '$0.60 in · $3.00 out / 1M tokens' },
-  'opencode/gpt-5.4-mini':            { tier: 2, tooltip: '$0.75 in · $4.50 out / 1M tokens' },
-  'opencode/kimi-k2.6':               { tier: 2, tooltip: '$0.95 in · $4.00 out / 1M tokens' },
-  'opencode/glm-5':                   { tier: 2, tooltip: '$1.00 in · $3.20 out / 1M tokens' },
-  'opencode/claude-haiku-4-5':        { tier: 2, tooltip: '$1.00 in · $5.00 out / 1M tokens' },
-
-  // ── Zen tier 3 (output $5.01–$15/1M) ──
-  'opencode/gpt-5':                   { tier: 3, tooltip: '$1.07 in · $8.50 out / 1M tokens' },
-  'opencode/gpt-5-codex':             { tier: 3, tooltip: '$1.07 in · $8.50 out / 1M tokens' },
-  'opencode/gpt-5.1':                 { tier: 3, tooltip: '$1.07 in · $8.50 out / 1M tokens' },
-  'opencode/gpt-5.1-codex':           { tier: 3, tooltip: '$1.07 in · $8.50 out / 1M tokens' },
-  'opencode/gpt-5.1-codex-max':       { tier: 3, tooltip: '$1.25 in · $10.00 out / 1M tokens' },
-  'opencode/glm-5.1':                 { tier: 3, tooltip: '$1.40 in · $4.40 out / 1M tokens' },
-  'opencode/gpt-5.3-codex':           { tier: 3, tooltip: '$1.75 in · $14.00 out / 1M tokens' },
-  'opencode/gpt-5.3-codex-spark':     { tier: 3, tooltip: '$1.75 in · $14.00 out / 1M tokens' },
-  'opencode/gpt-5.2':                 { tier: 3, tooltip: '$1.75 in · $14.00 out / 1M tokens' },
-  'opencode/gpt-5.2-codex':           { tier: 3, tooltip: '$1.75 in · $14.00 out / 1M tokens' },
-  'opencode/gemini-3.1-pro':          { tier: 3, tooltip: '$2.00 in · $12.00 out / 1M tokens (≤200K)' },
-  'opencode/gpt-5.4':                 { tier: 3, tooltip: '$2.50 in · $15.00 out / 1M tokens (≤272K)' },
-  'opencode/claude-sonnet-4.6':       { tier: 3, tooltip: '$3.00 in · $15.00 out / 1M tokens' },
-  'opencode/claude-sonnet-4-5':       { tier: 3, tooltip: '$3.00 in · $15.00 out / 1M tokens (≤200K)' },
-  'opencode/claude-sonnet-4':         { tier: 3, tooltip: '$3.00 in · $15.00 out / 1M tokens (≤200K)' },
-
-  // ── Zen tier 4 (output $15.01–$50/1M) ──
-  'opencode/gpt-5.5':                 { tier: 4, tooltip: '$5.00 in · $30.00 out / 1M tokens (≤272K)' },
-  'opencode/claude-opus-4.7':         { tier: 4, tooltip: '$5.00 in · $25.00 out / 1M tokens' },
-  'opencode/claude-opus-4-6':         { tier: 4, tooltip: '$5.00 in · $25.00 out / 1M tokens' },
-  'opencode/claude-opus-4-5':         { tier: 4, tooltip: '$5.00 in · $25.00 out / 1M tokens' },
-  'opencode/claude-opus-4-1':         { tier: 4, tooltip: '$15.00 in · $75.00 out / 1M tokens' },
-
-  // ── Zen tier 5 (output > $50/1M) ──
-  'opencode/gpt-5.5-pro':             { tier: 5, tooltip: '$30.00 in · $180.00 out / 1M tokens' },
-  'opencode/gpt-5.4-pro':             { tier: 5, tooltip: '$30.00 in · $180.00 out / 1M tokens' },
-
-  // ── Go models (tier based on requests per 5h: higher = cheaper) ──
-  'opencode-go/deepseek-v4-flash':    { tier: 1, tooltip: '31,650 req/5h — cheapest Go model' },
-  'opencode-go/qwen3.5-plus':         { tier: 1, tooltip: '10,200 req/5h' },
-  'opencode-go/minimax-m2.5':         { tier: 1, tooltip: '6,300 req/5h' },
-  'opencode-go/minimax-m2.7':         { tier: 2, tooltip: '3,400 req/5h' },
-  'opencode-go/deepseek-v4-pro':      { tier: 2, tooltip: '3,450 req/5h' },
-  'opencode-go/qwen3.6-plus':         { tier: 2, tooltip: '3,300 req/5h' },
-  'opencode-go/mimo-v2.5':            { tier: 2, tooltip: '2,150 req/5h' },
-  'opencode-go/kimi-k2.5':            { tier: 3, tooltip: '1,850 req/5h' },
-  'opencode-go/mimo-v2.5-pro':        { tier: 3, tooltip: '1,290 req/5h' },
-  'opencode-go/glm-5':                { tier: 3, tooltip: '1,150 req/5h' },
-  'opencode-go/kimi-k2.6':            { tier: 3, tooltip: '1,150 req/5h' },
-  'opencode-go/glm-5.1':              { tier: 4, tooltip: '880 req/5h — most expensive Go model' },
-
-  // ── Copilot models ──
-  'auto':                                { tier: 3, tooltip: 'Auto-selects best model for task' },
-  'claude-sonnet-4.6':                   { tier: 3, tooltip: 'Copilot model — balanced speed/quality' },
-  'gpt-4.5':                             { tier: 4, tooltip: 'Copilot model — high quality' },
-};
-
-export function getModelCostInfo(modelId: string): ModelCostInfo | undefined {
-  return MODEL_COST_MAP[modelId];
+// ── Exact pricing data per model (per 1M tokens) ──
+interface ZenPricing {
+  input: string;
+  output: string;
+  cachedRead: string;
+  cachedWrite?: string;
 }
 
-export interface PinnedModel {
-  modelId: string;
-  order: number;
+interface GoPricing {
+  per5Hour: string;
+  perWeek: string;
+  perMonth: string;
+}
+
+const ZEN_PRICING: Record<string, ZenPricing> = {
+  'gpt-5.5':         { input: '$5.00',   output: '$30.00',  cachedRead: '$0.50' },
+  'gpt-5.5-pro':     { input: '$30.00',  output: '$180.00', cachedRead: '$30.00' },
+  'gpt-5.4':         { input: '$2.50',   output: '$15.00',  cachedRead: '$0.25' },
+  'gpt-5.4-pro':     { input: '$30.00',  output: '$180.00', cachedRead: '$30.00' },
+  'gpt-5.4-mini':    { input: '$0.75',   output: '$4.50',   cachedRead: '$0.075' },
+  'gpt-5.4-nano':    { input: '$0.20',   output: '$1.25',   cachedRead: '$0.02' },
+  'gpt-5.3-codex':   { input: '$1.75',   output: '$14.00',  cachedRead: '$0.175' },
+  'gpt-5.3-codex-spark': { input: '$1.75', output: '$14.00', cachedRead: '$0.175' },
+  'gpt-5.2':         { input: '$1.75',   output: '$14.00',  cachedRead: '$0.175' },
+  'gpt-5.2-codex':   { input: '$1.75',   output: '$14.00',  cachedRead: '$0.175' },
+  'gpt-5.1':         { input: '$1.07',   output: '$8.50',   cachedRead: '$0.107' },
+  'gpt-5.1-codex':   { input: '$1.07',   output: '$8.50',   cachedRead: '$0.107' },
+  'gpt-5.1-codex-max': { input: '$1.25', output: '$10.00',  cachedRead: '$0.125' },
+  'gpt-5.1-codex-mini': { input: '$0.25', output: '$2.00',  cachedRead: '$0.025' },
+  'gpt-5':           { input: '$1.07',   output: '$8.50',   cachedRead: '$0.107' },
+  'gpt-5-codex':     { input: '$1.07',   output: '$8.50',   cachedRead: '$0.107' },
+  'gpt-5-nano':      { input: '$0.05',   output: '$0.40',   cachedRead: '$0.005' },
+  'claude-opus-4-7': { input: '$5.00',   output: '$25.00',  cachedRead: '$0.50',  cachedWrite: '$6.25' },
+  'claude-opus-4-6': { input: '$5.00',   output: '$25.00',  cachedRead: '$0.50',  cachedWrite: '$6.25' },
+  'claude-opus-4-5': { input: '$5.00',   output: '$25.00',  cachedRead: '$0.50',  cachedWrite: '$6.25' },
+  'claude-opus-4-1': { input: '$15.00',  output: '$75.00',  cachedRead: '$1.50',  cachedWrite: '$18.75' },
+  'claude-sonnet-4-6': { input: '$3.00', output: '$15.00',  cachedRead: '$0.30',  cachedWrite: '$3.75' },
+  'claude-sonnet-4-5': { input: '$3.00', output: '$15.00',  cachedRead: '$0.30',  cachedWrite: '$3.75' },
+  'claude-sonnet-4':  { input: '$3.00',  output: '$15.00',  cachedRead: '$0.30',  cachedWrite: '$3.75' },
+  'claude-haiku-4-5': { input: '$1.00',  output: '$5.00',   cachedRead: '$0.10',  cachedWrite: '$1.25' },
+  'gemini-3.1-pro':  { input: '$2.00',   output: '$12.00',  cachedRead: '$0.20' },
+  'gemini-3-flash':  { input: '$0.50',   output: '$3.00',   cachedRead: '$0.05' },
+  'qwen3.6-plus':    { input: '$0.50',   output: '$3.00',   cachedRead: '$0.05',  cachedWrite: '$0.625' },
+  'qwen3.5-plus':    { input: '$0.20',   output: '$1.20',   cachedRead: '$0.02',  cachedWrite: '$0.25' },
+  'minimax-m2.7':    { input: '$0.30',   output: '$1.20',   cachedRead: '$0.06',  cachedWrite: '$0.375' },
+  'minimax-m2.5':    { input: '$0.30',   output: '$1.20',   cachedRead: '$0.06',  cachedWrite: '$0.375' },
+  'glm-5.1':         { input: '$1.40',   output: '$4.40',   cachedRead: '$0.26' },
+  'glm-5':           { input: '$1.00',   output: '$3.20',   cachedRead: '$0.20' },
+  'kimi-k2.5':       { input: '$0.60',   output: '$3.00',   cachedRead: '$0.10' },
+  'kimi-k2.6':       { input: '$0.95',   output: '$4.00',   cachedRead: '$0.16' },
+};
+
+const GO_PRICING: Record<string, GoPricing> = {
+  'glm-5.1':          { per5Hour: '880',  perWeek: '2,150',  perMonth: '4,300' },
+  'glm-5':            { per5Hour: '1,150', perWeek: '2,880', perMonth: '5,750' },
+  'kimi-k2.5':        { per5Hour: '1,850', perWeek: '4,630', perMonth: '9,250' },
+  'kimi-k2.6':        { per5Hour: '1,150', perWeek: '2,880', perMonth: '5,750' },
+  'mimo-v2.5':        { per5Hour: '2,150', perWeek: '5,450', perMonth: '10,900' },
+  'mimo-v2.5-pro':    { per5Hour: '1,290', perWeek: '3,225', perMonth: '6,450' },
+  'minimax-m2.7':     { per5Hour: '3,400', perWeek: '8,500', perMonth: '17,000' },
+  'minimax-m2.5':     { per5Hour: '6,300', perWeek: '15,900', perMonth: '31,800' },
+  'qwen3.6-plus':     { per5Hour: '3,300', perWeek: '8,200', perMonth: '16,300' },
+  'qwen3.5-plus':     { per5Hour: '10,200', perWeek: '25,200', perMonth: '50,500' },
+  'deepseek-v4-pro':  { per5Hour: '3,450', perWeek: '8,550', perMonth: '17,150' },
+  'deepseek-v4-flash': { per5Hour: '31,650', perWeek: '79,050', perMonth: '158,150' },
+};
+
+function findZenPrice(id: string): ZenPricing | undefined {
+  const parts = id.replace(/^opencode\//, '').replace(/-/g, '-');
+  const keys = Object.keys(ZEN_PRICING);
+  for (const key of keys) {
+    if (parts.includes(key) || key.includes(parts) || id.includes(key)) {
+      return ZEN_PRICING[key];
+    }
+  }
+  return undefined;
+}
+
+function findGoPrice(id: string): GoPricing | undefined {
+  const parts = id.replace(/^opencode-go\//, '').replace(/-/g, '-');
+  const keys = Object.keys(GO_PRICING);
+  for (const key of keys) {
+    if (parts.includes(key) || key.includes(parts) || id.includes(key)) {
+      return GO_PRICING[key];
+    }
+  }
+  return undefined;
+}
+
+type TooltipFn = (id: string) => string;
+
+const tierTooltips: Record<string, TooltipFn> = {
+  free: () => 'Free — no usage cost',
+  '1':   (id: string) => buildPricingTooltip(id, 'Lowest cost'),
+  '2':   (id: string) => buildPricingTooltip(id, 'Very low cost'),
+  '3':   (id: string) => buildPricingTooltip(id, 'Mid cost'),
+  '4':   (id: string) => buildPricingTooltip(id, 'High cost'),
+  '5':   (id: string) => buildPricingTooltip(id, 'Highest cost'),
+};
+
+function buildPricingTooltip(id: string, label: string): string {
+  const zen = findZenPrice(id);
+  const go = findGoPrice(id);
+  if (!zen && !go) return label;
+  const lines: string[] = [label];
+  if (zen) {
+    lines.push(`Input: ${zen.input}/M • Output: ${zen.output}/M • Cached: ${zen.cachedRead}/M`);
+    if (zen.cachedWrite) lines.push(`Cached write: ${zen.cachedWrite}/M`);
+  }
+  if (go) {
+    lines.push(`Go: ${go.per5Hour} req/5h • ${go.perWeek} req/wk • ${go.perMonth} req/mo`);
+  }
+  return lines.join('\n');
+}
+
+export function getModelCostInfo(modelId: string): ModelCostInfo | undefined {
+  if (!modelId) return;
+  const id = modelId.toLowerCase();
+
+  // Free models
+  if (/\bfree\b/.test(id) || /big-pickle/.test(id))
+    return { tier: 'free', tooltip: tierTooltips.free(id) };
+
+  // Zen models (opencode/*)
+  if (id.startsWith('opencode/')) {
+    if (/nano/.test(id))      return { tier: 1, tooltip: tierTooltips['1'](id) };
+    if (/mini/.test(id))      return { tier: 2, tooltip: tierTooltips['2'](id) };
+    if (/haiku/.test(id))     return { tier: 2, tooltip: tierTooltips['2'](id) };
+    if (/flash/.test(id))     return { tier: 2, tooltip: tierTooltips['2'](id) };
+    if (/sonnet/.test(id))    return { tier: 3, tooltip: tierTooltips['3'](id) };
+    if (/plus/.test(id))      return { tier: 3, tooltip: tierTooltips['3'](id) };
+    if (/codex/.test(id))     return { tier: 3, tooltip: tierTooltips['3'](id) };
+    if (/opus/.test(id))      return { tier: 4, tooltip: tierTooltips['4'](id) };
+    if (/(5\.\d).*pro/.test(id)) return { tier: 5, tooltip: tierTooltips['5'](id) };
+    if (/pro/.test(id))       return { tier: 4, tooltip: tierTooltips['4'](id) };
+    if (/max/.test(id))       return { tier: 5, tooltip: tierTooltips['5'](id) };
+    return { tier: 3, tooltip: tierTooltips['3'](id) };
+  }
+
+  // Go models (opencode-go/*)
+  if (id.startsWith('opencode-go/')) {
+    if (/flash/.test(id))     return { tier: 1, tooltip: tierTooltips['1'](id) };
+    if (/qwen.*plus/.test(id)) return { tier: 2, tooltip: tierTooltips['2'](id) };
+    if (/m2\.5/.test(id))     return { tier: 2, tooltip: tierTooltips['2'](id) };
+    if (/plus/.test(id))      return { tier: 2, tooltip: tierTooltips['2'](id) };
+    if (/m2\.7/.test(id))     return { tier: 3, tooltip: tierTooltips['3'](id) };
+    if (/pro/.test(id))       return { tier: 3, tooltip: tierTooltips['3'](id) };
+    if (/kimi/.test(id))      return { tier: 3, tooltip: tierTooltips['3'](id) };
+    if (/mimo/.test(id))      return { tier: 3, tooltip: tierTooltips['3'](id) };
+    if (/glm/.test(id))       return { tier: 4, tooltip: tierTooltips['4'](id) };
+    return { tier: 3, tooltip: tierTooltips['3'](id) };
+  }
+
+  // Copilot / other models
+  if (id === 'auto')          return { tier: 3, tooltip: 'Auto-selects best model for task' };
+  if (/sonnet/.test(id))      return { tier: 3, tooltip: tierTooltips['3'](id) };
+  if (/opus/.test(id))        return { tier: 4, tooltip: tierTooltips['4'](id) };
+  if (/gpt/.test(id))         return { tier: 4, tooltip: tierTooltips['4'](id) };
+  if (/claude/.test(id))      return { tier: 3, tooltip: tierTooltips['3'](id) };
 }
 
 // ── Default model fallbacks ──
@@ -154,32 +234,6 @@ export const OPENCODE_MODELS = [
   { id: 'opencode/minimax-m2.7', label: 'Minimax M2.7' },
   { id: 'opencode/minimax-m2.5-free', label: 'Minimax M2.5 Free' },
 ] as const;
-
-/** @deprecated Use COPILOT_MODELS or OPENCODE_MODELS */
-export const AVAILABLE_MODELS = COPILOT_MODELS;
-
-export type CopilotModelId = typeof COPILOT_MODELS[number]['id'];
-export type OpenCodeModelId = typeof OPENCODE_MODELS[number]['id'];
-export type AvailableModelId = CopilotModelId;
-
-const ALLOWED_COPILOT_IDS = new Set<string>(COPILOT_MODELS.map(m => m.id));
-const ALLOWED_OPENCODE_IDS = new Set<string>(OPENCODE_MODELS.map(m => m.id));
-
-export function isAllowedModelId(modelId: string | undefined): modelId is AvailableModelId {
-  return !!modelId && ALLOWED_COPILOT_IDS.has(modelId);
-}
-
-export function isAllowedOpenCodeModelId(modelId: string | undefined): modelId is OpenCodeModelId {
-  return !!modelId && ALLOWED_OPENCODE_IDS.has(modelId);
-}
-
-export function normalizeModelId(modelId: string | undefined): AvailableModelId {
-  return isAllowedModelId(modelId) ? modelId : COPILOT_MODELS[0].id;
-}
-
-export function normalizeOpenCodeModelId(modelId: string | undefined): OpenCodeModelId {
-  return isAllowedOpenCodeModelId(modelId) ? modelId : OPENCODE_MODELS[0].id;
-}
 
 export function modelsForTool(tool: LaunchTool): ReadonlyArray<{ id: string; label: string }> {
   return tool === 'opencode' ? OPENCODE_MODELS : COPILOT_MODELS;

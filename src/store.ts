@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, PinnedModel, LaunchHistoryEntry } from './types';
+import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry } from './types';
 
 type ActivePanel = 'launches' | 'phrases' | 'settings' | 'history' | null;
 
@@ -45,11 +45,6 @@ interface AppState {
   deleteLaunchHistoryByLaunchId: (launchId: string) => void;
   settings: Settings;
   setSettings: (s: Settings) => void;
-  pinnedModels: PinnedModel[];
-  setPinnedModels: (p: PinnedModel[]) => void;
-  addPinnedModel: (modelId: string) => void;
-  removePinnedModel: (modelId: string) => void;
-  reorderPinnedModels: (newOrder: PinnedModel[]) => void;
   activePanel: ActivePanel;
   setActivePanel: (panel: ActivePanel) => void;
   togglePanel: (panel: Exclude<ActivePanel, null>) => void;
@@ -147,18 +142,6 @@ export const useStore = create<AppState>((set, get) => ({
   })),
   settings: { theme: 'light', language: 'auto', useOneDrive: true },
   setSettings: (settings) => set({ settings }),
-  pinnedModels: [],
-  setPinnedModels: (pinned) => set({ pinnedModels: pinned }),
-  addPinnedModel: (modelId) => set(s => {
-    const existing = s.pinnedModels.find(p => p.modelId === modelId);
-    if (existing) return s;
-    const newOrder = (s.pinnedModels.length > 0 ? Math.max(...s.pinnedModels.map(p => p.order)) : 0) + 1;
-    return { pinnedModels: [...s.pinnedModels, { modelId, order: newOrder }] };
-  }),
-  removePinnedModel: (modelId) => set(s => ({
-    pinnedModels: s.pinnedModels.filter(p => p.modelId !== modelId),
-  })),
-  reorderPinnedModels: (newOrder) => set({ pinnedModels: newOrder }),
   activePanel: null,
   setActivePanel: (panel) => set({ activePanel: panel }),
   togglePanel: (panel) => set(s => ({ activePanel: s.activePanel === panel ? null : panel })),

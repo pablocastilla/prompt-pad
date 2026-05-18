@@ -208,8 +208,8 @@ export default function App() {
       });
     };
 
-    window.addEventListener('keydown', handleLaunchShortcut);
-    return () => window.removeEventListener('keydown', handleLaunchShortcut);
+    window.addEventListener('keydown', handleLaunchShortcut, { capture: true });
+    return () => window.removeEventListener('keydown', handleLaunchShortcut, { capture: true });
   }, [launchByShortcut, activeTab, setPendingLaunch]);
 
   return (

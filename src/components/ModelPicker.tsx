@@ -33,6 +33,7 @@ export function ModelPicker() {
   const [dragPinnedIdx, setDragPinnedIdx] = useState<number | null>(null);
   const [dropPinnedIdx, setDropPinnedIdx] = useState<number | null>(null);
   const userScrolledRef = useRef(false);
+  const [confirmExpensiveIdx, setConfirmExpensiveIdx] = useState<number | null>(null);
 
   const tool: LaunchTool = pendingLaunch?.launch.tool ?? 'copilot';
   const fallbackModels = modelsForTool(tool);
@@ -163,6 +164,12 @@ export function ModelPicker() {
     const ms = allModels;
     if (!ms[idx]) return;
     const model = ms[idx].id;
+    const cost = getModelCostInfo(model);
+    if (cost && (cost.tier === 4 || cost.tier === 5) && confirmExpensiveIdx !== idx) {
+      setConfirmExpensiveIdx(idx);
+      return;
+    }
+    setConfirmExpensiveIdx(null);
     setPendingLaunch(null);
     const entry: LaunchHistoryEntry = {
       id: uid(),
@@ -197,6 +204,11 @@ export function ModelPicker() {
     }
   };
 
+  // Reset confirmation when picker closes
+  useEffect(() => {
+    if (!pendingLaunch) setConfirmExpensiveIdx(null);
+  }, [pendingLaunch]);
+
   useEffect(() => {
     if (!pendingLaunch) return;
     const ms = allModels;
@@ -214,6 +226,11 @@ export function ModelPicker() {
       Digit0: 9, Numpad0: 9,
     };
     const handler = (e: KeyboardEvent) => {
+      if (confirmExpensiveIdx !== null) {
+        if (e.key === 'Enter') { e.preventDefault(); execute(confirmExpensiveIdx); }
+        else if (e.key === 'Escape') { e.preventDefault(); setConfirmExpensiveIdx(null); }
+        return;
+      }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIdx(i => (i + 1) % ms.length);
@@ -240,7 +257,7 @@ export function ModelPicker() {
     };
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [pendingLaunch, selectedIdx, allModels, pinnedModels.length, pinnedIds]);
+  }, [pendingLaunch, selectedIdx, allModels, pinnedModels.length, pinnedIds, confirmExpensiveIdx]);
 
   function CostIndicator({ modelId }: { modelId: string }) {
     const info = getModelCostInfo(modelId);
@@ -361,6 +378,19 @@ export function ModelPicker() {
         <div className="model-picker-hint">
           {pinnedModels.length > 0 ? t('modelPickerHintPinned') : t('modelPickerHint')}
         </div>
+        {confirmExpensiveIdx !== null && (
+          <div className="model-picker-confirm-overlay">
+            <div className="model-picker-confirm-card">
+              <div className="model-picker-confirm-icon">⚠️</div>
+              <div className="model-picker-confirm-text">{t('expensiveModelConfirm')}</div>
+              <div className="model-picker-confirm-model">{allModels[confirmExpensiveIdx]?.label}</div>
+              <div className="model-picker-confirm-actions">
+                <button className="model-picker-confirm-btn model-picker-confirm-cancel" onClick={() => setConfirmExpensiveIdx(null)}>{t('cancelBtn')}</button>
+                <button className="model-picker-confirm-btn model-picker-confirm-launch" onClick={() => execute(confirmExpensiveIdx)}>{t('launch')}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

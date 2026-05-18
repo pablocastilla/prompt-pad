@@ -66,6 +66,7 @@ const translations = {
     gaudyCopyHistory: '📋 PROMPT BEAMED TO CLIPBOARD',
     gaudyClearHistory: '🧹 HISTORY DIMENSION WIPED',
     gaudyOpenHistory: '⚡ PROMPT RESTORED FROM THE VOID',
+    expensiveModelConfirm: 'This model is expensive. Are you sure you want to launch it?',
   },
   es: {
     launch: 'Lanzar', selectLaunch: 'Seleccionar lanzamiento…', noLaunches: 'Sin configuraciones aún.',
@@ -134,6 +135,7 @@ const translations = {
     gaudyCopyHistory: '📋 PROMPT TRANSMITIDO AL PORTAPAPELES',
     gaudyClearHistory: '🧹 DIMENSIÓN DEL HISTORIAL BORRADA',
     gaudyOpenHistory: '⚡ PROMPT RESTAURADO DEL VACÍO',
+    expensiveModelConfirm: 'Este modelo es muy caro. ¿Estás seguro de que quieres lanzarlo?',
   },
 } as const;
 

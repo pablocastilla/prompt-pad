@@ -216,8 +216,10 @@ The Gaudy theme is best experienced live. It features:
 - **Dynamic model lists**: fetches available models from both Copilot CLI (`copilot help config`) and OpenCode (`opencode models`) at runtime.
 - **Dual tool support**: automatically shows the correct model list based on whether the launch config uses Copilot or OpenCode.
 - **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
+- **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) and usage limits.
+- **Expensive model confirmation**: launching tier 4-5 models prompts a confirmation dialog to prevent accidental high-cost launches.
 - **Pin favourite models**: press `Ctrl+1` through `Ctrl+0` while hovering a model to pin it to the top. Pinned models appear first and can be launched instantly with `1` through `0`. Press the same shortcut again to unpin.
-- **Drag-to-reorder pinned**: drag the  handle on pinned models to reorder them.
+- **Drag-to-reorder pinned**: drag the ⠿ handle on pinned models to reorder them.
 - **CLI sync**: pinned models are saved to `settings.json` and sync via OneDrive when enabled. The model list is always fresh from the CLI — pins just give you quick access to your favourites.
 
 ### Settings
