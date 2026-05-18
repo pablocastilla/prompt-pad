@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { modelsForTool } from '../types';
+import { modelsForTool, getModelCostInfo } from '../types';
 import { t } from '../i18n';
-import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry } from '../types';
+import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry, CostTier } from '../types';
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -202,16 +202,16 @@ export function ModelPicker() {
     const ms = allModels;
     if (!ms.length) return;
     const digitByCode: Record<string, number> = {
-      Digit1: 0,
-      Digit2: 1,
-      Digit3: 2,
-      Digit4: 3,
-      Digit5: 4,
-      Digit6: 5,
-      Digit7: 6,
-      Digit8: 7,
-      Digit9: 8,
-      Digit0: 9,
+      Digit1: 0, Numpad1: 0,
+      Digit2: 1, Numpad2: 1,
+      Digit3: 2, Numpad3: 2,
+      Digit4: 3, Numpad4: 3,
+      Digit5: 4, Numpad5: 4,
+      Digit6: 5, Numpad6: 5,
+      Digit7: 6, Numpad7: 6,
+      Digit8: 7, Numpad8: 7,
+      Digit9: 8, Numpad9: 8,
+      Digit0: 9, Numpad0: 9,
     };
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
@@ -241,6 +241,23 @@ export function ModelPicker() {
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
   }, [pendingLaunch, selectedIdx, allModels, pinnedModels.length, pinnedIds]);
+
+  function CostIndicator({ modelId }: { modelId: string }) {
+    const info = getModelCostInfo(modelId);
+    if (!info) return null;
+    const { tier, tooltip } = info;
+    if (tier === 'free') {
+      return <span className="model-cost-badge model-cost-free" title={tooltip}>free</span>;
+    }
+    const bars: string[] = [];
+    for (let i = 0; i < tier; i++) {
+      bars.push('▮');
+    }
+    for (let i = tier; i < 3; i++) {
+      bars.push('▯');
+    }
+    return <span className="model-cost-bars" title={tooltip}>{bars.join('')}</span>;
+  }
 
   if (!pendingLaunch) return null;
 
@@ -306,6 +323,7 @@ export function ModelPicker() {
                   <span className="model-picker-drag-handle" title={t('dragHandleTitle')}>⠿</span>
                   <span className="model-picker-item-dot" />
                   <span className="model-picker-item-label">{m.label}</span>
+                  <CostIndicator modelId={m.id} />
                   <span className="model-picker-shortcut">{getShortcutLabel(idx)}</span>
                   <button
                     className="model-picker-pin-btn pinned"
@@ -327,6 +345,7 @@ export function ModelPicker() {
                   >
                     <span className="model-picker-item-dot" />
                     <span className="model-picker-item-label">{m.label}</span>
+                    <CostIndicator modelId={m.id} />
                     <button
                       className="model-picker-pin-btn"
                       onClick={e => { e.stopPropagation(); togglePin(m.id); }}

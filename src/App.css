@@ -1407,6 +1407,99 @@ html, body, #root {
   font-size: 11px; color: var(--text3); text-align: center;
 }
 
+/* ── MODEL COST INDICATORS ──────────────────────── */
+
+.model-cost-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 0 5px;
+  border-radius: 4px;
+  line-height: 16px;
+  cursor: default;
+  transition: all .15s;
+}
+
+.model-cost-free {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid transparent;
+}
+
+.model-cost-bars {
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: .5px;
+  line-height: 1;
+  padding: 0 3px;
+  cursor: default;
+  opacity: .55;
+  transition: opacity .15s, transform .15s;
+  user-select: none;
+}
+
+.model-picker-item:hover .model-cost-bars,
+.model-picker-item.selected .model-cost-bars {
+  opacity: .9;
+}
+
+.model-picker-item:hover .model-cost-badge {
+  transform: scale(1.04);
+}
+
+/* ── GAUDY MODEL COST INDICATORS ─────────────────── */
+
+[data-theme="gaudy"] .model-cost-free {
+  background: linear-gradient(135deg, rgba(255, 226, 138, .15), rgba(255, 120, 200, .12));
+  border-color: rgba(255, 226, 138, .25);
+  color: #ffe28a;
+  text-shadow: 0 0 6px rgba(255, 226, 138, .3);
+  box-shadow: 0 0 8px rgba(255, 226, 138, .08);
+}
+
+[data-theme="gaudy"] .model-cost-bars {
+  font-size: 11px;
+  text-shadow: 0 0 4px rgba(255, 226, 138, .15);
+  opacity: .7;
+}
+
+[data-theme="gaudy"] .model-picker-item:hover .model-cost-bars {
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(255, 120, 200, .35), 0 0 14px rgba(255, 226, 138, .2);
+  transform: scale(1.08);
+}
+
+[data-theme="gaudy"] .model-cost-bars {
+  animation: gaudy-cost-pulse 1.8s ease-in-out infinite;
+}
+
+[data-theme="gaudy"] .model-cost-free {
+  animation: gaudy-cost-free-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes gaudy-cost-pulse {
+  0%, 100% { opacity: .65; }
+  50% { opacity: .9; }
+}
+
+@keyframes gaudy-cost-free-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(255, 226, 138, .06); }
+  50% { box-shadow: 0 0 14px rgba(255, 226, 138, .18), 0 0 24px rgba(255, 120, 200, .08); }
+}
+
+[data-theme="cyberpunk"] .model-cost-bars {
+  opacity: .65;
+  text-shadow: 0 0 4px rgba(71, 233, 255, .12);
+}
+
+[data-theme="cyberpunk"] .model-cost-free {
+  background: rgba(71, 233, 255, .08);
+  border-color: rgba(71, 233, 255, .18);
+  color: #9eefff;
+}
+
 @keyframes model-picker-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
