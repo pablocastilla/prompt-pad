@@ -24,6 +24,13 @@ test.describe('Window icon', () => {
     expect(stats.size).toBeGreaterThan(0);
   });
 
+  test('PNG icon file exists and is not empty', () => {
+    const pngPath = path.join(RESOURCES_DIR, 'icon.png');
+    expect(fs.existsSync(pngPath)).toBe(true);
+    const stats = fs.statSync(pngPath);
+    expect(stats.size).toBeGreaterThan(0);
+  });
+
   test('app window loads successfully', async () => {
     const testDir = getTestDir();
     try {

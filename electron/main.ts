@@ -196,12 +196,17 @@ let mainWindow: BrowserWindow | null = null;
 function getWindowIcon(): Electron.NativeImage | null {
   const candidates: string[] = [];
 
-  // 1. Relative to __dirname (works in dev and packaged because electron-builder copies resources/)
-  const projectRoot = path.join(__dirname, '..');
-  candidates.push(path.join(projectRoot, 'resources', 'icon.ico'));
-  candidates.push(path.join(projectRoot, 'resources', 'icon.png'));
+  // 1. From app.getAppPath() (works in both dev and packaged, handles ASAR correctly)
+  const appPath = app.getAppPath();
+  candidates.push(path.join(appPath, 'resources', 'icon.ico'));
+  candidates.push(path.join(appPath, 'resources', 'icon.png'));
 
-  // 2. Packaged: extraResources or direct resourcesPath
+  // 2. From __dirname (dev: dist-electron/../resources, packaged: asar/resources)
+  const fromDir = path.join(__dirname, '..', 'resources');
+  candidates.push(path.join(fromDir, 'icon.ico'));
+  candidates.push(path.join(fromDir, 'icon.png'));
+
+  // 3. Packaged: process.resourcesPath (electron-builder places extra resources here)
   if (app.isPackaged) {
     candidates.push(path.join(process.resourcesPath, 'icon.ico'));
     candidates.push(path.join(process.resourcesPath, 'icon.png'));
