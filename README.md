@@ -89,6 +89,41 @@ Your prompt went from *"Refactor the database module"* (5 words) to a comprehens
 
 The phrases you set up once pay dividends forever. It's like having a macro keyboard for your AI prompts — but the macros are smart, editable, and reorderable with drag-and-drop.
 
+### Launch History — Your Prompt Time Machine
+
+Here's the thing about firing prompts at AI: sometimes you write something brilliant, hit launch, and then immediately forget what you wrote. Or worse — you write something *truly* brilliant, the CLI does its thing, and three weeks later you need that exact prompt again but your brain has moved on to other things.
+
+Enter the **Launch History** panel. Every time you fire a prompt, Prompt Pad remembers it. All of it. The prompt text, the model you used, whether you went YOLO or played it safe, the tool, the mode — the whole forensic record.
+
+#### What You Get
+
+| Feature | What it does |
+|---|---|
+| **Grouped by launcher** | History entries are organized under their launch config name. Expand a group to see all the prompts you've fired through that launcher. |
+| **Search everything** | Search across prompt text, model name, tool, and launcher name. Type "refactor" and find every time you asked the AI to refactor something. |
+| **Double-click to restore** | Found that brilliant prompt from last Tuesday? Double-click it and it opens in a new tab, ready to fire again. |
+| **Auto-collapse** | Groups start collapsed so you're not overwhelmed. Search auto-expands matching groups. Clear the search and they collapse again. |
+| **Deleted launcher handling** | If you delete a launcher, its history entries stick around (you might still need those prompts!) but show the original launcher name. |
+
+#### The "I Remember Writing Something Good" Workflow
+
+1. **Hit the History button** (📋) in the activity bar.
+2. **Scan your recent launches** — grouped by launcher, sorted by time.
+3. **See "3 hr ago" under "Refactor Auth"** — ah yes, that prompt you wrote at 2 PM.
+4. **Double-click it** — boom, new tab with the exact prompt text.
+5. **Tweak and fire again** — or just fire it as-is. No retyping. No "what did I write last time?"
+
+#### Why This Exists
+
+| Without History | With History |
+|---|---|
+| "What was that prompt I used last week?" | Search, find, double-click, done |
+| Rewrite the same prompt from memory | Exact text, every time |
+| Scroll through terminal output to find it | Clean panel, organized by launcher |
+| Hope your clipboard still has it | It's in history. It's always in history. |
+
+Your launch history is basically a prompt journal you didn't have to write. Every fire-and-forget prompt is catalogued, searchable, and one double-click away from resurrection.
+
 ### Why This Beats Terminal Tabs
 
 | Terminal Tabs | Prompt Pad |
@@ -114,6 +149,10 @@ The phrases you set up once pay dividends forever. It's like having a macro keyb
 ### Launch Configurations — manage pre-configured Copilot CLI / OpenCode runs
 
 ![Launch configurations panel](docs/screenshots/03-launches-panel.png)
+
+### Launch History — every prompt you've ever fired, grouped and searchable
+
+*(Screenshot coming soon — your history is too personal to screenshot anyway)*
 
 ### Model Picker — choose the model at launch time (↑↓ + Enter)
 
@@ -164,6 +203,14 @@ The Gaudy theme is best experienced live. It features:
 - **Drag-to-reorder**: drag the ⠿ handle to reprioritise configs. The `Ctrl+Shift+N` shortcuts follow the list order and are auto-saved.
 - **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
 - **Pin favourite models**: pin models in the picker for quick access with number keys.
+
+### Launch History
+- **Every launch remembered**: prompt text, model, tool, YOLO flag, and mode — all saved automatically.
+- **Grouped by launcher**: entries organized under their launch config name with collapsible groups.
+- **Full-text search**: filter by prompt content, model name, tool, or launcher name.
+- **Double-click to restore**: opens the exact prompt in a new tab, ready to edit or re-fire.
+- **Auto-sync aware**: history syncs via OneDrive when enabled, so your prompt journal follows you across machines.
+- **Gaudy theme toasts**: even clearing history gets a dramatic notification.
 
 ### Model Picker
 - **Dynamic model lists**: fetches available models from both Copilot CLI (`copilot help config`) and OpenCode (`opencode models`) at runtime.
@@ -234,6 +281,7 @@ All local data lives in `~/.prompt-pad/`:
 | `settings.json` | Theme, language, OneDrive preference |
 | `phrases.json` | Phrase catalog *(moved to OneDrive when sync is on)* |
 | `launches.json` | Launch configurations *(moved to OneDrive when sync is on)* |
+| `launch-history.json` | Launch history *(moved to OneDrive when sync is on)* |
 | `session.json` | Open tabs state (autosaved; ephemeral) |
 | `prompts/` | Explicitly saved prompt files |
 
@@ -244,7 +292,7 @@ All local data lives in `~/.prompt-pad/`:
 | Windows | `%OneDrive%\Apps\PromptPad\` |
 | macOS | `~/Library/CloudStorage/OneDrive-Personal/Apps/PromptPad/` |
 
-When you enable OneDrive sync for the first time, existing local `phrases.json` and `launches.json` are **migrated automatically**.
+When you enable OneDrive sync for the first time, existing local `phrases.json`, `launches.json`, and `launch-history.json` are **migrated automatically**.
 
 ---
 
