@@ -25,18 +25,11 @@ nsis:
 mac:
   category: public.app-category.developer-tools
   target:
-    - target: dmg
-      arch:
-        - x64
-        - arm64
     - target: zip
       arch:
         - x64
         - arm64
   icon: resources/icon.png
-dmg:
-  sign: false
-  artifactName: ${productName}-${version}.${ext}
 publish:
   provider: github
   releaseType: release
