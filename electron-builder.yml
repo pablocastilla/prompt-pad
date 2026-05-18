@@ -16,7 +16,7 @@ win:
         - x64
   icon: resources/icon.ico
 nsis:
-  artifactName: ${productName} Setup ${version}.${ext}
+  artifactName: ${productName}-Setup-${version}.${ext}
   oneClick: false
   perMachine: false
   allowElevation: false
@@ -33,9 +33,12 @@ mac:
       arch:
         - x64
         - arm64
+  zip:
+    artifactName: ${productName}-${version}.${ext}
   icon: resources/icon.png
 dmg:
   sign: false
+  artifactName: ${productName}-${version}.${ext}
 publish:
   provider: github
   releaseType: release
