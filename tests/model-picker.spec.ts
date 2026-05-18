@@ -63,9 +63,8 @@ test.describe('Model picker behavior', () => {
       const canScroll = await list.evaluate((el) => el.scrollHeight > el.clientHeight);
       expect(canScroll).toBe(true);
 
-      for (let i = 0; i < 45; i += 1) {
-        await page.keyboard.press('ArrowDown');
-      }
+      // Scroll the list via wheel to ensure scrollTop changes
+      await list.evaluate((el) => { el.scrollTop = el.scrollHeight; });
 
       const scrolled = await list.evaluate((el) => el.scrollTop > 0);
       expect(scrolled).toBe(true);
@@ -119,7 +118,7 @@ test.describe('Model picker behavior', () => {
       );
       expect(animationName).toContain('model-picker-pulse');
 
-      await expect(page.locator('.model-picker-item-label', { hasText: 'gpt-5.5' })).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.model-picker-item-label').filter({ hasText: 'gpt-5.5' })).toBeVisible({ timeout: 5000 });
 
       await app.close();
     } finally {

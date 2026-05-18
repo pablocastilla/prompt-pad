@@ -6,6 +6,7 @@ directories:
 files:
   - dist/**/*
   - dist-electron/**/*
+  - resources/**/*
 win:
   requestedExecutionLevel: asInvoker
   signAndEditExecutable: false

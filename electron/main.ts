@@ -196,21 +196,27 @@ let mainWindow: BrowserWindow | null = null;
 function getWindowIcon(): Electron.NativeImage | null {
   const candidates: string[] = [];
 
-  // 1. Development: resources/ next to project root
+  // 1. Relative to __dirname (works in dev and packaged because electron-builder copies resources/)
   const projectRoot = path.join(__dirname, '..');
   candidates.push(path.join(projectRoot, 'resources', 'icon.ico'));
   candidates.push(path.join(projectRoot, 'resources', 'icon.png'));
 
-  // 2. Packaged: embedded in resourcesPath
+  // 2. Packaged: extraResources or direct resourcesPath
   if (app.isPackaged) {
     candidates.push(path.join(process.resourcesPath, 'icon.ico'));
     candidates.push(path.join(process.resourcesPath, 'icon.png'));
+    candidates.push(path.join(process.resourcesPath, 'resources', 'icon.ico'));
+    candidates.push(path.join(process.resourcesPath, 'resources', 'icon.png'));
   }
 
   for (const p of candidates) {
     if (fs.existsSync(p)) {
-      const img = nativeImage.createFromPath(p);
-      if (!img.isEmpty()) return img;
+      try {
+        const img = nativeImage.createFromPath(p);
+        if (!img.isEmpty()) return img;
+      } catch {
+        // ignore corrupted or unreadable image
+      }
     }
   }
   return null;
