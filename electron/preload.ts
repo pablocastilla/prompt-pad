@@ -13,6 +13,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadLaunches: () => ipcRenderer.invoke('launches:load'),
   saveLaunches: (launches: unknown[]) => ipcRenderer.invoke('launches:save', launches),
 
+  // Launch History
+  loadLaunchHistory: () => ipcRenderer.invoke('launch-history:load'),
+  saveLaunchHistory: (entries: unknown[]) => ipcRenderer.invoke('launch-history:save', entries),
+
   // Session (tab autosave)
   loadSession: () => ipcRenderer.invoke('session:load'),
   saveSession: (session: unknown) => ipcRenderer.invoke('session:save', session),

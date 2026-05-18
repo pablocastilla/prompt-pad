@@ -2,7 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { modelsForTool } from '../types';
 import { t } from '../i18n';
-import type { LaunchTool, ModelOption, Settings } from '../types';
+import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry } from '../types';
+
+function uid(): string {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
 
 export function ModelPicker() {
   const pendingLaunch    = useStore(s => s.pendingLaunch);
@@ -10,6 +14,11 @@ export function ModelPicker() {
   const addToast         = useStore(s => s.addToast);
   const settings         = useStore(s => s.settings);
   const setSettings      = useStore(s => s.setSettings);
+  const addLaunchHistoryEntry = useStore(s => s.addLaunchHistoryEntry);
+  const launchHistory    = useStore(s => s.launchHistory);
+  const tabs             = useStore(s => s.tabs);
+  const activeTabId      = useStore(s => s.activeTabId);
+  const closeTab         = useStore(s => s.closeTab);
 
   const [modelCache, setModelCache] = useState<{ copilot: ModelOption[] | null; opencode: ModelOption[] | null }>({
     copilot: null,
@@ -134,6 +143,21 @@ export function ModelPicker() {
     if (!ms[idx]) return;
     const model = ms[idx].id;
     setPendingLaunch(null);
+    const entry: LaunchHistoryEntry = {
+      id: uid(),
+      launchId: pendingLaunch.launch.id,
+      launchName: pendingLaunch.launch.name,
+      tool: pendingLaunch.launch.tool,
+      model,
+      prompt: pendingLaunch.prompt,
+      timestamp: Date.now(),
+      folder: pendingLaunch.launch.folder,
+      yolo: pendingLaunch.launch.yolo,
+      mode: pendingLaunch.launch.mode,
+    };
+    addLaunchHistoryEntry(entry);
+    const updated = [entry, ...launchHistory].slice(0, 100);
+    await window.electronAPI.saveLaunchHistory(updated);
     await window.electronAPI.executeLaunch({
       tool: pendingLaunch.launch.tool ?? 'copilot',
       model,
@@ -143,6 +167,9 @@ export function ModelPicker() {
       mode: pendingLaunch.launch.mode,
       attachedFilePaths: pendingLaunch.attachedFilePaths,
     });
+    if (tabs.length > 1) {
+      closeTab(activeTabId);
+    }
     if (settings.theme === 'gaudy') addToast(t('gaudyLaunch'));
   };
 

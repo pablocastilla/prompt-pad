@@ -4,11 +4,13 @@ import { t } from '../i18n';
 import { LaunchPanel } from './LaunchPanel';
 import { PhraseCatalog } from './PhraseCatalog';
 import { SettingsPanel } from './SettingsPanel';
+import { HistoryPanel } from './HistoryPanel';
 
 const TITLES = {
   launches: 'launches',
   phrases:  'phraseCatalog',
   settings: 'settings',
+  history:  'launchHistory',
 } as const;
 
 export function SidePanel() {
@@ -24,6 +26,7 @@ export function SidePanel() {
         {activePanel === 'launches' && <LaunchPanel />}
         {activePanel === 'phrases'  && <PhraseCatalog />}
         {activePanel === 'settings' && <SettingsPanel />}
+        {activePanel === 'history'  && <HistoryPanel />}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, PinnedModel } from './types';
+import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, PinnedModel, LaunchHistoryEntry } from './types';
 
-type ActivePanel = 'launches' | 'phrases' | 'settings' | null;
+type ActivePanel = 'launches' | 'phrases' | 'settings' | 'history' | null;
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -14,6 +14,7 @@ interface AppState {
   tabs: Tab[];
   activeTabId: string;
   addTab: () => void;
+  createTabWithContent: (content: string, title?: string) => void;
   closeTab: (id: string) => void;
   closeTabsLeft: (id: string) => void;
   closeTabsRight: (id: string) => void;
@@ -38,6 +39,10 @@ interface AppState {
   addLaunch: (l: LaunchConfig) => void;
   updateLaunch: (l: LaunchConfig) => void;
   deleteLaunch: (id: string) => void;
+  launchHistory: LaunchHistoryEntry[];
+  setLaunchHistory: (h: LaunchHistoryEntry[]) => void;
+  addLaunchHistoryEntry: (entry: LaunchHistoryEntry) => void;
+  deleteLaunchHistoryByLaunchId: (launchId: string) => void;
   settings: Settings;
   setSettings: (s: Settings) => void;
   pinnedModels: PinnedModel[];
@@ -63,6 +68,12 @@ export const useStore = create<AppState>((set, get) => ({
   tabs: [initialTab],
   activeTabId: initialTab.id,
   addTab: () => { const tab = createTab(); set(s => ({ tabs: [...s.tabs, tab], activeTabId: tab.id })); },
+  createTabWithContent: (content, title) => {
+    const tab = createTab(title);
+    tab.content = content;
+    tab.dirty = true;
+    set(s => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+  },
   closeTab: (id) => {
     const { tabs, activeTabId } = get();
     if (tabs.length <= 1) return;
@@ -123,6 +134,15 @@ export const useStore = create<AppState>((set, get) => ({
   addLaunch: (l) => set(s => ({ launches: [...s.launches, l] })),
   updateLaunch: (l) => set(s => ({ launches: s.launches.map(x => x.id === l.id ? l : x) })),
   deleteLaunch: (id) => set(s => ({ launches: s.launches.filter(x => x.id !== id) })),
+  launchHistory: [],
+  setLaunchHistory: (launchHistory) => set({ launchHistory }),
+  addLaunchHistoryEntry: (entry) => set(s => {
+    const updated = [entry, ...s.launchHistory].slice(0, 100);
+    return { launchHistory: updated };
+  }),
+  deleteLaunchHistoryByLaunchId: (launchId) => set(s => ({
+    launchHistory: s.launchHistory.filter(e => e.launchId !== launchId),
+  })),
   settings: { theme: 'light', language: 'auto', useOneDrive: true },
   setSettings: (settings) => set({ settings }),
   pinnedModels: [],

@@ -318,6 +318,19 @@ ipcMain.handle('launches:save', (_e, l: unknown[]) => {
   safeWrite(path.join(getSyncDir(), 'launches.json'), JSON.stringify(sanitized, null, 2));
 });
 
+// Launch History
+ipcMain.handle('launch-history:load', () => {
+  const primary = path.join(getSyncDir(), 'launch-history.json');
+  const fallback = path.join(APP_DIR, 'launch-history.json');
+  if (primary !== fallback && !fs.existsSync(primary) && fs.existsSync(fallback)) {
+    fs.copyFileSync(fallback, primary);
+  }
+  return readJson(primary, []);
+});
+ipcMain.handle('launch-history:save', (_e, entries: unknown[]) => {
+  safeWrite(path.join(getSyncDir(), 'launch-history.json'), JSON.stringify(entries, null, 2));
+});
+
 // Session – persists open tabs across restarts
 const sessionPath = path.join(APP_DIR, 'session.json');
 ipcMain.handle('session:load', () => readJson(sessionPath, null));

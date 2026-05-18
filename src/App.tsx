@@ -15,6 +15,7 @@ export default function App() {
   const setSettings = useStore(s => s.setSettings);
   const setPhrases  = useStore(s => s.setPhrases);
   const setLaunches = useStore(s => s.setLaunches);
+  const setLaunchHistory = useStore(s => s.setLaunchHistory);
   const phrases     = useStore(s => s.phrases);
   const launches    = useStore(s => s.launches);
   const tabs        = useStore(s => s.tabs);
@@ -30,12 +31,13 @@ export default function App() {
   // ── Initial load: settings, phrases, launches, session ──────────────
   useEffect(() => {
     (async () => {
-      const [loadedSettings, phrases, launches, locale, session] = await Promise.all([
+      const [loadedSettings, phrases, launches, locale, session, launchHistory] = await Promise.all([
         window.electronAPI.loadSettings(),
         window.electronAPI.loadPhrases(),
         window.electronAPI.loadLaunches(),
         window.electronAPI.getLocale(),
         window.electronAPI.loadSession(),
+        window.electronAPI.loadLaunchHistory(),
       ]);
       const s = {
         ...{
@@ -53,6 +55,7 @@ export default function App() {
       setSettings(s);
       setPhrases(phrases);
       setLaunches(launches);
+      setLaunchHistory(launchHistory ?? []);
       setLanguage(s.language === 'auto' ? detectLanguage(locale) : s.language);
 
       // Restore session if there are saved tabs with content

@@ -107,6 +107,8 @@ export interface ElectronAPI {
   savePhrases: (phrases: Phrase[]) => Promise<void>;
   loadLaunches: () => Promise<LaunchConfig[]>;
   saveLaunches: (launches: LaunchConfig[]) => Promise<void>;
+  loadLaunchHistory: () => Promise<LaunchHistoryEntry[]>;
+  saveLaunchHistory: (entries: LaunchHistoryEntry[]) => Promise<void>;
   loadSession: () => Promise<SessionData | null>;
   saveSession: (session: SessionData) => Promise<void>;
   detectOneDrive: () => Promise<string | null>;
@@ -134,6 +136,20 @@ export interface ElectronAPI {
   getLocale: () => Promise<string>;
   getAppVersion: () => Promise<string>;
   checkForUpdates: () => Promise<boolean>;
+}
+
+// ── Launch History ──
+export interface LaunchHistoryEntry {
+  id: string;
+  launchId: string;
+  launchName: string;
+  tool: LaunchTool;
+  model: string;
+  prompt: string;
+  timestamp: number;
+  folder: string;
+  yolo: boolean;
+  mode: 'interactive' | 'non-interactive';
 }
 
 // ── Session (persisted across restarts) ──

@@ -18,6 +18,11 @@ export function ActivityBar() {
         onClick={() => togglePanel('phrases')}
         title={t('phraseCatalog')}
       >📝</button>
+      <button
+        className={'activity-btn' + (activePanel === 'history' ? ' active' : '')}
+        onClick={() => togglePanel('history')}
+        title={t('launchHistory')}
+      >📜</button>
       <div className="activity-spacer" />
       <button
         className={'activity-btn' + (activePanel === 'settings' ? ' active' : '')}

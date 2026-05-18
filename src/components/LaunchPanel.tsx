@@ -17,6 +17,8 @@ export function LaunchPanel() {
   const addLaunch           = useStore(s => s.addLaunch);
   const updateLaunch        = useStore(s => s.updateLaunch);
   const deleteLaunch        = useStore(s => s.deleteLaunch);
+  const deleteLaunchHistoryByLaunchId = useStore(s => s.deleteLaunchHistoryByLaunchId);
+  const launchHistory       = useStore(s => s.launchHistory);
   const selectedLaunchId    = useStore(s => s.selectedLaunchId);
   const setSelectedLaunchId = useStore(s => s.setSelectedLaunchId);
   const setPendingLaunch    = useStore(s => s.setPendingLaunch);
@@ -81,8 +83,10 @@ export function LaunchPanel() {
 
   const handleDelete = async (id: string) => {
     deleteLaunch(id);
+    deleteLaunchHistoryByLaunchId(id);
     if (selectedLaunchId === id) setSelectedLaunchId(null);
     await window.electronAPI.saveLaunches(launches.filter(l => l.id !== id));
+    await window.electronAPI.saveLaunchHistory(launchHistory.filter(e => e.launchId !== id));
     gaudy('gaudyDelete');
   };
 
