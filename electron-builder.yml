@@ -33,8 +33,6 @@ mac:
       arch:
         - x64
         - arm64
-  zip:
-    artifactName: ${productName}-${version}.${ext}
   icon: resources/icon.png
 dmg:
   sign: false
