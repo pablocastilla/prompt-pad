@@ -249,11 +249,12 @@ export function ModelPicker() {
     if (tier === 'free') {
       return <span className="model-cost-badge model-cost-free" title={tooltip}>free</span>;
     }
+    const maxBars = 5;
     const bars: string[] = [];
-    for (let i = 0; i < tier; i++) {
+    for (let i = 0; i < Math.min(tier, maxBars); i++) {
       bars.push('▮');
     }
-    for (let i = tier; i < 3; i++) {
+    for (let i = tier; i < maxBars; i++) {
       bars.push('▯');
     }
     return <span className="model-cost-bars" title={tooltip}>{bars.join('')}</span>;
