@@ -40,9 +40,9 @@ export function LaunchPanel() {
     [launches]
   );
 
-  const getShortcutLabel = (index: number): string | null => {
-    if (index < 0 || index > 9) return null;
-    const key = index === 9 ? '0' : String(index + 1);
+  const getShortcutLabel = (shortcut: number): string | null => {
+    if (shortcut < 0 || shortcut > 9) return null;
+    const key = shortcut === 0 ? '0' : String(shortcut);
     return `Ctrl+Shift+${key}`;
   };
 
@@ -171,9 +171,8 @@ export function LaunchPanel() {
               <div className="launch-list-item-info">
                 <div className="launch-list-item-title-row">
                   <div className="launch-list-item-name">{launch.name}</div>
-                  {(() => {
-                    const index = launchPosition.get(launch.id) ?? -1;
-                    const shortcut = getShortcutLabel(index);
+                  {launch.shortcut !== undefined && (() => {
+                    const shortcut = getShortcutLabel(launch.shortcut!);
                     if (!shortcut) return null;
                     return <kbd className="launch-shortcut">{shortcut}</kbd>;
                   })()}
@@ -256,6 +255,16 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder }: LaunchFo
           </select>
         </div>
       )}
+      <div className="form-group">
+        <label>{t('shortcut')}</label>
+        <select value={data.shortcut ?? ''}
+          onChange={e => onChange({ ...data, shortcut: e.target.value === '' ? undefined : Number(e.target.value) })}>
+          <option value="">{t('shortcutNone')}</option>
+          {[1,2,3,4,5,6,7,8,9,0].map(n => (
+            <option key={n} value={n}>Ctrl+Shift+{n === 0 ? '0' : n}</option>
+          ))}
+        </select>
+      </div>
       <div className="form-actions">
         <button className="btn btn-sm" onClick={onCancel}>{t('cancelBtn')}</button>
         <button className="btn btn-primary btn-sm" onClick={onSave}>{t('saveBtn')}</button>

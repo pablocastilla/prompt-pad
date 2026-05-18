@@ -35,9 +35,9 @@ export function PhraseCatalog() {
     [phrases]
   );
 
-  const getShortcutLabel = (index: number): string | null => {
-    if (index < 0 || index > 9) return null;
-    const key = index === 9 ? '0' : String(index + 1);
+  const getShortcutLabel = (shortcut: number): string | null => {
+    if (shortcut < 0 || shortcut > 9) return null;
+    const key = shortcut === 0 ? '0' : String(shortcut);
     return `Ctrl+${key}`;
   };
 
@@ -109,6 +109,16 @@ export function PhraseCatalog() {
             <textarea value={editing.content} rows={4}
               onChange={e => setEditing({ ...editing, content: e.target.value })} />
           </div>
+          <div className="form-group">
+            <label>{t('shortcut')}</label>
+            <select value={editing.shortcut ?? ''}
+              onChange={e => setEditing({ ...editing, shortcut: e.target.value === '' ? undefined : Number(e.target.value) })}>
+              <option value="">{t('shortcutNone')}</option>
+              {[1,2,3,4,5,6,7,8,9,0].map(n => (
+                <option key={n} value={n}>Ctrl+{n === 0 ? '0' : n}</option>
+              ))}
+            </select>
+          </div>
           <div className="form-actions">
             <button className="btn btn-sm" onClick={() => setEditing(null)}>{t('cancelBtn')}</button>
             <button className="btn btn-primary btn-sm" onClick={handleSave}>{t('saveBtn')}</button>
@@ -146,8 +156,8 @@ export function PhraseCatalog() {
                 <div className="phrase-item-main">
                   <div className="phrase-item-name-row">
                     <div className="phrase-item-name">{phrase.name}</div>
-                    {(() => {
-                      const shortcut = getShortcutLabel(origIdx);
+                    {phrase.shortcut !== undefined && (() => {
+                      const shortcut = getShortcutLabel(phrase.shortcut!);
                       if (!shortcut) return null;
                       return <kbd className="phrase-shortcut">{shortcut}</kbd>;
                     })()}

@@ -3,6 +3,7 @@ export interface Phrase {
   id: string;
   name: string;
   content: string;
+  shortcut?: number;
 }
 
 // ── Launch Configuration ──
@@ -16,6 +17,7 @@ export interface LaunchConfig {
   folder: string;
   yolo: boolean;
   mode: 'interactive' | 'non-interactive';
+  shortcut?: number;
 }
 
 // ── Attached file (transient – not persisted in session) ──
