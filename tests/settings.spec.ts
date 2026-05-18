@@ -20,6 +20,11 @@ function cleanSettings(testDir: string) {
   if (fs.existsSync(p)) fs.rmSync(p, { force: true });
 }
 
+async function openSettings(page: import('@playwright/test').Page) {
+  await page.locator('.activity-btn').nth(3).click();
+  await expect(page.locator('.settings-panel')).toBeVisible();
+}
+
 test.describe('Settings panel', () => {
   test('Settings panel renders theme cards and language selector', async () => {
     const testDir = getTestDir();
@@ -30,8 +35,7 @@ test.describe('Settings panel', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Open settings panel
-      await page.locator('.activity-btn').nth(2).click();
-      await expect(page.locator('.settings-panel')).toBeVisible();
+      await openSettings(page);
 
       // Theme cards
       await expect(page.locator('.theme-card')).toHaveCount(4);
@@ -58,8 +62,7 @@ test.describe('Settings panel', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Open settings
-      await page.locator('.activity-btn').nth(2).click();
-      await expect(page.locator('.settings-panel')).toBeVisible();
+      await openSettings(page);
 
       // Select English
       const langSelect = page.locator('.settings-select');
@@ -88,8 +91,7 @@ test.describe('Settings panel', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Open settings
-      await page.locator('.activity-btn').nth(2).click();
-      await expect(page.locator('.settings-panel')).toBeVisible();
+      await openSettings(page);
 
       // Select Spanish
       const langSelect = page.locator('.settings-select');
@@ -118,8 +120,7 @@ test.describe('Settings panel', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Open settings
-      await page.locator('.activity-btn').nth(2).click();
-      await expect(page.locator('.settings-panel')).toBeVisible();
+      await openSettings(page);
 
       // Check for updates button
       const updateBtn = page.locator('.settings-update-btn');
@@ -145,8 +146,7 @@ test.describe('Settings panel', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Open settings
-      await page.locator('.activity-btn').nth(2).click();
-      await expect(page.locator('.settings-panel')).toBeVisible();
+      await openSettings(page);
 
       // Switch to dark theme
       const darkCard = page.locator('.theme-card').nth(1);
@@ -179,8 +179,7 @@ test.describe('Settings panel', () => {
       await page.waitForLoadState('domcontentloaded');
 
       // Open settings
-      await page.locator('.activity-btn').nth(2).click();
-      await expect(page.locator('.settings-panel')).toBeVisible();
+      await openSettings(page);
 
       // Version element should be visible
       const versionEl = page.locator('.settings-version');

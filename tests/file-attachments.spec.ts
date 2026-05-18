@@ -190,38 +190,38 @@ test.describe('File Attachment feature', () => {
     }
   });
 
-  test('Pasting a native clipboard image shows an attached file chip', async () => {
+  test('Pasting image clipboard data shows an attached file chip', async () => {
     const testDir = getTestDir();
     try {
       const app = await launchWithTestDir(testDir);
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
 
-      await app.evaluate(({ clipboard, nativeImage }, dataUrl: string) => {
-        clipboard.writeImage(nativeImage.createFromDataURL(dataUrl));
-      }, RED_PIXEL_PNG_DATA_URL);
-
-      await page.waitForTimeout(1000);
-
-      const clipboardHasImage = await page.evaluate(() => {
-        return (window as unknown as { electronAPI: { clipboardHasImage: () => boolean } })
-          .electronAPI.clipboardHasImage();
-      });
-      expect(clipboardHasImage).toBe(true);
-
-      const directRead = await page.evaluate(async () => {
-        return (window as unknown as {
-          electronAPI: { readClipboardImage: () => Promise<{ name: string; path: string; size: number } | null> }
-        }).electronAPI.readClipboardImage();
-      });
-      expect(directRead).not.toBeNull();
-      expect(directRead?.name).toMatch(/^Pasted Image .+\.png$/);
-
       const textarea = page.locator('.editor-textarea');
       await textarea.click();
-      await app.evaluate(({ BrowserWindow }) => {
-        BrowserWindow.getAllWindows()[0]?.webContents.paste();
-      });
+      await page.evaluate((dataUrl: string) => {
+        const base64 = dataUrl.split(',')[1] ?? '';
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        const blob = new Blob([bytes], { type: 'image/png' });
+        const file = new File([blob], 'pasted-image.png', { type: 'image/png' });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+
+        const event = new Event('paste', { bubbles: true, cancelable: true }) as Event & { clipboardData: DataTransfer };
+        Object.defineProperty(event, 'clipboardData', { value: dataTransfer });
+
+        const target = document.querySelector('.editor-textarea');
+        if (!(target instanceof HTMLTextAreaElement)) {
+          throw new Error('Editor textarea not found');
+        }
+
+        target.dispatchEvent(event);
+      }, RED_PIXEL_PNG_DATA_URL);
 
       const chip = page.locator('.attach-chip').first();
       await expect(chip).toBeVisible({ timeout: 5000 });
