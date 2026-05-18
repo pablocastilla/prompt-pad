@@ -2,9 +2,19 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { execFileSync } from 'child_process';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 const RESOURCES_DIR = path.join(__dirname, '..', 'resources');
+const PACKAGED_WINDOWS_EXE = path.join(__dirname, '..', 'release', 'win-unpacked', 'Prompt-Pad.exe');
+
+interface WindowsVersionInfo {
+  FileDescription: string;
+  ProductName: string;
+  OriginalFilename: string;
+  InternalName: string;
+  FileVersion: string;
+}
 
 function getTestDir(): string {
   const dir = path.join(os.tmpdir(), `pp-test-${crypto.randomUUID()}`);
@@ -14,6 +24,17 @@ function getTestDir(): string {
 
 function launchWithTestDir(testDir: string) {
   return electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+}
+
+function readWindowsVersionInfo(filePath: string): WindowsVersionInfo {
+  const escapedPath = filePath.replace(/'/g, "''");
+  const output = execFileSync('powershell', [
+    '-NoProfile',
+    '-Command',
+    `(Get-Item '${escapedPath}').VersionInfo | Select-Object FileDescription, ProductName, OriginalFilename, InternalName, FileVersion | ConvertTo-Json -Compress`,
+  ], { encoding: 'utf-8' });
+
+  return JSON.parse(output) as WindowsVersionInfo;
 }
 
 test.describe('Window icon', () => {
@@ -29,6 +50,19 @@ test.describe('Window icon', () => {
     expect(fs.existsSync(pngPath)).toBe(true);
     const stats = fs.statSync(pngPath);
     expect(stats.size).toBeGreaterThan(0);
+  });
+
+  test('packaged Windows executable is branded instead of Electron', () => {
+    test.skip(process.platform !== 'win32', 'Windows executable metadata is only available on Windows.');
+    test.skip(!fs.existsSync(PACKAGED_WINDOWS_EXE), 'Run npm run dist:win to generate the packaged executable.');
+
+    const versionInfo = readWindowsVersionInfo(PACKAGED_WINDOWS_EXE);
+
+    expect(versionInfo.ProductName).toBe('Prompt-Pad');
+    expect(versionInfo.FileDescription).toBe('Prompt-Pad');
+    expect(versionInfo.OriginalFilename).toBe('Prompt-Pad.exe');
+    expect(versionInfo.InternalName).toBe('Prompt-Pad');
+    expect(versionInfo.FileVersion).toBeTruthy();
   });
 
   test('app window loads successfully', async () => {

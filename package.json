@@ -1,6 +1,6 @@
 {
   "name": "prompt-pad",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "A Notepad-like desktop app for creating and managing AI prompts",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -31,6 +31,7 @@
     "electron": "^39.8.5",
     "electron-builder": "^26.8.1",
     "playwright": "^1.59.1",
+    "rcedit": "^5.0.2",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "typescript": "^5.6.0",
