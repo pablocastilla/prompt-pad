@@ -61,6 +61,8 @@ interface AppState {
   clearInsertion: () => void;
   pendingLaunch: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[] } | null;
   setPendingLaunch: (data: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[] } | null) => void;
+  launchSplash: number;
+  triggerLaunchSplash: () => void;
 }
 
 const initialTab = createTab();
@@ -172,4 +174,6 @@ export const useStore = create<AppState>((set, get) => ({
   clearInsertion: () => set({ insertionSignal: null }),
   pendingLaunch: null,
   setPendingLaunch: (data) => set({ pendingLaunch: data }),
+  launchSplash: 0,
+  triggerLaunchSplash: () => set(s => ({ launchSplash: s.launchSplash + 1 })),
 }));

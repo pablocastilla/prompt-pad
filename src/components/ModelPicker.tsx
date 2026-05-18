@@ -19,6 +19,7 @@ export function ModelPicker() {
   const tabs             = useStore(s => s.tabs);
   const activeTabId      = useStore(s => s.activeTabId);
   const closeTab         = useStore(s => s.closeTab);
+  const triggerLaunchSplash = useStore(s => s.triggerLaunchSplash);
 
   const [modelCache, setModelCache] = useState<{ copilot: ModelOption[] | null; opencode: ModelOption[] | null }>({
     copilot: null,
@@ -190,7 +191,10 @@ export function ModelPicker() {
     if (tabs.length > 1) {
       closeTab(activeTabId);
     }
-    if (settings.theme === 'gaudy') addToast(t('gaudyLaunch'));
+    if (settings.theme === 'gaudy') {
+      triggerLaunchSplash();
+      addToast(t('gaudyLaunch'));
+    }
   };
 
   useEffect(() => {

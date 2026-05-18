@@ -7,6 +7,7 @@ import { SidePanel } from './components/SidePanel';
 import { Editor } from './components/Editor';
 import { GaudyToast } from './components/GaudyToast';
 import { ModelPicker } from './components/ModelPicker';
+import { LaunchSplash } from './components/LaunchSplash';
 import type { LaunchConfig, Phrase, Settings, Tab } from './types';
 import './App.css';
 
@@ -220,6 +221,7 @@ export default function App() {
       </div>
       {toasts.length > 0 && <GaudyToast />}
       <ModelPicker />
+      <LaunchSplash />
     </div>
   );
 }
