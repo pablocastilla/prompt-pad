@@ -43,6 +43,7 @@ export interface Settings {
   language: 'auto' | 'es' | 'en';
   useOneDrive?: boolean;
   pinnedModels?: Partial<Record<LaunchTool, string[]>>;
+  showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
 }
 
 export interface ModelOption {

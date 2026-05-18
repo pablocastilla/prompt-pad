@@ -1238,6 +1238,57 @@ html, body, #root {
   font-size: 15px; font-weight: 600; color: var(--text);
 }
 
+.model-picker-go-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.model-picker-go-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.model-picker-go-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .12s;
+  flex-shrink: 0;
+}
+
+.model-picker-go-checkbox::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: scale(0);
+  transition: transform .12s;
+}
+
+.model-picker-go-toggle input:checked + .model-picker-go-checkbox {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.model-picker-go-toggle input:checked + .model-picker-go-checkbox::after {
+  transform: scale(1);
+}
+
+.model-picker-go-toggle:hover .model-picker-go-checkbox {
+  border-color: var(--accent);
+}
+
 .model-picker-list {
   display: flex;
   flex-direction: column;

@@ -37,14 +37,20 @@ export function ModelPicker() {
   const fallbackModels = modelsForTool(tool);
   const availableModels = modelCache[tool] ?? fallbackModels;
   const pinnedIds = settings.pinnedModels?.[tool] ?? [];
+  const showGoOnly = settings.showGoModelsOnly?.[tool] ?? (tool === 'opencode' ? true : false);
+
+  const filteredModels = useMemo(() => {
+    if (!showGoOnly || tool !== 'opencode') return availableModels;
+    return availableModels.filter(m => m.id.startsWith('opencode-go/'));
+  }, [availableModels, showGoOnly, tool]);
 
   const pinnedModels = useMemo(
-    () => pinnedIds.map(id => availableModels.find(m => m.id === id)).filter((m): m is ModelOption => !!m),
-    [pinnedIds, availableModels]
+    () => pinnedIds.map(id => filteredModels.find(m => m.id === id)).filter((m): m is ModelOption => !!m),
+    [pinnedIds, filteredModels]
   );
   const unpinnedModels = useMemo(
-    () => availableModels.filter(m => !pinnedIds.includes(m.id)),
-    [availableModels, pinnedIds]
+    () => filteredModels.filter(m => !pinnedIds.includes(m.id)),
+    [filteredModels, pinnedIds]
   );
   const allModels = useMemo(() => [...pinnedModels, ...unpinnedModels], [pinnedModels, unpinnedModels]);
 
@@ -73,6 +79,18 @@ export function ModelPicker() {
       return;
     }
     void setPinnedForTool([...pinnedIds, modelId]);
+  };
+
+  const toggleGoOnly = async () => {
+    const nextSettings: Settings = {
+      ...settings,
+      showGoModelsOnly: {
+        ...settings.showGoModelsOnly,
+        [tool]: !showGoOnly,
+      },
+    };
+    setSettings(nextSettings);
+    await window.electronAPI.saveSettings(nextSettings);
   };
 
   const reorderPinned = (fromIdx: number, toIdx: number) => {
@@ -121,13 +139,15 @@ export function ModelPicker() {
 
   // Reset selection when a new pending launch arrives
   useEffect(() => {
-    if (pendingLaunch && allModels.length > 0) {
+    if (pendingLaunch) {
       void loadModels(tool);
-      const ms = allModels;
-      const idx = Math.max(0, ms.findIndex(m => m.id === pendingLaunch.launch.model));
-      setSelectedIdx(idx);
+      if (allModels.length > 0) {
+        const ms = allModels;
+        const idx = Math.max(0, ms.findIndex(m => m.id === pendingLaunch.launch.model));
+        setSelectedIdx(idx);
+      }
     }
-  }, [pendingLaunch?.launch.id, tool, allModels.length]);
+  }, [pendingLaunch?.launch.id, tool]);
 
   // Never auto-scroll; keep list at top. User scrolls manually if needed.
   useEffect(() => {
@@ -232,6 +252,13 @@ export function ModelPicker() {
           <div className="model-picker-launch-name">{pendingLaunch.launch.name}</div>
           <div className="model-picker-tool-badge">{toolLabel}</div>
         </div>
+        {tool === 'opencode' && (
+          <label className="model-picker-go-toggle">
+            <input type="checkbox" checked={showGoOnly} onChange={toggleGoOnly} />
+            <span className="model-picker-go-checkbox" />
+            <span>{t('showGoModelsOnly')}</span>
+          </label>
+        )}
         <div className="model-picker-list" ref={listRef}>
           {isLoading && <div className="model-picker-loading"><span className="model-picker-loading-dot" />{t('loadingModels')}</div>}
           {allModels.length === 0 ? (

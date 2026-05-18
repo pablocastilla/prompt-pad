@@ -40,15 +40,17 @@ test.describe('Model picker behavior', () => {
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
 
-      const modelCount = await page.evaluate(async () => {
+      const models = await page.evaluate(async () => {
         const api = (window as unknown as {
           electronAPI: {
             getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
           };
         }).electronAPI;
-        return (await api.getOpenCodeModels()).length;
+        return await api.getOpenCodeModels();
       });
-      expect(modelCount).toBeGreaterThan(20);
+
+      expect(models.length).toBeGreaterThan(20);
+      expect(models.filter(m => m.id.startsWith('opencode-go/')).length).toBeGreaterThan(0);
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -57,15 +59,18 @@ test.describe('Model picker behavior', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
 
-      await expect(page.locator('.model-picker-item')).toHaveCount(modelCount, { timeout: 5000 });
+      // Wait for Go models to load (filter enabled by default)
+      await page.waitForTimeout(3000);
+
+      const goModelCount = await page.locator('.model-picker-item').count();
+      expect(goModelCount).toBeGreaterThan(0);
+      expect(goModelCount).toBeLessThanOrEqual(models.length);
 
       const list = page.locator('.model-picker-list');
       const canScroll = await list.evaluate((el) => el.scrollHeight > el.clientHeight);
       expect(canScroll).toBe(true);
 
-      // Scroll the list via wheel to ensure scrollTop changes
       await list.evaluate((el) => { el.scrollTop = el.scrollHeight; });
-
       const scrolled = await list.evaluate((el) => el.scrollTop > 0);
       expect(scrolled).toBe(true);
 
@@ -119,6 +124,61 @@ test.describe('Model picker behavior', () => {
       expect(animationName).toContain('model-picker-pulse');
 
       await expect(page.locator('.model-picker-item-label').filter({ hasText: 'gpt-5.5' })).toBeVisible({ timeout: 5000 });
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('OpenCode model picker shows Go models filter checkbox checked by default', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir, 'opencode');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+
+      // Checkbox should be visible and checked by default
+      await expect(page.locator('.model-picker-go-toggle')).toBeVisible();
+      await expect(page.locator('.model-picker-go-toggle input[type="checkbox"]')).toBeChecked();
+
+      // Wait for Go models to load
+      await page.waitForTimeout(3000);
+      const goModelCount = await page.locator('.model-picker-item').count();
+      expect(goModelCount).toBeGreaterThan(0);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('Copilot model picker does not show Go models filter', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir, 'copilot');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+
+      await expect(page.locator('.model-picker-go-toggle')).not.toBeVisible();
 
       await app.close();
     } finally {
