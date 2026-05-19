@@ -518,7 +518,7 @@ async function executeLaunchOpenCode(config: {
     const safeModel = escapeSingleQuotePS(model);
     const safeMsg   = escapeSingleQuotePS(message);
     const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
-    const variantArg = "--dangerously-skip-permissions";
+    const variantArg = yolo ? '--dangerously-skip-permissions' : '';
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
       "$ocArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "'" + (variantArg ? ", '" + variantArg + "'" : '') + (isInteractive ? ", '--interactive'" : '') + ", '" + safeMsg + "')",
@@ -539,7 +539,7 @@ async function executeLaunchOpenCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
-    const variantArg = ' --dangerously-skip-permissions';
+    const variantArg = yolo ? ' --dangerously-skip-permissions' : '';
     const interactiveArg = isInteractive ? ' --interactive' : '';
     const script = [
       '#!/bin/bash',

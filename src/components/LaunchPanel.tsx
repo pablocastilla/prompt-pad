@@ -178,7 +178,7 @@ export function LaunchPanel() {
                   })()}
                 </div>
                 <div className="launch-list-item-meta">
-                {launch.tool === 'opencode' ? 'opencode' : `copilot · ${launch.yolo ? 'YOLO' : 'safe'} · ${launch.mode === 'interactive' ? '-i' : '-p'}`}
+                {launch.tool === 'opencode' ? `opencode · ${launch.yolo ? 'YOLO' : 'safe'}` : `copilot · ${launch.yolo ? 'YOLO' : 'safe'} · ${launch.mode === 'interactive' ? '-i' : '-p'}`}
               </div>
               </div>
               <div className="launch-list-item-actions">
@@ -236,16 +236,14 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder }: LaunchFo
           <button className="btn btn-sm" onClick={onPickFolder}>{t('browseFolder')}</button>
         </div>
       </div>
-      {data.tool !== 'opencode' && (
-        <div className="form-group form-checkbox">
-          <label>
-            <input type="checkbox" checked={data.yolo}
-              onChange={e => onChange({ ...data, yolo: e.target.checked })} />
-            {t('yoloMode')}
-          </label>
-        </div>
-      )}
-      {data.tool !== 'opencode' && (
+      <div className="form-group form-checkbox">
+        <label>
+          <input type="checkbox" checked={data.yolo}
+            onChange={e => onChange({ ...data, yolo: e.target.checked })} />
+          {t('yoloMode')}
+        </label>
+      </div>
+      {data.tool === 'copilot' && (
         <div className="form-group">
           <label>{t('launchMode')}</label>
           <select title={t('launchMode')} value={data.mode}
