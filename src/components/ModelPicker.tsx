@@ -16,9 +16,6 @@ export function ModelPicker() {
   const setSettings      = useStore(s => s.setSettings);
   const addLaunchHistoryEntry = useStore(s => s.addLaunchHistoryEntry);
   const launchHistory    = useStore(s => s.launchHistory);
-  const tabs             = useStore(s => s.tabs);
-  const activeTabId      = useStore(s => s.activeTabId);
-  const closeTab         = useStore(s => s.closeTab);
   const triggerLaunchSplash = useStore(s => s.triggerLaunchSplash);
 
   const [modelCache, setModelCache] = useState<{ copilot: ModelOption[] | null; opencode: ModelOption[] | null }>({
@@ -195,9 +192,6 @@ export function ModelPicker() {
       mode: pendingLaunch.launch.mode,
       attachedFilePaths: pendingLaunch.attachedFilePaths,
     });
-    if (tabs.length > 1) {
-      closeTab(activeTabId);
-    }
     if (settings.theme === 'gaudy') {
       triggerLaunchSplash();
       addToast(t('gaudyLaunch'));
