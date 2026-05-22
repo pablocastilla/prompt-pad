@@ -105,8 +105,16 @@ export function ModelPicker() {
     void setPinnedForTool([...reorderedVisible, ...hiddenIds]);
   };
 
-  const loadModels = async (selectedTool: LaunchTool) => {
-    if (modelCache[selectedTool] || loadingModels[selectedTool]) return;
+  const cleanStalePins = async (selectedTool: LaunchTool, fetchedIds: string[]) => {
+    const pinned = settings.pinnedModels?.[selectedTool] ?? [];
+    if (pinned.length === 0) return;
+    const stale = pinned.filter(id => !fetchedIds.includes(id));
+    if (stale.length === 0) return;
+    void setPinnedForTool(pinned.filter(id => !stale.includes(id)));
+  };
+
+  const loadModels = async (selectedTool: LaunchTool, force = false) => {
+    if (!force && (modelCache[selectedTool] || loadingModels[selectedTool])) return;
     setLoadingModels(prev => ({ ...prev, [selectedTool]: true }));
     const fallback = modelsForTool(selectedTool);
     try {
@@ -129,11 +137,18 @@ export function ModelPicker() {
         : list;
 
       setModelCache(prev => ({ ...prev, [selectedTool]: normalized }));
+      void cleanStalePins(selectedTool, normalized.map(m => m.id));
     } catch {
       setModelCache(prev => ({ ...prev, [selectedTool]: fallback }));
     } finally {
       setLoadingModels(prev => ({ ...prev, [selectedTool]: false }));
     }
+  };
+
+  const refreshModels = async () => {
+    await window.electronAPI.clearModelCache();
+    setModelCache({ copilot: null, opencode: null });
+    await loadModels(tool, true);
   };
 
   // Reset selection when a new pending launch arrives
@@ -284,6 +299,12 @@ export function ModelPicker() {
           <div className="model-picker-title">{t('selectModelToLaunch')}</div>
           <div className="model-picker-launch-name">{pendingLaunch.launch.name}</div>
           <div className="model-picker-tool-badge">{toolLabel}</div>
+          <button
+            className="model-picker-refresh-btn"
+            onClick={e => { e.stopPropagation(); void refreshModels(); }}
+            disabled={isLoading}
+            title={t('refreshModels')}
+          >{isLoading ? '⏳' : '🔄'}</button>
         </div>
         {tool === 'opencode' && (
           <label className="model-picker-go-toggle">

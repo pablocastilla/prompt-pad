@@ -267,6 +267,7 @@ export interface ElectronAPI {
   }) => Promise<boolean>;
   getOpenCodeModels: () => Promise<ModelOption[]>;
   getCopilotModels: () => Promise<ModelOption[]>;
+  clearModelCache: () => Promise<void>;
   readClipboardImage: () => Promise<{ name: string; path: string; size: number } | null>;
   clipboardHasImage: () => boolean;
   pickFiles: () => Promise<{ name: string; path: string; size: number }[]>;

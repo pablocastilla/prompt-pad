@@ -67,6 +67,7 @@ const translations = {
     gaudyClearHistory: '🧹 HISTORY DIMENSION WIPED',
     gaudyOpenHistory: '⚡ PROMPT RESTORED FROM THE VOID',
     expensiveModelConfirm: 'This model is expensive. Are you sure you want to launch it?',
+    refreshModels: 'Refresh models',
   },
   es: {
     launch: 'Lanzar', selectLaunch: 'Seleccionar lanzamiento…', noLaunches: 'Sin configuraciones aún.',
@@ -136,6 +137,7 @@ const translations = {
     gaudyClearHistory: '🧹 DIMENSIÓN DEL HISTORIAL BORRADA',
     gaudyOpenHistory: '⚡ PROMPT RESTAURADO DEL VACÍO',
     expensiveModelConfirm: 'Este modelo es muy caro. ¿Estás seguro de que quieres lanzarlo?',
+    refreshModels: 'Refrescar modelos',
   },
 } as const;
 

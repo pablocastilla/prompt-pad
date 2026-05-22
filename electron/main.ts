@@ -366,6 +366,11 @@ ipcMain.handle('models:get-opencode', async () => {
   return openCodeModelsCache;
 });
 
+ipcMain.handle('models:clear-cache', () => {
+  openCodeModelsCache = null;
+  copilotModelsCache = null;
+});
+
 ipcMain.handle('models:get-copilot', async () => {
   if (copilotModelsCache && copilotModelsCache.length > 0) return copilotModelsCache;
   try {

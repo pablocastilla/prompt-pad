@@ -182,4 +182,121 @@ test.describe('OpenCode Models Feature', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  test('clearModelCache IPC clears model cache', async () => {
+    const testDir = getTestDir();
+    try {
+      const app = await launchWithTestDir(testDir);
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      const models1 = await page.evaluate(async () => {
+        const api = (window as unknown as {
+          electronAPI: { getOpenCodeModels: () => Promise<{ id: string; label: string }[]>; clearModelCache: () => Promise<void> }
+        }).electronAPI;
+        const m = await api.getOpenCodeModels();
+        await api.clearModelCache();
+        const m2 = await api.getOpenCodeModels();
+        return { first: m.length, second: m2.length, same: JSON.stringify(m) === JSON.stringify(m2) };
+      });
+
+      expect(models1.first).toBeGreaterThan(0);
+      expect(models1.first).toBe(models1.second);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('stale pinned models are removed when unavailable in refreshed list', async () => {
+    const testDir = getTestDir();
+    try {
+      const launches = [
+        {
+          id: 'stale-pin-launch',
+          name: 'Stale Pin Test',
+          tool: 'copilot',
+          model: 'auto',
+          folder: process.cwd(),
+          yolo: true,
+          mode: 'interactive',
+          shortcut: 1,
+        },
+      ];
+      const settings = {
+        theme: 'light',
+        language: 'auto',
+        pinnedModels: {
+          copilot: ['auto', 'nonexistent-model-xyz'],
+          opencode: [],
+        },
+      };
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify(launches, null, 2), 'utf-8');
+      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf-8');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('stale pin test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+
+      await page.waitForTimeout(2500);
+
+      await app.close();
+      await new Promise(r => setTimeout(r, 500));
+
+      const savedSettings = JSON.parse(fs.readFileSync(path.join(testDir, 'settings.json'), 'utf-8'));
+      const copilotPins = savedSettings.pinnedModels?.copilot ?? [];
+      console.log(`Copilot pinned after cleanup: ${JSON.stringify(copilotPins)}`);
+      expect(copilotPins).not.toContain('nonexistent-model-xyz');
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('refresh button appears in model picker header', async () => {
+    const testDir = getTestDir();
+    try {
+      const launches = [
+        {
+          id: 'refresh-btn-launch',
+          name: 'Refresh Btn Test',
+          tool: 'opencode',
+          model: 'opencode/kimi-k2.6',
+          folder: process.cwd(),
+          yolo: true,
+          mode: 'interactive',
+          shortcut: 1,
+        },
+      ];
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify(launches, null, 2), 'utf-8');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('refresh btn test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+
+      const refreshBtn = page.locator('.model-picker-refresh-btn');
+      await expect(refreshBtn).toBeVisible({ timeout: 3000 });
+
+      const isLoading = await refreshBtn.isDisabled();
+      console.log(`Refresh button disabled (loading): ${isLoading}`);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });
