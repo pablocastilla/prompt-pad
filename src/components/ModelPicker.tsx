@@ -18,13 +18,15 @@ export function ModelPicker() {
   const launchHistory    = useStore(s => s.launchHistory);
   const triggerLaunchSplash = useStore(s => s.triggerLaunchSplash);
 
-  const [modelCache, setModelCache] = useState<{ copilot: ModelOption[] | null; opencode: ModelOption[] | null }>({
+  const [modelCache, setModelCache] = useState<{ copilot: ModelOption[] | null; opencode: ModelOption[] | null; antigravity: ModelOption[] | null }>({
     copilot: null,
     opencode: null,
+    antigravity: null,
   });
-  const [loadingModels, setLoadingModels] = useState<{ copilot: boolean; opencode: boolean }>({
+  const [loadingModels, setLoadingModels] = useState<{ copilot: boolean; opencode: boolean; antigravity: boolean }>({
     copilot: false,
     opencode: false,
+    antigravity: false,
   });
   const listRef = useRef<HTMLDivElement | null>(null);
   const [dragPinnedIdx, setDragPinnedIdx] = useState<number | null>(null);
@@ -65,6 +67,7 @@ export function ModelPicker() {
       pinnedModels: {
         copilot: settings.pinnedModels?.copilot ?? [],
         opencode: settings.pinnedModels?.opencode ?? [],
+        antigravity: settings.pinnedModels?.antigravity ?? [],
         [tool]: nextIds,
       },
     };
@@ -118,9 +121,14 @@ export function ModelPicker() {
     setLoadingModels(prev => ({ ...prev, [selectedTool]: true }));
     const fallback = modelsForTool(selectedTool);
     try {
-      const fetched = selectedTool === 'opencode'
-        ? await window.electronAPI.getOpenCodeModels()
-        : await window.electronAPI.getCopilotModels();
+      let fetched: ModelOption[] = [];
+      if (selectedTool === 'opencode') {
+        fetched = await window.electronAPI.getOpenCodeModels();
+      } else if (selectedTool === 'copilot') {
+        fetched = await window.electronAPI.getCopilotModels();
+      } else if (selectedTool === 'antigravity') {
+        fetched = await window.electronAPI.getAntigravityModels();
+      }
       if (!Array.isArray(fetched) || fetched.length === 0) {
         setModelCache(prev => ({ ...prev, [selectedTool]: fallback }));
         return;
@@ -147,7 +155,7 @@ export function ModelPicker() {
 
   const refreshModels = async () => {
     await window.electronAPI.clearModelCache();
-    setModelCache({ copilot: null, opencode: null });
+    setModelCache({ copilot: null, opencode: null, antigravity: null });
     await loadModels(tool, true);
   };
 
@@ -288,7 +296,7 @@ export function ModelPicker() {
 
   if (!pendingLaunch) return null;
 
-  const toolLabel = tool === 'opencode' ? '⚡ OpenCode' : '🤖 GitHub Copilot';
+  const toolLabel = tool === 'opencode' ? '⚡ OpenCode' : tool === 'antigravity' ? '🌌 Antigravity' : '🤖 GitHub Copilot';
   const isLoading = loadingModels[tool];
   const getShortcutLabel = (idx: number): string => `${(idx + 1) % 10}`;
 

@@ -19,8 +19,12 @@ const FALLBACK_OPENCODE_MODELS = [
   { id: 'opencode/minimax-m2.7', label: 'Minimax M2.7' },
   { id: 'opencode/minimax-m2.5-free', label: 'Minimax M2.5 Free' },
 ];
+const FALLBACK_ANTIGRAVITY_MODELS = [
+  { id: 'antigravity/default', label: 'Antigravity Default' },
+];
 const DEFAULT_MODEL = 'claude-sonnet-4.6';
 const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.7';
+const DEFAULT_ANTIGRAVITY_MODEL = 'antigravity/default';
 
 // Maximum reasoning effort supported by each model
 const MODEL_MAX_EFFORT: Record<string, string> = {
@@ -91,12 +95,24 @@ function normalizeOpenCodeModel(model: unknown): string {
   return candidate || DEFAULT_OPENCODE_MODEL;
 }
 
+function normalizeAntigravityModel(model: unknown): string {
+  if (typeof model !== 'string') return DEFAULT_ANTIGRAVITY_MODEL;
+  const candidate = model.trim();
+  return candidate || DEFAULT_ANTIGRAVITY_MODEL;
+}
+
 function sanitizeLaunches(launches: unknown[]): unknown[] {
   return launches.map((item) => {
     if (!item || typeof item !== 'object') return item;
     const launch = item as Record<string, unknown>;
-    const tool = launch.tool === 'opencode' ? 'opencode' : 'copilot';
-    return { ...launch, tool, model: tool === 'opencode' ? normalizeOpenCodeModel(launch.model) : normalizeModel(launch.model) };
+    const tool = launch.tool === 'opencode' ? 'opencode' :
+                 launch.tool === 'antigravity' ? 'antigravity' : 'copilot';
+    if (tool === 'opencode') {
+      return { ...launch, tool, model: normalizeOpenCodeModel(launch.model) };
+    } else if (tool === 'antigravity') {
+      return { ...launch, tool, model: normalizeAntigravityModel(launch.model) };
+    }
+    return { ...launch, tool, model: normalizeModel(launch.model) };
   });
 }
 
@@ -127,6 +143,19 @@ function parseOpenCodeModels(raw: string): Array<{ id: string; label: string }> 
     unique.set(clean, {
       id: clean,
       label: clean.replace(/^opencode(-go)?\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    });
+  }
+  return [...unique.values()];
+}
+
+function parseAntigravityModels(raw: string): Array<{ id: string; label: string }> {
+  const unique = new Map<string, { id: string; label: string }>();
+  for (const line of raw.split(/\r?\n/)) {
+    const clean = line.trim();
+    if (!clean.startsWith('antigravity/')) continue;
+    unique.set(clean, {
+      id: clean,
+      label: clean.replace(/^antigravity\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
     });
   }
   return [...unique.values()];
@@ -349,6 +378,7 @@ ipcMain.handle('onedrive:detect', () => detectOneDrivePath());
 // Dynamic model lists (cached in process memory)
 let openCodeModelsCache: { id: string; label: string }[] | null = null;
 let copilotModelsCache: { id: string; label: string }[] | null = null;
+let antigravityModelsCache: { id: string; label: string }[] | null = null;
 
 ipcMain.handle('models:get-opencode', async () => {
   if (openCodeModelsCache && openCodeModelsCache.length > 0) return openCodeModelsCache;
@@ -366,9 +396,26 @@ ipcMain.handle('models:get-opencode', async () => {
   return openCodeModelsCache;
 });
 
+ipcMain.handle('models:get-antigravity', async () => {
+  if (antigravityModelsCache && antigravityModelsCache.length > 0) return antigravityModelsCache;
+  try {
+    const output = await runCommand('agy.exe', ['models'], 8000);
+    const parsed = parseAntigravityModels(output);
+    if (parsed.length > 0) {
+      antigravityModelsCache = parsed;
+      return parsed;
+    }
+  } catch {
+    // fallback below
+  }
+  antigravityModelsCache = FALLBACK_ANTIGRAVITY_MODELS;
+  return antigravityModelsCache;
+});
+
 ipcMain.handle('models:clear-cache', () => {
   openCodeModelsCache = null;
   copilotModelsCache = null;
+  antigravityModelsCache = null;
 });
 
 ipcMain.handle('models:get-copilot', async () => {
@@ -471,9 +518,12 @@ ipcMain.handle('launch:execute', async (_e, config: {
   tool?: string; model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
 }) => {
-  const tool = config.tool === 'opencode' ? 'opencode' : 'copilot';
+  const tool = config.tool === 'opencode' ? 'opencode' :
+               config.tool === 'antigravity' ? 'antigravity' : 'copilot';
   if (tool === 'opencode') {
     return executeLaunchOpenCode(config);
+  } else if (tool === 'antigravity') {
+    return executeLaunchAntigravity(config);
   }
   return executeLaunchCopilot(config);
 });
@@ -484,8 +534,6 @@ async function executeLaunchOpenCode(config: {
 }) {
   const { folder, yolo, prompt, mode, attachedFilePaths = [] } = config;
   const model = normalizeOpenCodeModel(config.model);
-  // opencode uses provider/model format: strip the leading 'opencode/' prefix for --model flag
-  // Actually opencode expects the full id like 'opencode/kimi-k2.6'
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
   const isInteractive = mode === 'interactive';
   const id = Date.now().toString();
@@ -511,7 +559,6 @@ async function executeLaunchOpenCode(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  // Build message: read the prompt file and mention attachments
   let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
@@ -523,10 +570,11 @@ async function executeLaunchOpenCode(config: {
     const safeModel = escapeSingleQuotePS(model);
     const safeMsg   = escapeSingleQuotePS(message);
     const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
-    const variantArg = yolo ? '--dangerously-skip-permissions' : '';
+    const yoloArg = yolo ? "'--dangerously-skip-permissions'" : '';
+    const interactiveArg = isInteractive ? ", '--interactive'" : '';
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
-      "$ocArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "'" + (variantArg ? ", '" + variantArg + "'" : '') + (isInteractive ? ", '--interactive'" : '') + ", '" + safeMsg + "')",
+      "$ocArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "'" + (yoloArg ? ", " + yoloArg : '') + interactiveArg + ", '" + safeMsg + "')",
       "& opencode @ocArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
@@ -544,12 +592,12 @@ async function executeLaunchOpenCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
-    const variantArg = yolo ? ' --dangerously-skip-permissions' : '';
+    const yoloArg = yolo ? ' --dangerously-skip-permissions' : '';
     const interactiveArg = isInteractive ? ' --interactive' : '';
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'opencode run --model ' + JSON.stringify(model) + ' --dir ' + JSON.stringify(workDir) + variantArg + interactiveArg + ' ' + JSON.stringify(message),
+      'opencode run --model ' + JSON.stringify(model) + ' --dir ' + JSON.stringify(workDir) + yoloArg + interactiveArg + ' ' + JSON.stringify(message),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');
@@ -562,6 +610,85 @@ async function executeLaunchOpenCode(config: {
         'end tell',
       ].join('\n');
       spawn('osascript', ['-e', appleScript], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      spawnTerminalLinux([
+        ['gnome-terminal', ['--', 'bash', shPath]],
+        ['konsole',        ['-e', 'bash', shPath]],
+        ['xfce4-terminal', ['--command', 'bash "' + shPath + '"']],
+        ['xterm',          ['-e', 'bash "' + shPath + '"']],
+      ]);
+    }
+  }
+  return true;
+}
+
+async function executeLaunchAntigravity(config: {
+  model: string; folder: string; yolo: boolean; prompt: string; mode: string;
+  attachedFilePaths?: string[];
+}) {
+  const { folder, yolo, prompt, attachedFilePaths = [] } = config;
+  const model = normalizeAntigravityModel(config.model);
+  const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
+  const id = Date.now().toString();
+
+  const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
+  fs.mkdirSync(launchTmpDir, { recursive: true });
+
+  const promptFileName = 'pp-prompt-' + id + '.txt';
+  const promptPath = path.join(launchTmpDir, promptFileName);
+  fs.writeFileSync(promptPath, prompt, 'utf-8');
+
+  const copiedNames = new Set<string>([promptFileName]);
+  const attachedFileNames: string[] = [];
+  for (const srcPath of attachedFilePaths) {
+    if (!srcPath || !fs.existsSync(srcPath)) continue;
+    let destName = path.basename(srcPath);
+    if (copiedNames.has(destName)) {
+      const ext = path.extname(destName);
+      destName = path.basename(destName, ext) + '-' + id + ext;
+    }
+    copiedNames.add(destName);
+    attachedFileNames.push(destName);
+    fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
+  }
+
+  const message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  const safeDir = escapeSingleQuotePS(workDir);
+  const safeModel = escapeSingleQuotePS(model);
+  const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
+
+  if (process.platform === 'win32') {
+    const psPath = path.join(os.tmpdir(), 'pp-ag-' + id + '.ps1');
+    const script = [
+      "Set-Location -LiteralPath '" + safeDir + "'",
+      "$agArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "')",
+      "& agy.exe @agArgs",
+      "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
+    ].join('\n');
+    fs.writeFileSync(psPath, script, 'utf-8');
+    const wt = spawn('wt.exe', [
+      'new-tab', '--title', 'Prompt Pad',
+      'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
+    ], { detached: true, stdio: 'ignore' });
+    wt.on('error', () => {
+      spawn('cmd.exe', [
+        '/c', 'start', '"Prompt Pad"', 'powershell.exe',
+        '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
+      ], { detached: true, stdio: 'ignore' }).unref();
+    });
+    wt.unref();
+  } else {
+    const shPath = path.join(os.tmpdir(), 'pp-ag-' + id + '.sh');
+    const script = [
+      '#!/bin/bash',
+      'cd ' + JSON.stringify(workDir),
+      'agy.exe run --model ' + JSON.stringify(model) + ' --dir ' + JSON.stringify(workDir) + ' ' + JSON.stringify(message),
+      'rm -rf ' + JSON.stringify(launchTmpDir),
+      'rm -f "$0"',
+    ].join('\n');
+    fs.writeFileSync(shPath, script, { mode: 0o755 });
+    if (process.platform === 'darwin') {
+      spawn('osascript', ['-e', 'tell application "Terminal" to do script "bash ' + shPath.replace(/'/g, "'\\''") + '"'], { detached: true, stdio: 'ignore' }).unref();
     } else {
       spawnTerminalLinux([
         ['gnome-terminal', ['--', 'bash', shPath]],

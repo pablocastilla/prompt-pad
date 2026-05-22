@@ -11,6 +11,18 @@ const DEFAULT: Omit<LaunchConfig, 'id'> = {
   name: '', tool: 'copilot', folder: '', yolo: true, mode: 'interactive',
 };
 
+const TOOL_LABELS: Record<LaunchTool, string> = {
+  copilot: '🤖 GitHub Copilot',
+  opencode: '⚡ OpenCode',
+  antigravity: '🌌 Antigravity',
+};
+
+const TOOL_ICONS: Record<LaunchTool, string> = {
+  copilot: '🤖',
+  opencode: '⚡',
+  antigravity: '🌌',
+};
+
 export function LaunchPanel() {
   const launches            = useStore(s => s.launches);
   const setLaunches         = useStore(s => s.setLaunches);
@@ -178,8 +190,8 @@ export function LaunchPanel() {
                   })()}
                 </div>
                 <div className="launch-list-item-meta">
-                {launch.tool === 'opencode' ? `opencode · ${launch.yolo ? 'YOLO' : 'safe'}` : `copilot · ${launch.yolo ? 'YOLO' : 'safe'} · ${launch.mode === 'interactive' ? '-i' : '-p'}`}
-              </div>
+                  {TOOL_ICONS[launch.tool]} {launch.tool === 'opencode' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : launch.tool === 'antigravity' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : `· ${launch.yolo ? 'YOLO' : 'safe'} · ${launch.mode === 'interactive' ? '-i' : '-p'}`}
+                </div>
               </div>
               <div className="launch-list-item-actions">
                 <button className="btn-icon" onClick={e => { e.stopPropagation(); handleStartEdit(launch); }}>✏️</button>
@@ -216,14 +228,14 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder }: LaunchFo
       <div className="form-group">
         <label>{t('launchTool')}</label>
         <div className="tool-selector">
-          {(['copilot', 'opencode'] as LaunchTool[]).map(tool => (
+          {(['copilot', 'opencode', 'antigravity'] as LaunchTool[]).map(tool => (
             <button
               key={tool}
               className={'tool-btn' + (data.tool === tool ? ' active' : '')}
               onClick={() => onChange({ ...data, tool })}
               type="button"
             >
-              {tool === 'copilot' ? '🤖 GitHub Copilot' : '⚡ OpenCode'}
+              {TOOL_LABELS[tool]}
             </button>
           ))}
         </div>

@@ -7,7 +7,7 @@ export interface Phrase {
 }
 
 // ── Launch Configuration ──
-export type LaunchTool = 'copilot' | 'opencode';
+export type LaunchTool = 'copilot' | 'opencode' | 'antigravity';
 
 export interface LaunchConfig {
   id: string;
@@ -235,7 +235,12 @@ export const OPENCODE_MODELS = [
   { id: 'opencode/minimax-m2.5-free', label: 'Minimax M2.5 Free' },
 ] as const;
 
+export const ANTIGRAVITY_MODELS = [
+  { id: 'antigravity/default', label: 'Antigravity Default' },
+] as const;
+
 export function modelsForTool(tool: LaunchTool): ReadonlyArray<{ id: string; label: string }> {
+  if (tool === 'antigravity') return ANTIGRAVITY_MODELS;
   return tool === 'opencode' ? OPENCODE_MODELS : COPILOT_MODELS;
 }
 
@@ -257,7 +262,7 @@ export interface ElectronAPI {
   openFile: () => Promise<{ filePath: string; content: string } | null>;
   getPromptsDir: () => Promise<string>;
   executeLaunch: (config: {
-    tool: 'copilot' | 'opencode';
+    tool: 'copilot' | 'opencode' | 'antigravity';
     model: string;
     folder: string;
     yolo: boolean;
@@ -267,6 +272,7 @@ export interface ElectronAPI {
   }) => Promise<boolean>;
   getOpenCodeModels: () => Promise<ModelOption[]>;
   getCopilotModels: () => Promise<ModelOption[]>;
+  getAntigravityModels: () => Promise<ModelOption[]>;
   clearModelCache: () => Promise<void>;
   readClipboardImage: () => Promise<{ name: string; path: string; size: number } | null>;
   clipboardHasImage: () => boolean;

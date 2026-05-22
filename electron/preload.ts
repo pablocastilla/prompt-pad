@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('launch:execute', config),
   getOpenCodeModels: () => ipcRenderer.invoke('models:get-opencode'),
   getCopilotModels: () => ipcRenderer.invoke('models:get-copilot'),
+  getAntigravityModels: () => ipcRenderer.invoke('models:get-antigravity'),
   clearModelCache: () => ipcRenderer.invoke('models:clear-cache'),
 
   // Read native clipboard image (Snipping Tool, PrintScreen)
