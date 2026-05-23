@@ -377,4 +377,67 @@ test.describe('Custom Shortcuts', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  test('Enter key creates a single line break on first press', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, []);
+      saveLaunches(testDir, []);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      const editor = page.locator('.editor-textarea');
+      await editor.click();
+      await page.keyboard.type('line1');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('line2');
+      await page.waitForTimeout(200);
+
+      await expect(editor).toContainText('line1');
+      await expect(editor).toContainText('line2');
+      const content = await editor.textContent();
+      expect(content).toContain('\n');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('Enter does not get phrase-text styling', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, [
+        { id: 'p1', name: 'Greeting', content: 'Hello', shortcut: '1' },
+      ]);
+      saveLaunches(testDir, []);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      const editor = page.locator('.editor-textarea');
+      await editor.click();
+      await page.keyboard.press('Control+1');
+      await page.waitForTimeout(200);
+      await expect(editor.locator('.phrase-text')).toContainText('Hello');
+
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('middle text');
+      await page.waitForTimeout(200);
+
+      const spans = editor.locator('.phrase-text');
+      await expect(spans).toHaveCount(1);
+      await expect(spans.first()).toContainText('Hello');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });

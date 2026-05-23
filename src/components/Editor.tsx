@@ -189,6 +189,8 @@ export function Editor() {
   const addToast = useStore(s => s.addToast);
 
   const activeTab = tabs.find(tab => tab.id === activeTabId);
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
   const editorRef = useRef<HTMLDivElement>(null);
   const editorSurfaceRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef(activeTab?.content || '');
@@ -237,7 +239,8 @@ export function Editor() {
 
   const insertPlainTextAtSelection = useCallback((insertText: string, source: 'catalog' | 'shortcut' = 'shortcut') => {
     const editor = editorSurfaceRef.current;
-    if (!editor || !activeTab) return;
+    const tab = activeTabRef.current;
+    if (!editor || !tab) return;
 
     const current = getPlainTextFromEditor(editor);
     const selection = getSelectionOffsets(editor) ?? { start: current.length, end: current.length };
@@ -247,14 +250,14 @@ export function Editor() {
     const shift = insertText.length - (selection.end - selection.start);
 
     const newRanges: Array<{ start: number; end: number }> = [];
-    for (const r of activeTab.phraseRanges) {
+    for (const r of tab.phraseRanges) {
       if (r.end <= selection.start) {
         newRanges.push(r);
       } else if (r.start >= selection.end) {
         newRanges.push({ start: r.start + shift, end: r.end + shift });
       }
     }
-    if (source === 'catalog' || source === 'shortcut') {
+    if (source === 'catalog') {
       newRanges.push({ start: insertStart, end: insertEnd });
     }
 
@@ -268,7 +271,7 @@ export function Editor() {
     setTabPhraseRanges(activeTabId, newRanges);
     syncEditorValue(editor, newText);
     editor.focus();
-  }, [activeTabId, activeTab, updateTabContent, setTabPhraseRanges]);
+  }, [activeTabId, updateTabContent, setTabPhraseRanges]);
 
   const processEditorPaste = useCallback(async (clipboardData: DataTransfer | null) => {
     const fileItems = Array.from(clipboardData?.files ?? []) as (File & { path?: string })[];
@@ -402,9 +405,9 @@ export function Editor() {
     syncEditorValue(editor, newContent);
     setIsEditorEmpty(newLen === 0);
 
-    if (activeTab && activeTab.phraseRanges.length > 0 && oldText !== newContent) {
+    if (activeTabRef.current && activeTabRef.current.phraseRanges.length > 0 && oldText !== newContent) {
       const caret = selection?.start ?? newContent.length;
-      setTabPhraseRanges(activeTabId, adjustPhraseRanges(activeTab.phraseRanges, oldText, newContent, caret));
+      setTabPhraseRanges(activeTabId, adjustPhraseRanges(activeTabRef.current.phraseRanges, oldText, newContent, caret));
     }
 
     if (theme === 'gaudy') {
@@ -437,7 +440,7 @@ export function Editor() {
         }, 180);
       }
     }
-  }, [activeTabId, activeTab, theme, updateTabContent, setTabPhraseRanges]);
+  }, [activeTabId, theme, updateTabContent, setTabPhraseRanges]);
 
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
