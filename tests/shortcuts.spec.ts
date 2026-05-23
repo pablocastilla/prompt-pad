@@ -99,11 +99,16 @@ test.describe('Custom Shortcuts', () => {
       await page.keyboard.press('Control+3');
       await page.waitForTimeout(200);
         await expect(editor).toContainText('Hello from phrase');
+      await expect(editor).toHaveClass(/phrase-catalog-highlight/);
 
       await editor.fill('');
       await page.keyboard.press('Control+0');
       await page.waitForTimeout(200);
         await expect(editor).toContainText('Goodbye');
+      await expect(editor).toHaveClass(/phrase-catalog-highlight/);
+
+      await page.waitForTimeout(3600);
+      await expect(editor).not.toHaveClass(/phrase-catalog-highlight/);
 
       await app.close();
     } finally {

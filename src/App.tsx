@@ -177,7 +177,7 @@ export default function App() {
       if (!phrase) return;
 
       e.preventDefault();
-      requestInsertion(activeTabId, phrase.content, 'shortcut');
+      requestInsertion(activeTabId, phrase.content, 'catalog');
       if (settings.theme === 'gaudy') addToast(t('gaudyPhrase'));
     };
 

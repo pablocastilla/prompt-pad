@@ -195,7 +195,7 @@ The Gaudy theme is best experienced live. It features:
 ### Phrase Catalog
 - **Reusable snippets**: create named text templates you type once and reuse everywhere.
 - **Keyboard insertion**: `Ctrl/⌘+1` through `Ctrl/⌘+9` (and `+0`) insert phrase at the current cursor position.
-- **Catalog insertion highlight**: when a phrase is inserted from the catalog, only the inserted fragment is temporarily highlighted with theme-aware colors in the editor.
+- **Catalog insertion highlight**: when a phrase is inserted (from the catalog panel or via `Ctrl+N` shortcut), the inserted fragment is temporarily highlighted with theme-aware colors in the editor.
 - **Drag-to-reorder**: grab the ⠿ handle and drop a phrase to a new position. The `Ctrl+N` shortcuts adjust automatically and the new order is auto-saved.
 - **Search**: filter phrases by name or content with the search bar.
 
