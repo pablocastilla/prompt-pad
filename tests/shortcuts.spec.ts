@@ -99,16 +99,13 @@ test.describe('Custom Shortcuts', () => {
       await page.keyboard.press('Control+3');
       await page.waitForTimeout(200);
         await expect(editor).toContainText('Hello from phrase');
-      await expect(editor).toHaveClass(/phrase-catalog-highlight/);
+      await expect(editor.locator('.phrase-text')).toContainText('Hello from phrase');
 
       await editor.fill('');
       await page.keyboard.press('Control+0');
       await page.waitForTimeout(200);
         await expect(editor).toContainText('Goodbye');
-      await expect(editor).toHaveClass(/phrase-catalog-highlight/);
-
-      await page.waitForTimeout(3600);
-      await expect(editor).not.toHaveClass(/phrase-catalog-highlight/);
+      await expect(editor.locator('.phrase-text')).toContainText('Goodbye');
 
       await app.close();
     } finally {
@@ -179,7 +176,7 @@ test.describe('Custom Shortcuts', () => {
     }
   });
 
-  test('inserting a phrase from catalog applies temporary highlight class', async () => {
+  test('inserting a phrase from catalog applies persistent phrase-text styling', async () => {
     const testDir = getTestDir();
     try {
       savePhrases(testDir, [
@@ -198,10 +195,11 @@ test.describe('Custom Shortcuts', () => {
 
       const editor = page.locator('.editor-textarea');
         await expect(editor).toContainText('Hello from catalog');
-      await expect(editor).toHaveClass(/phrase-catalog-highlight/);
+      const phraseSpan = editor.locator('.phrase-text');
+      await expect(phraseSpan).toContainText('Hello from catalog');
 
       await page.waitForTimeout(3600);
-      await expect(editor).not.toHaveClass(/phrase-catalog-highlight/);
+      await expect(phraseSpan).toContainText('Hello from catalog');
 
       await app.close();
     } finally {

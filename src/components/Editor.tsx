@@ -84,24 +84,35 @@ function setSelectionOffsets(editor: HTMLElement, start: number, end: number) {
   sel.addRange(range);
 }
 
-function renderEditorText(editor: HTMLElement, text: string, highlightRange?: { start: number; end: number }) {
+function renderEditorText(editor: HTMLElement, text: string, phraseRanges?: Array<{ start: number; end: number }>) {
   editor.innerHTML = '';
-  if (!highlightRange || highlightRange.end <= highlightRange.start) {
+
+  if (!phraseRanges || phraseRanges.length === 0) {
     editor.appendChild(document.createTextNode(text));
     syncEditorValue(editor, text);
     return;
   }
 
-  const before = text.slice(0, highlightRange.start);
-  const highlighted = text.slice(highlightRange.start, highlightRange.end);
-  const after = text.slice(highlightRange.end);
-
-  if (before) editor.appendChild(document.createTextNode(before));
-  const mark = document.createElement('span');
-  mark.className = 'phrase-catalog-inline-highlight';
-  mark.textContent = highlighted;
-  editor.appendChild(mark);
-  if (after) editor.appendChild(document.createTextNode(after));
+  const sorted = [...phraseRanges].sort((a, b) => a.start - b.start);
+  let pos = 0;
+  for (const r of sorted) {
+    if (r.start >= r.end) continue;
+    const clampedStart = Math.max(pos, Math.min(r.start, text.length));
+    const clampedEnd = Math.max(clampedStart, Math.min(r.end, text.length));
+    if (pos < clampedStart) {
+      editor.appendChild(document.createTextNode(text.slice(pos, clampedStart)));
+    }
+    if (clampedStart < clampedEnd) {
+      const span = document.createElement('span');
+      span.className = 'phrase-text';
+      span.textContent = text.slice(clampedStart, clampedEnd);
+      editor.appendChild(span);
+      pos = clampedEnd;
+    }
+  }
+  if (pos < text.length) {
+    editor.appendChild(document.createTextNode(text.slice(pos)));
+  }
   syncEditorValue(editor, text);
 }
 
@@ -139,11 +150,39 @@ function getBurstPosition(editor: HTMLElement, content: string, caretOffset: num
   };
 }
 
+function adjustPhraseRanges(
+  ranges: Array<{ start: number; end: number }>,
+  oldText: string,
+  newText: string,
+  _caret: number,
+): Array<{ start: number; end: number }> {
+  let editStart = 0;
+  const minLen = Math.min(oldText.length, newText.length);
+  while (editStart < minLen && oldText[editStart] === newText[editStart]) editStart++;
+  let oldEnd = oldText.length;
+  let newEnd = newText.length;
+  while (oldEnd > editStart && newEnd > editStart && oldText[oldEnd - 1] === newText[newEnd - 1]) {
+    oldEnd--;
+    newEnd--;
+  }
+  const delta = (newEnd - editStart) - (oldEnd - editStart);
+  const result: Array<{ start: number; end: number }> = [];
+  for (const r of ranges) {
+    if (r.end <= editStart) {
+      result.push(r);
+    } else if (r.start >= oldEnd) {
+      result.push({ start: r.start + delta, end: r.end + delta });
+    }
+  }
+  return result;
+}
+
 export function Editor() {
   const activeTabId = useStore(s => s.activeTabId);
   const tabs = useStore(s => s.tabs);
   const theme = useStore(s => s.settings.theme);
   const updateTabContent = useStore(s => s.updateTabContent);
+  const setTabPhraseRanges = useStore(s => s.setTabPhraseRanges);
   const insertionSignal = useStore(s => s.insertionSignal);
   const clearInsertion = useStore(s => s.clearInsertion);
   const attachFileToTab = useStore(s => s.attachFileToTab);
@@ -160,11 +199,8 @@ export function Editor() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteBurst, setDeleteBurst] = useState<BurstPosition | null>(null);
   const [isFileDragOver, setIsFileDragOver] = useState(false);
-  const [catalogInsertHighlight, setCatalogInsertHighlight] = useState(false);
-  const [catalogInsertFlash, setCatalogInsertFlash] = useState(false);
   const [isEditorEmpty, setIsEditorEmpty] = useState(!(activeTab?.content ?? '').length);
   const prevLengthRef = useRef(activeTab?.content.length ?? 0);
-  const catalogInsertTimerRef = useRef<number | null>(null);
 
   const attachPaths = useCallback((items: { name: string; path: string; size: number }[]) => {
     let added = 0;
@@ -201,38 +237,38 @@ export function Editor() {
 
   const insertPlainTextAtSelection = useCallback((insertText: string, source: 'catalog' | 'shortcut' = 'shortcut') => {
     const editor = editorSurfaceRef.current;
-    if (!editor) return;
+    if (!editor || !activeTab) return;
 
     const current = getPlainTextFromEditor(editor);
     const selection = getSelectionOffsets(editor) ?? { start: current.length, end: current.length };
     const newText = current.slice(0, selection.start) + insertText + current.slice(selection.end);
     const insertStart = selection.start;
     const insertEnd = selection.start + insertText.length;
+    const shift = insertText.length - (selection.end - selection.start);
 
-    if (source === 'catalog') {
-      renderEditorText(editor, newText, { start: insertStart, end: insertEnd });
-      setSelectionOffsets(editor, insertStart, insertEnd);
-      setCatalogInsertHighlight(true);
-      setCatalogInsertFlash(true);
-      if (catalogInsertTimerRef.current !== null) window.clearTimeout(catalogInsertTimerRef.current);
-      catalogInsertTimerRef.current = window.setTimeout(() => {
-        renderEditorText(editor, newText);
-        setSelectionOffsets(editor, insertEnd, insertEnd);
-        setCatalogInsertHighlight(false);
-        setCatalogInsertFlash(false);
-      }, 3200);
-    } else {
-      renderEditorText(editor, newText);
-      setSelectionOffsets(editor, insertEnd, insertEnd);
+    const newRanges: Array<{ start: number; end: number }> = [];
+    for (const r of activeTab.phraseRanges) {
+      if (r.end <= selection.start) {
+        newRanges.push(r);
+      } else if (r.start >= selection.end) {
+        newRanges.push({ start: r.start + shift, end: r.end + shift });
+      }
     }
+    if (source === 'catalog' || source === 'shortcut') {
+      newRanges.push({ start: insertStart, end: insertEnd });
+    }
+
+    renderEditorText(editor, newText, newRanges);
+    setSelectionOffsets(editor, insertEnd, insertEnd);
 
     contentRef.current = newText;
     prevLengthRef.current = newText.length;
     setIsEditorEmpty(newText.length === 0);
     updateTabContent(activeTabId, newText);
+    setTabPhraseRanges(activeTabId, newRanges);
     syncEditorValue(editor, newText);
     editor.focus();
-  }, [activeTabId, updateTabContent]);
+  }, [activeTabId, activeTab, updateTabContent, setTabPhraseRanges]);
 
   const processEditorPaste = useCallback(async (clipboardData: DataTransfer | null) => {
     const fileItems = Array.from(clipboardData?.files ?? []) as (File & { path?: string })[];
@@ -322,14 +358,8 @@ export function Editor() {
     contentRef.current = activeTab?.content || '';
     prevLengthRef.current = activeTab?.content.length ?? 0;
     setIsEditorEmpty((activeTab?.content.length ?? 0) === 0);
-    setCatalogInsertHighlight(false);
-    setCatalogInsertFlash(false);
-    if (catalogInsertTimerRef.current !== null) {
-      window.clearTimeout(catalogInsertTimerRef.current);
-      catalogInsertTimerRef.current = null;
-    }
     if (editorSurfaceRef.current) {
-      renderEditorText(editorSurfaceRef.current, contentRef.current);
+      renderEditorText(editorSurfaceRef.current, contentRef.current, activeTab?.phraseRanges);
       syncEditorValue(editorSurfaceRef.current, contentRef.current);
     }
   }, [activeTabId]);
@@ -344,7 +374,7 @@ export function Editor() {
     contentRef.current = nextContent;
     prevLengthRef.current = nextContent.length;
     setIsEditorEmpty(nextContent.length === 0);
-    renderEditorText(editor, nextContent);
+    renderEditorText(editor, nextContent, activeTab?.phraseRanges);
     syncEditorValue(editor, nextContent);
 
     if (selection) {
@@ -365,22 +395,16 @@ export function Editor() {
     const newContent = getPlainTextFromEditor(editor);
     const newLen = newContent.length;
     const wasDeleting = newLen < prevLengthRef.current;
+    const oldText = contentRef.current;
     prevLengthRef.current = newLen;
     contentRef.current = newContent;
     updateTabContent(activeTabId, newContent);
     syncEditorValue(editor, newContent);
     setIsEditorEmpty(newLen === 0);
 
-    if (catalogInsertHighlight || catalogInsertFlash) {
-      setCatalogInsertHighlight(false);
-      setCatalogInsertFlash(false);
-      if (catalogInsertTimerRef.current !== null) {
-        window.clearTimeout(catalogInsertTimerRef.current);
-        catalogInsertTimerRef.current = null;
-      }
-      renderEditorText(editor, newContent);
+    if (activeTab && activeTab.phraseRanges.length > 0 && oldText !== newContent) {
       const caret = selection?.start ?? newContent.length;
-      setSelectionOffsets(editor, caret, caret);
+      setTabPhraseRanges(activeTabId, adjustPhraseRanges(activeTab.phraseRanges, oldText, newContent, caret));
     }
 
     if (theme === 'gaudy') {
@@ -413,7 +437,7 @@ export function Editor() {
         }, 180);
       }
     }
-  }, [activeTabId, theme, updateTabContent, catalogInsertHighlight, catalogInsertFlash]);
+  }, [activeTabId, activeTab, theme, updateTabContent, setTabPhraseRanges]);
 
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
@@ -441,7 +465,6 @@ export function Editor() {
 
   useEffect(() => () => {
     if (typingTimeoutRef.current !== null) window.clearTimeout(typingTimeoutRef.current);
-    if (catalogInsertTimerRef.current !== null) window.clearTimeout(catalogInsertTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -461,8 +484,7 @@ export function Editor() {
     <div ref={editorRef} className={
       'editor' +
       (theme === 'gaudy' && isTyping ? ' typing' : '') +
-      (theme === 'gaudy' && isDeleting ? ' deleting' : '') +
-      (catalogInsertFlash ? ' phrase-catalog-flash' : '')
+      (theme === 'gaudy' && isDeleting ? ' deleting' : '')
     }>
       {theme === 'gaudy' && burst && (
         <div className="gaudy-burst" key={burst.id} aria-hidden="true">
@@ -483,8 +505,7 @@ export function Editor() {
         className={
           'editor-textarea' +
           (isEditorEmpty ? ' is-empty' : '') +
-          (isFileDragOver ? ' file-drag-over' : '') +
-          (catalogInsertHighlight ? ' phrase-catalog-highlight' : '')
+          (isFileDragOver ? ' file-drag-over' : '')
         }
         data-placeholder={t('placeholder')}
         contentEditable

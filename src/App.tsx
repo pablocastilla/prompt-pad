@@ -106,7 +106,7 @@ export default function App() {
 
       // Restore session if there are saved tabs with content
       if (session && Array.isArray(session.tabs) && session.tabs.length > 0) {
-        const restoredTabs: Tab[] = session.tabs.map((t: Pick<Tab, 'id' | 'title' | 'content' | 'path'>) => ({
+        const restoredTabs: Tab[] = session.tabs.map((t: Pick<Tab, 'id' | 'title' | 'content' | 'path' | 'phraseRanges'>) => ({
           id: t.id,
           title: t.title || 'Untitled',
           content: t.content || '',
@@ -114,6 +114,7 @@ export default function App() {
           dirty: false,
           lastSavedAt: null,
           attachedFiles: [],
+          phraseRanges: t.phraseRanges || [],
         }));
         const validActiveId = restoredTabs.find(t => t.id === session.activeTabId)
           ? session.activeTabId
@@ -129,7 +130,7 @@ export default function App() {
     if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
     sessionTimerRef.current = setTimeout(() => {
       window.electronAPI.saveSession({
-        tabs: tabs.map(t => ({ id: t.id, title: t.title, content: t.content, path: t.path })),
+        tabs: tabs.map(t => ({ id: t.id, title: t.title, content: t.content, path: t.path, phraseRanges: t.phraseRanges })),
         activeTabId,
       });
     }, 600);

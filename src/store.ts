@@ -7,7 +7,7 @@ function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 function createTab(title?: string): Tab {
-  return { id: uid(), title: title || 'Untitled', path: null, content: '', dirty: false, lastSavedAt: null, attachedFiles: [] };
+  return { id: uid(), title: title || 'Untitled', path: null, content: '', dirty: false, lastSavedAt: null, attachedFiles: [], phraseRanges: [] };
 }
 
 interface AppState {
@@ -22,6 +22,7 @@ interface AppState {
   closeOtherTabs: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabContent: (id: string, content: string) => void;
+  setTabPhraseRanges: (id: string, ranges: { start: number; end: number }[]) => void;
   markTabSaved: (id: string, path: string | null, title: string) => void;
   loadFileIntoTab: (id: string, path: string, content: string, title: string) => void;
   restoreSession: (tabs: Tab[], activeTabId: string) => void;
@@ -105,6 +106,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setActiveTab: (id) => set({ activeTabId: id }),
   updateTabContent: (id, content) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, content, dirty: true } : t) })),
+  setTabPhraseRanges: (id, phraseRanges) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, phraseRanges } : t) })),
   markTabSaved: (id, path, title) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, path, title, dirty: false, lastSavedAt: Date.now() } : t) })),
   loadFileIntoTab: (id, path, content, title) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, path, content, title, dirty: false, lastSavedAt: Date.now() } : t) })),
   restoreSession: (tabs, activeTabId) => set({ tabs, activeTabId }),

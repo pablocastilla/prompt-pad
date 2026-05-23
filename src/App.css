@@ -796,40 +796,12 @@ html, body, #root {
 }
 .editor-textarea::selection { background: var(--accent-dim); }
 
-.editor-textarea.phrase-catalog-highlight {
-  color: var(--phrase-catalog-highlight-editor-fg);
+.editor-textarea .phrase-text {
+  color: color-mix(in srgb, var(--editor-fg) 66%, var(--editor-bg) 34%);
 }
-
-.editor-textarea .phrase-catalog-inline-highlight {
-  color: var(--phrase-catalog-highlight-editor-fg);
-  background: color-mix(in srgb, var(--phrase-catalog-highlight-bg) 75%, transparent);
-  border-radius: 3px;
+.editor-textarea .phrase-text::selection {
+  background: var(--accent-dim);
 }
-
-.editor-textarea.phrase-catalog-highlight::selection {
-  background: var(--phrase-catalog-highlight-bg);
-  color: var(--phrase-catalog-highlight-fg);
-}
-
-.editor.phrase-catalog-flash {
-  box-shadow: inset 0 0 0 2px var(--phrase-catalog-highlight-bg);
-}
-
-.editor.phrase-catalog-flash::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--phrase-catalog-highlight-bg), transparent);
-  opacity: .25;
-  animation: phrase-catalog-flash 1.2s ease-out;
-}
-
-@keyframes phrase-catalog-flash {
-  from { opacity: .45; }
-  to { opacity: 0; }
-}
-
 /* ── ATTACHED FILES BAR ──────────────────────────── */
 
 .attached-files-bar {

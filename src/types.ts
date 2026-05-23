@@ -29,6 +29,11 @@ export interface AttachedFile {
 }
 
 // ── Tab / Document ──
+export interface PhraseRange {
+  start: number;
+  end: number;
+}
+
 export interface Tab {
   id: string;
   title: string;
@@ -37,6 +42,7 @@ export interface Tab {
   dirty: boolean;
   lastSavedAt: number | null;
   attachedFiles: AttachedFile[];
+  phraseRanges: PhraseRange[];
 }
 
 // ── Settings ──
@@ -307,7 +313,7 @@ export interface LaunchHistoryEntry {
 
 // ── Session (persisted across restarts) ──
 export interface SessionData {
-  tabs: Pick<Tab, 'id' | 'title' | 'content' | 'path'>[];
+  tabs: Pick<Tab, 'id' | 'title' | 'content' | 'path' | 'phraseRanges'>[];
   activeTabId: string;
 }
 
