@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { t } from '../i18n';
-import type { LaunchConfig, LaunchTool } from '../types';
+import type { LaunchConfig, LaunchTool, Settings } from '../types';
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -15,12 +15,16 @@ const TOOL_LABELS: Record<LaunchTool, string> = {
   copilot: '🤖 GitHub Copilot',
   opencode: '⚡ OpenCode',
   antigravity: '🌌 Antigravity',
+  'claude-code': '🧠 Claude Code',
+  codex: '💡 Codex',
 };
 
 const TOOL_ICONS: Record<LaunchTool, string> = {
   copilot: '🤖',
   opencode: '⚡',
   antigravity: '🌌',
+  'claude-code': '🧠',
+  codex: '💡',
 };
 
 export function LaunchPanel() {
@@ -54,6 +58,10 @@ export function LaunchPanel() {
 
   const getShortcutLabel = (shortcut: string): string | null => {
     if (!shortcut) return null;
+    const mod = settings.launchShortcutModifier;
+    if (mod === 'ctrl+shift') return `Ctrl+Shift+${shortcut}`;
+    if (mod === 'ctrl+alt') return `Ctrl+Alt+${shortcut}`;
+    if (mod === 'ctrl+alt+shift') return `Ctrl+Alt+Shift+${shortcut}`;
     return `Ctrl+Shift+${shortcut}`;
   };
 
@@ -150,6 +158,7 @@ export function LaunchPanel() {
             data={form} onChange={setForm}
             onSave={handleSaveForm} onCancel={() => setEditingId(null)}
             onPickFolder={handlePickFolder}
+            launchShortcutModifier={settings.launchShortcutModifier}
           />
         )}
 
@@ -160,6 +169,7 @@ export function LaunchPanel() {
               data={form} onChange={setForm}
               onSave={handleSaveForm} onCancel={() => setEditingId(null)}
               onPickFolder={handlePickFolder}
+              launchShortcutModifier={settings.launchShortcutModifier}
             />
           ) : (
             <div
@@ -189,7 +199,7 @@ export function LaunchPanel() {
                   })()}
                 </div>
                 <div className="launch-list-item-meta">
-                  {TOOL_ICONS[launch.tool]} {launch.tool === 'opencode' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : launch.tool === 'antigravity' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : `· ${launch.yolo ? 'YOLO' : 'safe'} · ${launch.mode === 'interactive' ? '-i' : '-p'}`}
+                  {TOOL_ICONS[launch.tool]} {launch.tool === 'opencode' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : launch.tool === 'antigravity' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : launch.tool === 'claude-code' || launch.tool === 'codex' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : `· ${launch.yolo ? 'YOLO' : 'safe'} · ${launch.mode === 'interactive' ? '-i' : '-p'}`}
                 </div>
               </div>
               <div className="launch-list-item-actions">
@@ -214,9 +224,12 @@ interface LaunchFormProps {
   onSave: () => void;
   onCancel: () => void;
   onPickFolder: () => void;
+  launchShortcutModifier: Settings['launchShortcutModifier'];
 }
 
-function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder }: LaunchFormProps) {
+function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder, launchShortcutModifier }: LaunchFormProps) {
+  const mod = launchShortcutModifier;
+  const modLabel = mod === 'ctrl+shift' ? 'Ctrl+Shift+' : mod === 'ctrl+alt' ? 'Ctrl+Alt+' : 'Ctrl+Alt+Shift+';
   return (
     <div className="launch-form">
       <div className="form-group">
@@ -227,7 +240,7 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder }: LaunchFo
       <div className="form-group">
         <label>{t('launchTool')}</label>
         <div className="tool-selector">
-          {(['copilot', 'opencode', 'antigravity'] as LaunchTool[]).map(tool => (
+          {(['copilot', 'opencode', 'antigravity', 'claude-code', 'codex'] as LaunchTool[]).map(tool => (
             <button
               key={tool}
               className={'tool-btn' + (data.tool === tool ? ' active' : '')}
@@ -266,13 +279,13 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder }: LaunchFo
       )}
       <div className="form-group">
         <label>{t('shortcut')}</label>
-        <select value={data.shortcut ?? ''}
-          onChange={e => onChange({ ...data, shortcut: e.target.value === '' ? undefined : e.target.value })}>
-          <option value="">{t('shortcutNone')}</option>
-          {Array.from('1234567890QWERTYUIOPASDFGHJKLZXCVBNM').map(n => (
-            <option key={n} value={n}>Ctrl+Shift+{n}</option>
-          ))}
-        </select>
+          <select value={data.shortcut ?? ''}
+            onChange={e => onChange({ ...data, shortcut: e.target.value === '' ? undefined : e.target.value })}>
+            <option value="">{t('shortcutNone')}</option>
+            {Array.from('1234567890QWERTYUIOPASDFGHJKLZXCVBNM').map(n => (
+              <option key={n} value={n}>{modLabel}{n}</option>
+            ))}
+          </select>
       </div>
       <div className="form-actions">
         <button className="btn btn-sm" onClick={onCancel}>{t('cancelBtn')}</button>

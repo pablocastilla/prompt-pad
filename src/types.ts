@@ -7,7 +7,7 @@ export interface Phrase {
 }
 
 // ── Launch Configuration ──
-export type LaunchTool = 'copilot' | 'opencode' | 'antigravity';
+export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex';
 
 export interface LaunchConfig {
   id: string;
@@ -40,6 +40,8 @@ export interface Tab {
 }
 
 // ── Settings ──
+export type ShortcutModifier = 'ctrl' | 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
+
 export interface Settings {
   theme: 'light' | 'dark' | 'gaudy' | 'cyberpunk';
   language: 'auto' | 'es' | 'en';
@@ -48,6 +50,8 @@ export interface Settings {
   showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
   phraseShortcutKeys: 'digit' | 'letter';
   launchShortcutKeys: 'digit' | 'letter';
+  phraseShortcutModifier: ShortcutModifier;
+  launchShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
 }
 
 export type CostTier = 'free' | 1 | 2 | 3 | 4 | 5;
@@ -264,7 +268,7 @@ export interface ElectronAPI {
   openFile: () => Promise<{ filePath: string; content: string } | null>;
   getPromptsDir: () => Promise<string>;
   executeLaunch: (config: {
-    tool: 'copilot' | 'opencode' | 'antigravity';
+    tool: LaunchTool;
     model: string;
     folder: string;
     yolo: boolean;

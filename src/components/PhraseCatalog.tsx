@@ -37,6 +37,11 @@ export function PhraseCatalog() {
 
   const getShortcutLabel = (shortcut: string): string | null => {
     if (!shortcut) return null;
+    const mod = settings.phraseShortcutModifier;
+    if (mod === 'ctrl') return `Ctrl+${shortcut}`;
+    if (mod === 'ctrl+shift') return `Ctrl+Shift+${shortcut}`;
+    if (mod === 'ctrl+alt') return `Ctrl+Alt+${shortcut}`;
+    if (mod === 'ctrl+alt+shift') return `Ctrl+Alt+Shift+${shortcut}`;
     return `Ctrl+${shortcut}`;
   };
 

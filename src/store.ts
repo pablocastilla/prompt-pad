@@ -140,7 +140,7 @@ export const useStore = create<AppState>((set, get) => ({
   deleteLaunchHistoryByLaunchId: (launchId) => set(s => ({
     launchHistory: s.launchHistory.filter(e => e.launchId !== launchId),
   })),
-  settings: { theme: 'light', language: 'auto', useOneDrive: true, phraseShortcutKeys: 'digit', launchShortcutKeys: 'digit' },
+  settings: { theme: 'light', language: 'auto', useOneDrive: true, phraseShortcutKeys: 'digit', launchShortcutKeys: 'digit', phraseShortcutModifier: 'ctrl', launchShortcutModifier: 'ctrl+shift' },
   setSettings: (settings) => set({ settings }),
   activePanel: null,
   setActivePanel: (panel) => set({ activePanel: panel }),

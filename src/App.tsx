@@ -47,6 +47,8 @@ export default function App() {
           pinnedModels: { copilot: [], opencode: [] },
           phraseShortcutKeys: 'digit' as const,
           launchShortcutKeys: 'digit' as const,
+          phraseShortcutModifier: 'ctrl' as const,
+          launchShortcutModifier: 'ctrl+shift' as const,
         },
         ...loadedSettings,
         pinnedModels: {
@@ -147,7 +149,14 @@ export default function App() {
 
   useEffect(() => {
     const handleShortcut = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const mod = settings.phraseShortcutModifier;
+      const needCtrl = mod === 'ctrl' || mod === 'ctrl+shift' || mod === 'ctrl+alt' || mod === 'ctrl+alt+shift';
+      const needShift = mod === 'ctrl+shift' || mod === 'ctrl+alt+shift';
+      const needAlt = mod === 'ctrl+alt' || mod === 'ctrl+alt+shift';
+      if (needCtrl && !(e.ctrlKey || e.metaKey)) return;
+      if (needShift && !e.shiftKey) return;
+      if (needAlt && !e.altKey) return;
+      if (!needCtrl && (e.ctrlKey || e.metaKey)) return;
       if (e.repeat) return;
       const rawKey = e.key;
       if (!rawKey) return;
@@ -169,7 +178,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [phraseByShortcut, activeTabId, requestInsertion, settings.theme, settings.phraseShortcutKeys, addToast]);
+  }, [phraseByShortcut, activeTabId, requestInsertion, settings.theme, settings.phraseShortcutKeys, settings.phraseShortcutModifier, addToast]);
 
   const launchByShortcut = useMemo(() => {
     const map = new Map<string, LaunchConfig>();
@@ -183,7 +192,13 @@ export default function App() {
 
   useEffect(() => {
     const handleLaunchShortcut = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey) return;
+      const mod = settings.launchShortcutModifier;
+      const needCtrl = mod === 'ctrl+shift' || mod === 'ctrl+alt' || mod === 'ctrl+alt+shift';
+      const needShift = mod === 'ctrl+shift' || mod === 'ctrl+alt+shift';
+      const needAlt = mod === 'ctrl+alt' || mod === 'ctrl+alt+shift';
+      if (needCtrl && !(e.ctrlKey || e.metaKey)) return;
+      if (needShift && !e.shiftKey) return;
+      if (needAlt && !e.altKey) return;
       if (e.repeat) return;
       const rawKey = e.key;
       if (!rawKey) return;
@@ -209,7 +224,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleLaunchShortcut, { capture: true });
     return () => window.removeEventListener('keydown', handleLaunchShortcut, { capture: true });
-  }, [launchByShortcut, activeTab, setPendingLaunch, settings.launchShortcutKeys]);
+  }, [launchByShortcut, activeTab, setPendingLaunch, settings.launchShortcutKeys, settings.launchShortcutModifier]);
 
   // Ctrl+Alt+letter opens VS Code in the launch's folder
   useEffect(() => {

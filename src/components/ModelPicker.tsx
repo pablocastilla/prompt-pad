@@ -18,15 +18,19 @@ export function ModelPicker() {
   const launchHistory    = useStore(s => s.launchHistory);
   const triggerLaunchSplash = useStore(s => s.triggerLaunchSplash);
 
-  const [modelCache, setModelCache] = useState<{ copilot: ModelOption[] | null; opencode: ModelOption[] | null; antigravity: ModelOption[] | null }>({
+  const [modelCache, setModelCache] = useState<Record<LaunchTool, ModelOption[] | null>>({
     copilot: null,
     opencode: null,
     antigravity: null,
+    'claude-code': null,
+    codex: null,
   });
-  const [loadingModels, setLoadingModels] = useState<{ copilot: boolean; opencode: boolean; antigravity: boolean }>({
+  const [loadingModels, setLoadingModels] = useState<Record<LaunchTool, boolean>>({
     copilot: false,
     opencode: false,
     antigravity: false,
+    'claude-code': false,
+    codex: false,
   });
   const listRef = useRef<HTMLDivElement | null>(null);
   const [dragPinnedIdx, setDragPinnedIdx] = useState<number | null>(null);
@@ -68,6 +72,8 @@ export function ModelPicker() {
         copilot: settings.pinnedModels?.copilot ?? [],
         opencode: settings.pinnedModels?.opencode ?? [],
         antigravity: settings.pinnedModels?.antigravity ?? [],
+        'claude-code': settings.pinnedModels?.['claude-code'] ?? [],
+        codex: settings.pinnedModels?.codex ?? [],
         [tool]: nextIds,
       },
     };
@@ -155,7 +161,7 @@ export function ModelPicker() {
 
   const refreshModels = async () => {
     await window.electronAPI.clearModelCache();
-    setModelCache({ copilot: null, opencode: null, antigravity: null });
+    setModelCache({ copilot: null, opencode: null, antigravity: null, 'claude-code': null, codex: null });
     await loadModels(tool, true);
   };
 
@@ -296,7 +302,7 @@ export function ModelPicker() {
 
   if (!pendingLaunch) return null;
 
-  const toolLabel = tool === 'opencode' ? '⚡ OpenCode' : tool === 'antigravity' ? '🌌 Antigravity' : '🤖 GitHub Copilot';
+  const toolLabel = tool === 'opencode' ? '⚡ OpenCode' : tool === 'antigravity' ? '🌌 Antigravity' : tool === 'claude-code' ? '🧠 Claude Code' : tool === 'codex' ? '💡 Codex' : '🤖 GitHub Copilot';
   const isLoading = loadingModels[tool];
   const getShortcutLabel = (idx: number): string => `${(idx + 1) % 10}`;
 

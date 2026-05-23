@@ -106,11 +106,17 @@ function sanitizeLaunches(launches: unknown[]): unknown[] {
     if (!item || typeof item !== 'object') return item;
     const launch = item as Record<string, unknown>;
     const tool = launch.tool === 'opencode' ? 'opencode' :
-                 launch.tool === 'antigravity' ? 'antigravity' : 'copilot';
+                 launch.tool === 'antigravity' ? 'antigravity' :
+                 launch.tool === 'claude-code' ? 'claude-code' :
+                 launch.tool === 'codex' ? 'codex' : 'copilot';
     if (tool === 'opencode') {
       return { ...launch, tool, model: normalizeOpenCodeModel(launch.model) };
     } else if (tool === 'antigravity') {
       return { ...launch, tool, model: normalizeAntigravityModel(launch.model) };
+    } else if (tool === 'claude-code') {
+      return { ...launch, tool, model: normalizeOpenCodeModel(launch.model) };
+    } else if (tool === 'codex') {
+      return { ...launch, tool, model: normalizeOpenCodeModel(launch.model) };
     }
     return { ...launch, tool, model: normalizeModel(launch.model) };
   });
@@ -519,11 +525,17 @@ ipcMain.handle('launch:execute', async (_e, config: {
   attachedFilePaths?: string[];
 }) => {
   const tool = config.tool === 'opencode' ? 'opencode' :
-               config.tool === 'antigravity' ? 'antigravity' : 'copilot';
+               config.tool === 'antigravity' ? 'antigravity' :
+               config.tool === 'claude-code' ? 'claude-code' :
+               config.tool === 'codex' ? 'codex' : 'copilot';
   if (tool === 'opencode') {
     return executeLaunchOpenCode(config);
   } else if (tool === 'antigravity') {
     return executeLaunchAntigravity(config);
+  } else if (tool === 'claude-code') {
+    return executeLaunchClaudeCode(config);
+  } else if (tool === 'codex') {
+    return executeLaunchCodex(config);
   }
   return executeLaunchCopilot(config);
 });
@@ -701,6 +713,174 @@ async function executeLaunchAntigravity(config: {
   return true;
 }
 
+async function executeLaunchClaudeCode(config: {
+  model: string; folder: string; yolo: boolean; prompt: string; mode: string;
+  attachedFilePaths?: string[];
+}) {
+  const { folder, yolo, prompt, attachedFilePaths = [] } = config;
+  const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
+  const id = Date.now().toString();
+
+  const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
+  fs.mkdirSync(launchTmpDir, { recursive: true });
+
+  const promptFileName = 'pp-prompt-' + id + '.txt';
+  const promptPath = path.join(launchTmpDir, promptFileName);
+  fs.writeFileSync(promptPath, prompt, 'utf-8');
+
+  const copiedNames = new Set<string>([promptFileName]);
+  const attachedFileNames: string[] = [];
+  for (const srcPath of attachedFilePaths) {
+    if (!srcPath || !fs.existsSync(srcPath)) continue;
+    let destName = path.basename(srcPath);
+    if (copiedNames.has(destName)) {
+      const ext = path.extname(destName);
+      destName = path.basename(destName, ext) + '-' + id + ext;
+    }
+    copiedNames.add(destName);
+    attachedFileNames.push(destName);
+    fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
+  }
+
+  const message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  const safeDir = escapeSingleQuotePS(workDir);
+  const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
+
+  if (process.platform === 'win32') {
+    const psPath = path.join(os.tmpdir(), 'pp-claude-' + id + '.ps1');
+    const script = [
+      "Set-Location -LiteralPath '" + safeDir + "'",
+      "$claudeArgs = @('cli', 'prompt', '--prompt-file', '" + safeTmpDir + "')",
+      ...(yolo ? ["$claudeArgs += '--dangerously-skip-permissions'"] : []),
+      "& claude-code @claudeArgs",
+      "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
+    ].join('\n');
+    fs.writeFileSync(psPath, script, 'utf-8');
+    const wt = spawn('wt.exe', [
+      'new-tab', '--title', 'Prompt Pad',
+      'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
+    ], { detached: true, stdio: 'ignore' });
+    wt.on('error', () => {
+      spawn('cmd.exe', [
+        '/c', 'start', '"Prompt Pad"', 'powershell.exe',
+        '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
+      ], { detached: true, stdio: 'ignore' }).unref();
+    });
+    wt.unref();
+  } else {
+    const shPath = path.join(os.tmpdir(), 'pp-claude-' + id + '.sh');
+    const script = [
+      '#!/bin/bash',
+      'cd ' + JSON.stringify(workDir),
+      'claude-code cli prompt --prompt-file ' + JSON.stringify(launchTmpDir) + (yolo ? ' --dangerously-skip-permissions' : ''),
+      'rm -rf ' + JSON.stringify(launchTmpDir),
+      'rm -f "$0"',
+    ].join('\n');
+    fs.writeFileSync(shPath, script, { mode: 0o755 });
+    if (process.platform === 'darwin') {
+      const appleScript = [
+        'tell application "Terminal"',
+        '  do script "bash ' + shPath.replace(/'/g, "'\\''" ) + '"',
+        '  activate',
+        'end tell',
+      ].join('\n');
+      spawn('osascript', ['-e', appleScript], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      spawnTerminalLinux([
+        ['gnome-terminal', ['--', 'bash', shPath]],
+        ['konsole',        ['-e', 'bash', shPath]],
+        ['xfce4-terminal', ['--command', 'bash "' + shPath + '"']],
+        ['xterm',          ['-e', 'bash "' + shPath + '"']],
+      ]);
+    }
+  }
+  return true;
+}
+
+async function executeLaunchCodex(config: {
+  model: string; folder: string; yolo: boolean; prompt: string; mode: string;
+  attachedFilePaths?: string[];
+}) {
+  const { folder, yolo, prompt, attachedFilePaths = [] } = config;
+  const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
+  const id = Date.now().toString();
+
+  const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
+  fs.mkdirSync(launchTmpDir, { recursive: true });
+
+  const promptFileName = 'pp-prompt-' + id + '.txt';
+  const promptPath = path.join(launchTmpDir, promptFileName);
+  fs.writeFileSync(promptPath, prompt, 'utf-8');
+
+  const copiedNames = new Set<string>([promptFileName]);
+  const attachedFileNames: string[] = [];
+  for (const srcPath of attachedFilePaths) {
+    if (!srcPath || !fs.existsSync(srcPath)) continue;
+    let destName = path.basename(srcPath);
+    if (copiedNames.has(destName)) {
+      const ext = path.extname(destName);
+      destName = path.basename(destName, ext) + '-' + id + ext;
+    }
+    copiedNames.add(destName);
+    attachedFileNames.push(destName);
+    fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
+  }
+
+  const message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  const safeDir = escapeSingleQuotePS(workDir);
+  const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
+
+  if (process.platform === 'win32') {
+    const psPath = path.join(os.tmpdir(), 'pp-codex-' + id + '.ps1');
+    const script = [
+      "Set-Location -LiteralPath '" + safeDir + "'",
+      "$codexArgs = @('cli', 'prompt', '--prompt-file', '" + safeTmpDir + "')",
+      ...(yolo ? ["$codexArgs += '--dangerously-skip-permissions'"] : []),
+      "& codex @codexArgs",
+      "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
+    ].join('\n');
+    fs.writeFileSync(psPath, script, 'utf-8');
+    const wt = spawn('wt.exe', [
+      'new-tab', '--title', 'Prompt Pad',
+      'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
+    ], { detached: true, stdio: 'ignore' });
+    wt.on('error', () => {
+      spawn('cmd.exe', [
+        '/c', 'start', '"Prompt Pad"', 'powershell.exe',
+        '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
+      ], { detached: true, stdio: 'ignore' }).unref();
+    });
+    wt.unref();
+  } else {
+    const shPath = path.join(os.tmpdir(), 'pp-codex-' + id + '.sh');
+    const script = [
+      '#!/bin/bash',
+      'cd ' + JSON.stringify(workDir),
+      'codex cli prompt --prompt-file ' + JSON.stringify(launchTmpDir) + (yolo ? ' --dangerously-skip-permissions' : ''),
+      'rm -rf ' + JSON.stringify(launchTmpDir),
+      'rm -f "$0"',
+    ].join('\n');
+    fs.writeFileSync(shPath, script, { mode: 0o755 });
+    if (process.platform === 'darwin') {
+      const appleScript = [
+        'tell application "Terminal"',
+        '  do script "bash ' + shPath.replace(/'/g, "'\\''" ) + '"',
+        '  activate',
+        'end tell',
+      ].join('\n');
+      spawn('osascript', ['-e', appleScript], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      spawnTerminalLinux([
+        ['gnome-terminal', ['--', 'bash', shPath]],
+        ['konsole',        ['-e', 'bash', shPath]],
+        ['xfce4-terminal', ['--command', 'bash "' + shPath + '"']],
+        ['xterm',          ['-e', 'bash "' + shPath + '"']],
+      ]);
+    }
+  }
+  return true;
+}
+
 async function executeLaunchCopilot(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
@@ -853,12 +1033,13 @@ ipcMain.handle('app:version', () => app.getVersion());
 
 // Open VS Code at a given folder
 ipcMain.handle('vscode:open', async (_e, folder: string) => {
-  if (!folder || !fs.existsSync(folder)) return false;
+  if (!folder) return false;
+  const openFolder = fs.existsSync(folder) ? folder : os.homedir();
   try {
     if (process.platform === 'win32') {
-      spawn('code.cmd', [folder], { detached: true, stdio: 'ignore' }).unref();
+      spawn('code.cmd', [openFolder], { detached: true, stdio: 'ignore' }).unref();
     } else {
-      spawn('code', [folder], { detached: true, stdio: 'ignore' }).unref();
+      spawn('code', [openFolder], { detached: true, stdio: 'ignore' }).unref();
     }
     return true;
   } catch {

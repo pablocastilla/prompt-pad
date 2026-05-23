@@ -47,6 +47,12 @@ export function SettingsPanel() {
     await window.electronAPI.saveSettings(next);
   };
 
+  const updateShortcutModifier = async (key: 'phraseShortcutModifier' | 'launchShortcutModifier', value: Settings['phraseShortcutModifier'] | Settings['launchShortcutModifier']) => {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    await window.electronAPI.saveSettings(next);
+  };
+
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
     try {
@@ -121,6 +127,19 @@ export function SettingsPanel() {
           <label>{t('phraseShortcuts')}</label>
           <select
             className="settings-select"
+            value={settings.phraseShortcutModifier}
+            onChange={e => updateShortcutModifier('phraseShortcutModifier', e.target.value as Settings['phraseShortcutModifier'])}
+          >
+            <option value="ctrl">{t('modifierCtrl')}</option>
+            <option value="ctrl+shift">{t('modifierCtrlShift')}</option>
+            <option value="ctrl+alt">{t('modifierCtrlAlt')}</option>
+            <option value="ctrl+alt+shift">{t('modifierCtrlAltShift')}</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>{t('phraseShortcutsKeyType')}</label>
+          <select
+            className="settings-select"
             value={settings.phraseShortcutKeys}
             onChange={e => updateShortcutKeys('phraseShortcutKeys', e.target.value as 'digit' | 'letter')}
           >
@@ -130,6 +149,18 @@ export function SettingsPanel() {
         </div>
         <div className="form-group">
           <label>{t('launchShortcuts')}</label>
+          <select
+            className="settings-select"
+            value={settings.launchShortcutModifier}
+            onChange={e => updateShortcutModifier('launchShortcutModifier', e.target.value as Settings['launchShortcutModifier'])}
+          >
+            <option value="ctrl+shift">{t('modifierCtrlShift')}</option>
+            <option value="ctrl+alt">{t('modifierCtrlAlt')}</option>
+            <option value="ctrl+alt+shift">{t('modifierCtrlAltShift')}</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>{t('launchShortcutsKeyType')}</label>
           <select
             className="settings-select"
             value={settings.launchShortcutKeys}
