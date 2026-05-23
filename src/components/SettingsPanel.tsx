@@ -41,6 +41,12 @@ export function SettingsPanel() {
     await window.electronAPI.saveSettings(next);
   };
 
+  const updateShortcutKeys = async (key: 'phraseShortcutKeys' | 'launchShortcutKeys', value: 'digit' | 'letter') => {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    await window.electronAPI.saveSettings(next);
+  };
+
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
     try {
@@ -106,6 +112,33 @@ export function SettingsPanel() {
         ) : (
           <div className="settings-info settings-muted">{t('oneDriveNotFound')}</div>
         )}
+      </div>
+
+      <div className="settings-section">
+        <h4>{t('shortcutKeys')}</h4>
+        <div className="settings-info" style={{ marginBottom: 8 }}>{t('shortcutKeysInfo')}</div>
+        <div className="form-group">
+          <label>{t('phraseShortcuts')}</label>
+          <select
+            className="settings-select"
+            value={settings.phraseShortcutKeys}
+            onChange={e => updateShortcutKeys('phraseShortcutKeys', e.target.value as 'digit' | 'letter')}
+          >
+            <option value="digit">{t('digits')}</option>
+            <option value="letter">{t('letters')}</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label>{t('launchShortcuts')}</label>
+          <select
+            className="settings-select"
+            value={settings.launchShortcutKeys}
+            onChange={e => updateShortcutKeys('launchShortcutKeys', e.target.value as 'digit' | 'letter')}
+          >
+            <option value="digit">{t('digits')}</option>
+            <option value="letter">{t('letters')}</option>
+          </select>
+        </div>
       </div>
 
       <div className="settings-section">

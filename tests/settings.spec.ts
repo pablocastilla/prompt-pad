@@ -42,7 +42,7 @@ test.describe('Settings panel', () => {
       await expect(page.locator('.theme-card').first()).toContainText(/Light|Claro/i);
 
       // Language selector
-      const langSelect = page.locator('.settings-select');
+      const langSelect = page.locator('.settings-select').first();
       await expect(langSelect).toBeVisible();
       const options = langSelect.locator('option');
       await expect(options).toHaveCount(3);
@@ -65,7 +65,7 @@ test.describe('Settings panel', () => {
       await openSettings(page);
 
       // Select English
-      const langSelect = page.locator('.settings-select');
+      const langSelect = page.locator('.settings-select').first();
       await langSelect.selectOption('en');
 
       // Verify settings were saved
@@ -94,7 +94,7 @@ test.describe('Settings panel', () => {
       await openSettings(page);
 
       // Select Spanish
-      const langSelect = page.locator('.settings-select');
+      const langSelect = page.locator('.settings-select').first();
       await langSelect.selectOption('es');
 
       // Verify settings were saved

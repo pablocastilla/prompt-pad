@@ -3,7 +3,7 @@ export interface Phrase {
   id: string;
   name: string;
   content: string;
-  shortcut?: number;
+  shortcut?: string;
 }
 
 // ── Launch Configuration ──
@@ -17,7 +17,7 @@ export interface LaunchConfig {
   folder: string;
   yolo: boolean;
   mode: 'interactive' | 'non-interactive';
-  shortcut?: number;
+  shortcut?: string;
 }
 
 // ── Attached file (transient – not persisted in session) ──
@@ -46,6 +46,8 @@ export interface Settings {
   useOneDrive?: boolean;
   pinnedModels?: Partial<Record<LaunchTool, string[]>>;
   showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
+  phraseShortcutKeys: 'digit' | 'letter';
+  launchShortcutKeys: 'digit' | 'letter';
 }
 
 export type CostTier = 'free' | 1 | 2 | 3 | 4 | 5;
@@ -283,6 +285,7 @@ export interface ElectronAPI {
   getLocale: () => Promise<string>;
   getAppVersion: () => Promise<string>;
   checkForUpdates: () => Promise<boolean>;
+  openVsCode: (folder: string) => Promise<boolean>;
 }
 
 // ── Launch History ──

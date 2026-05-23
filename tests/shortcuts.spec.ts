@@ -24,9 +24,9 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 7 },
-        { id: 'l2', name: 'Project B', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: 9 },
-        { id: 'l3', name: 'Project C', tool: 'copilot', folder: '/tmp/c', yolo: true, mode: 'interactive', shortcut: 3 },
+        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
+        { id: 'l2', name: 'Project B', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: '9' },
+        { id: 'l3', name: 'Project C', tool: 'copilot', folder: '/tmp/c', yolo: true, mode: 'interactive', shortcut: '3' },
       ]);
       savePhrases(testDir, []);
 
@@ -54,9 +54,9 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       savePhrases(testDir, [
-        { id: 'p1', name: 'Greeting', content: 'Hello', shortcut: 3 },
-        { id: 'p2', name: 'Farewell', content: 'Goodbye', shortcut: 0 },
-        { id: 'p3', name: 'Question', content: 'How are you?', shortcut: 6 },
+        { id: 'p1', name: 'Greeting', content: 'Hello', shortcut: '3' },
+        { id: 'p2', name: 'Farewell', content: 'Goodbye', shortcut: '0' },
+        { id: 'p3', name: 'Question', content: 'How are you?', shortcut: '6' },
       ]);
       saveLaunches(testDir, []);
 
@@ -84,8 +84,8 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       savePhrases(testDir, [
-        { id: 'p1', name: 'Greeting', content: 'Hello from phrase', shortcut: 3 },
-        { id: 'p2', name: 'Farewell', content: 'Goodbye', shortcut: 0 },
+        { id: 'p1', name: 'Greeting', content: 'Hello from phrase', shortcut: '3' },
+        { id: 'p2', name: 'Farewell', content: 'Goodbye', shortcut: '0' },
       ]);
       saveLaunches(testDir, []);
 
@@ -115,8 +115,8 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 7 },
-        { id: 'l2', name: 'Project B', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: 9 },
+        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
+        { id: 'l2', name: 'Project B', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: '9' },
       ]);
       savePhrases(testDir, []);
 
@@ -148,10 +148,10 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       savePhrases(testDir, [
-        { id: 'p1', name: 'Greeting', content: 'Hello', shortcut: 3 },
+        { id: 'p1', name: 'Greeting', content: 'Hello', shortcut: '3' },
       ]);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 7 },
+        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
       ]);
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
@@ -235,13 +235,13 @@ test.describe('Custom Shortcuts', () => {
 
       // Check migration persisted to file
       const savedLaunches = JSON.parse(fs.readFileSync(path.join(testDir, 'launches.json'), 'utf-8'));
-      expect(savedLaunches[0].shortcut).toBe(1);
-      expect(savedLaunches[1].shortcut).toBe(2);
-      expect(savedLaunches[2].shortcut).toBe(3);
+      expect(savedLaunches[0].shortcut).toBe('1');
+      expect(savedLaunches[1].shortcut).toBe('2');
+      expect(savedLaunches[2].shortcut).toBe('3');
 
       const savedPhrases = JSON.parse(fs.readFileSync(path.join(testDir, 'phrases.json'), 'utf-8'));
-      expect(savedPhrases[0].shortcut).toBe(1);
-      expect(savedPhrases[1].shortcut).toBe(2);
+      expect(savedPhrases[0].shortcut).toBe('1');
+      expect(savedPhrases[1].shortcut).toBe('2');
 
       // Verify display
       await page.locator('.activity-btn').first().click();
@@ -266,7 +266,7 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       savePhrases(testDir, [
-        { id: 'p1', name: 'Test', content: 'Hello', shortcut: 3 },
+        { id: 'p1', name: 'Test', content: 'Hello', shortcut: '3' },
       ]);
       saveLaunches(testDir, []);
 
@@ -299,7 +299,7 @@ test.describe('Custom Shortcuts', () => {
 
       // Verify persisted
       const saved = JSON.parse(fs.readFileSync(path.join(testDir, 'phrases.json'), 'utf-8'));
-      expect(saved[0].shortcut).toBe(7);
+      expect(saved[0].shortcut).toBe('7');
 
       // Verify the kbd label updated
       await expect(phraseItem.locator('.phrase-shortcut')).toHaveText('Ctrl+7');

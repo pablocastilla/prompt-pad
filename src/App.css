@@ -42,6 +42,7 @@ html, body, #root {
   --tab-bd:      #6366f1;
   --shadow:      0 1px 4px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06);
   --shadow-lg:   0 8px 24px rgba(0,0,0,.12);
+  --phrase-color: #059669;
 }
 
 [data-theme="dark"] {
@@ -73,6 +74,7 @@ html, body, #root {
   --tab-bd:      #818cf8;
   --shadow:      0 1px 4px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.2);
   --shadow-lg:   0 8px 24px rgba(0,0,0,.4);
+  --phrase-color: #34d399;
 }
 
 [data-theme="gaudy"] {
@@ -104,6 +106,7 @@ html, body, #root {
   --tab-bd:      #ffe28a;
   --shadow:      0 0 18px rgba(255, 120, 200, .16), 0 0 36px rgba(255, 214, 120, .06);
   --shadow-lg:   0 0 34px rgba(255, 120, 200, .2), 0 0 60px rgba(255, 214, 120, .08);
+  --phrase-color: #00ffcc;
 }
 
 [data-theme="cyberpunk"] {
@@ -135,6 +138,7 @@ html, body, #root {
   --tab-bd:      #ff4fd8;
   --shadow:      0 10px 30px rgba(0, 0, 0, .32), 0 0 22px rgba(71, 233, 255, .08);
   --shadow-lg:   0 18px 50px rgba(0, 0, 0, .44), 0 0 36px rgba(255, 79, 216, .08);
+  --phrase-color: #ff4fd8;
 }
 
 /* ── LAYOUT ──────────────────────────────────────── */
@@ -588,7 +592,7 @@ html, body, #root {
 .phrase-item:hover { background: var(--bg3); }
 .phrase-item-main { flex: 1; min-width: 0; }
 .phrase-item-name-row { display: flex; align-items: center; gap: 8px; }
-.phrase-item-name { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phrase-item-name { font-size: 13px; font-weight: 500; color: var(--phrase-color, var(--accent)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .phrase-shortcut {
   margin-left: auto;
   padding: 1px 6px;

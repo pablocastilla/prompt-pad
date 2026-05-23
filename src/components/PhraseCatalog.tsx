@@ -35,10 +35,9 @@ export function PhraseCatalog() {
     [phrases]
   );
 
-  const getShortcutLabel = (shortcut: number): string | null => {
-    if (shortcut < 0 || shortcut > 9) return null;
-    const key = shortcut === 0 ? '0' : String(shortcut);
-    return `Ctrl+${key}`;
+  const getShortcutLabel = (shortcut: string): string | null => {
+    if (!shortcut) return null;
+    return `Ctrl+${shortcut}`;
   };
 
   const gaudy = (key: Parameters<typeof t>[0]) => { if (settings.theme === 'gaudy') addToast(t(key)); };
@@ -108,14 +107,14 @@ export function PhraseCatalog() {
             <label>{t('phraseContent')}</label>
             <textarea value={editing.content} rows={4}
               onChange={e => setEditing({ ...editing, content: e.target.value })} />
-          </div>
+</div>
           <div className="form-group">
             <label>{t('shortcut')}</label>
             <select value={editing.shortcut ?? ''}
-              onChange={e => setEditing({ ...editing, shortcut: e.target.value === '' ? undefined : Number(e.target.value) })}>
+              onChange={e => setEditing({ ...editing, shortcut: e.target.value === '' ? undefined : e.target.value })}>
               <option value="">{t('shortcutNone')}</option>
-              {[1,2,3,4,5,6,7,8,9,0].map(n => (
-                <option key={n} value={n}>Ctrl+{n === 0 ? '0' : n}</option>
+              {Array.from('1234567890QWERTYUIOPASDFGHJKLZXCVBNM').map(n => (
+                <option key={n} value={n}>Ctrl+{n}</option>
               ))}
             </select>
           </div>

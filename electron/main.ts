@@ -850,3 +850,18 @@ ipcMain.handle('dialog:pick-folder', async () => {
 
 ipcMain.handle('system:locale', () => app.getLocale());
 ipcMain.handle('app:version', () => app.getVersion());
+
+// Open VS Code at a given folder
+ipcMain.handle('vscode:open', async (_e, folder: string) => {
+  if (!folder || !fs.existsSync(folder)) return false;
+  try {
+    if (process.platform === 'win32') {
+      spawn('code.cmd', [folder], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      spawn('code', [folder], { detached: true, stdio: 'ignore' }).unref();
+    }
+    return true;
+  } catch {
+    return false;
+  }
+});

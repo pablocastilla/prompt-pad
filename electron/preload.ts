@@ -68,4 +68,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Updater
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+
+  // VS Code
+  openVsCode: (folder: string) => ipcRenderer.invoke('vscode:open', folder),
 });

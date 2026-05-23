@@ -193,16 +193,19 @@ The Gaudy theme is best experienced live. It features:
 
 ### Phrase Catalog
 - **Reusable snippets**: create named text templates you type once and reuse everywhere.
-- **Keyboard insertion**: `Ctrl/⌘+1` through `Ctrl/⌘+9` (and `+0`) insert phrase at the current cursor position — shortcuts are assigned by list order.
+- **Keyboard insertion**: `Ctrl/⌘+1` through `Ctrl/⌘+9` (and `+0`), or optionally `Ctrl/⌘+A` through `Ctrl/⌘+Z` (configurable in Settings) insert phrase at the current cursor position — shortcuts are assigned by list order.
+- **Color-coded phrases**: phrase names appear in a distinct color (green/emerald in light, teal in dark, cyan in Gaudy, pink in Cyberpunk) so you can visually distinguish inserted phrases from your own text.
 - **Drag-to-reorder**: grab the ⠿ handle and drop a phrase to a new position. The `Ctrl+N` shortcuts adjust automatically and the new order is auto-saved.
 - **Search**: filter phrases by name or content with the search bar.
+- **Configurable shortcut keys**: in Settings, choose between digits (`1-0`) or letters (`A-Z`) for phrase shortcuts.
 
 ### Launch Configurations
 - **Pre-configured runs**: each config stores a name, working folder, `--yolo` flag, tool (Copilot CLI or OpenCode), and interactive / non-interactive mode.
 - **Model chosen at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **model picker** appears — navigate with `↑ ↓`, confirm with `Enter`, cancel with `Esc`.
 - **Drag-to-reorder**: drag the ⠿ handle to reprioritise configs. The `Ctrl+Shift+N` shortcuts follow the list order and are auto-saved.
-- **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
+- **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`), or optionally `Ctrl/⌘+Shift+A` through `+Z` (configurable in Settings) fire the corresponding launch config on the current tab's content. `Ctrl+Alt+Shift+letter` opens VS Code directly in the launch's folder.
 - **Pin favourite models**: pin models in the picker for quick access with number keys.
+- **Configurable shortcut keys**: in Settings, choose between digits (`1-0`) or letters (`A-Z`) for launch shortcuts.
 
 ### Launch History
 - **Every launch remembered**: prompt text, model, tool, YOLO flag, and mode — all saved automatically.

@@ -45,6 +45,8 @@ export default function App() {
           theme: 'light' as const,
           language: 'auto' as const,
           pinnedModels: { copilot: [], opencode: [] },
+          phraseShortcutKeys: 'digit' as const,
+          launchShortcutKeys: 'digit' as const,
         },
         ...loadedSettings,
         pinnedModels: {
@@ -53,21 +55,30 @@ export default function App() {
         },
       } as Settings;
 
-      // Migrate items without shortcuts (assign positional shortcuts for 0-9)
+      // Migrate items without shortcuts (assign positional shortcuts 1-9, 0)
+      // Also migrate numeric shortcuts to strings for consistency
       let migrated = false;
       const phrases = rawPhrases.map((p, i) => {
-        if (p.shortcut === undefined && i <= 9) {
+        let p2 = p;
+        if (typeof p2.shortcut === 'number') {
+          p2 = { ...p2, shortcut: String(p2.shortcut) };
           migrated = true;
-          return { ...p, shortcut: i === 9 ? 0 : i + 1 };
+        } else if (p2.shortcut === undefined && i < 10) {
+          p2 = { ...p2, shortcut: String(i === 9 ? 0 : i + 1) };
+          migrated = true;
         }
-        return p;
+        return p2;
       });
       const launches = rawLaunches.map((l, i) => {
-        if (l.shortcut === undefined && i <= 9) {
+        let l2 = l;
+        if (typeof l2.shortcut === 'number') {
+          l2 = { ...l2, shortcut: String(l2.shortcut) };
           migrated = true;
-          return { ...l, shortcut: i === 9 ? 0 : i + 1 };
+        } else if (l2.shortcut === undefined && i < 10) {
+          l2 = { ...l2, shortcut: String(i === 9 ? 0 : i + 1) };
+          migrated = true;
         }
-        return l;
+        return l2;
       });
       if (migrated) {
         window.electronAPI.savePhrases(phrases);
@@ -125,9 +136,9 @@ export default function App() {
   }, [settings.language]);
 
   const phraseByShortcut = useMemo(() => {
-    const map = new Map<number, Phrase>();
+    const map = new Map<string, Phrase>();
     for (const p of phrases) {
-      if (p.shortcut !== undefined && p.shortcut >= 0 && p.shortcut <= 9) {
+      if (p.shortcut !== undefined) {
         if (!map.has(p.shortcut)) map.set(p.shortcut, p);
       }
     }
@@ -135,26 +146,20 @@ export default function App() {
   }, [phrases]);
 
   useEffect(() => {
-    const digitByCode: Record<string, number> = {
-      Digit1: 1, Numpad1: 1,
-      Digit2: 2, Numpad2: 2,
-      Digit3: 3, Numpad3: 3,
-      Digit4: 4, Numpad4: 4,
-      Digit5: 5, Numpad5: 5,
-      Digit6: 6, Numpad6: 6,
-      Digit7: 7, Numpad7: 7,
-      Digit8: 8, Numpad8: 8,
-      Digit9: 9, Numpad9: 9,
-      Digit0: 0, Numpad0: 0,
-    };
-
     const handleShortcut = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       if (e.repeat) return;
-      const shortcut = digitByCode[e.code];
-      if (shortcut === undefined) return;
+      const rawKey = e.key;
+      if (!rawKey) return;
 
-      const phrase = phraseByShortcut.get(shortcut);
+      const isDigit = /^[0-9]$/.test(rawKey);
+      const isLetter = /^[a-zA-Z]$/.test(rawKey);
+
+      if (settings.phraseShortcutKeys === 'digit' && !isDigit) return;
+      if (settings.phraseShortcutKeys === 'letter' && !isLetter) return;
+
+      const key = settings.phraseShortcutKeys === 'letter' ? rawKey.toUpperCase() : rawKey;
+      const phrase = phraseByShortcut.get(key);
       if (!phrase) return;
 
       e.preventDefault();
@@ -164,12 +169,12 @@ export default function App() {
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [phraseByShortcut, activeTabId, requestInsertion, settings.theme, addToast]);
+  }, [phraseByShortcut, activeTabId, requestInsertion, settings.theme, settings.phraseShortcutKeys, addToast]);
 
   const launchByShortcut = useMemo(() => {
-    const map = new Map<number, LaunchConfig>();
+    const map = new Map<string, LaunchConfig>();
     for (const l of launches) {
-      if (l.shortcut !== undefined && l.shortcut >= 0 && l.shortcut <= 9) {
+      if (l.shortcut !== undefined) {
         if (!map.has(l.shortcut)) map.set(l.shortcut, l);
       }
     }
@@ -177,26 +182,20 @@ export default function App() {
   }, [launches]);
 
   useEffect(() => {
-    const digitByCode: Record<string, number> = {
-      Digit1: 1, Numpad1: 1,
-      Digit2: 2, Numpad2: 2,
-      Digit3: 3, Numpad3: 3,
-      Digit4: 4, Numpad4: 4,
-      Digit5: 5, Numpad5: 5,
-      Digit6: 6, Numpad6: 6,
-      Digit7: 7, Numpad7: 7,
-      Digit8: 8, Numpad8: 8,
-      Digit9: 9, Numpad9: 9,
-      Digit0: 0, Numpad0: 0,
-    };
-
     const handleLaunchShortcut = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey) return;
       if (e.repeat) return;
-      const shortcut = digitByCode[e.code];
-      if (shortcut === undefined) return;
+      const rawKey = e.key;
+      if (!rawKey) return;
 
-      const launch = launchByShortcut.get(shortcut);
+      const isDigit = /^[0-9]$/.test(rawKey);
+      const isLetter = /^[a-zA-Z]$/.test(rawKey);
+
+      if (settings.launchShortcutKeys === 'digit' && !isDigit) return;
+      if (settings.launchShortcutKeys === 'letter' && !isLetter) return;
+
+      const key = settings.launchShortcutKeys === 'letter' ? rawKey.toUpperCase() : rawKey;
+      const launch = launchByShortcut.get(key);
       if (!launch || !activeTab?.content.trim()) return;
 
       e.preventDefault();
@@ -210,7 +209,27 @@ export default function App() {
 
     window.addEventListener('keydown', handleLaunchShortcut, { capture: true });
     return () => window.removeEventListener('keydown', handleLaunchShortcut, { capture: true });
-  }, [launchByShortcut, activeTab, setPendingLaunch]);
+  }, [launchByShortcut, activeTab, setPendingLaunch, settings.launchShortcutKeys]);
+
+  // Ctrl+Alt+letter opens VS Code in the launch's folder
+  useEffect(() => {
+    const handleVsCodeShortcut = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || !e.altKey || !e.shiftKey) return;
+      if (e.repeat) return;
+      const key = e.key.toUpperCase();
+      if (!key) return;
+
+      const launch = launchByShortcut.get(key);
+      if (!launch || !launch.folder) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      window.electronAPI.openVsCode(launch.folder);
+    };
+
+    window.addEventListener('keydown', handleVsCodeShortcut, { capture: true });
+    return () => window.removeEventListener('keydown', handleVsCodeShortcut, { capture: true });
+  }, [launchByShortcut]);
 
   return (
     <div className="app">

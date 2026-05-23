@@ -52,10 +52,9 @@ export function LaunchPanel() {
     [launches]
   );
 
-  const getShortcutLabel = (shortcut: number): string | null => {
-    if (shortcut < 0 || shortcut > 9) return null;
-    const key = shortcut === 0 ? '0' : String(shortcut);
-    return `Ctrl+Shift+${key}`;
+  const getShortcutLabel = (shortcut: string): string | null => {
+    if (!shortcut) return null;
+    return `Ctrl+Shift+${shortcut}`;
   };
 
   // Open model picker (model chosen at launch time)
@@ -268,10 +267,10 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder }: LaunchFo
       <div className="form-group">
         <label>{t('shortcut')}</label>
         <select value={data.shortcut ?? ''}
-          onChange={e => onChange({ ...data, shortcut: e.target.value === '' ? undefined : Number(e.target.value) })}>
+          onChange={e => onChange({ ...data, shortcut: e.target.value === '' ? undefined : e.target.value })}>
           <option value="">{t('shortcutNone')}</option>
-          {[1,2,3,4,5,6,7,8,9,0].map(n => (
-            <option key={n} value={n}>Ctrl+Shift+{n === 0 ? '0' : n}</option>
+          {Array.from('1234567890QWERTYUIOPASDFGHJKLZXCVBNM').map(n => (
+            <option key={n} value={n}>Ctrl+Shift+{n}</option>
           ))}
         </select>
       </div>

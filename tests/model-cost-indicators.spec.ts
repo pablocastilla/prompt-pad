@@ -200,7 +200,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Zero Launch', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 0 },
+        { id: 'l1', name: 'Zero Launch', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '0' },
       ]);
       savePhrases(testDir, []);
 
@@ -241,7 +241,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
       await page.waitForTimeout(500);
 
       const saved = JSON.parse(fs.readFileSync(path.join(testDir, 'launches.json'), 'utf-8'));
-      expect(saved[9].shortcut).toBe(0);
+      expect(saved[9].shortcut).toBe('0');
 
       await page.locator('.editor-textarea').fill('test prompt for shortcut 0');
 

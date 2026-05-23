@@ -68,6 +68,12 @@ const translations = {
     gaudyOpenHistory: '⚡ PROMPT RESTORED FROM THE VOID',
     expensiveModelConfirm: 'This model is expensive. Are you sure you want to launch it?',
     refreshModels: 'Refresh models',
+    shortcutKeys: 'Shortcut keys',
+    shortcutKeysInfo: 'Choose whether phrases use Ctrl+1-0 (digits) or Ctrl+A-Z (letters). Launches use Ctrl+Shift+1-0 or Ctrl+Shift+A-Z.',
+    phraseShortcuts: 'Phrase shortcuts',
+    launchShortcuts: 'Launch shortcuts',
+    digits: 'Digits (1-0)',
+    letters: 'Letters (A-Z)',
   },
   es: {
     launch: 'Lanzar', selectLaunch: 'Seleccionar lanzamiento…', noLaunches: 'Sin configuraciones aún.',
@@ -138,6 +144,12 @@ const translations = {
     gaudyOpenHistory: '⚡ PROMPT RESTAURADO DEL VACÍO',
     expensiveModelConfirm: 'Este modelo es muy caro. ¿Estás seguro de que quieres lanzarlo?',
     refreshModels: 'Refrescar modelos',
+    shortcutKeys: 'Teclas de atajo',
+    shortcutKeysInfo: 'Elige si las frases usan Ctrl+1-0 (dígitos) o Ctrl+A-Z (letras). Los lanzamientos usan Ctrl+Shift+1-0 o Ctrl+Shift+A-Z.',
+    phraseShortcuts: 'Atajos de frases',
+    launchShortcuts: 'Atajos de lanzamientos',
+    digits: 'Dígitos (1-0)',
+    letters: 'Letras (A-Z)',
   },
 } as const;
 
