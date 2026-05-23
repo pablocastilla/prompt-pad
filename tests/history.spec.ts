@@ -29,14 +29,14 @@ function savePhrases(testDir: string, phrases: unknown[]) {
 }
 
 const SAMPLE_LAUNCHES = [
-  { id: 'launch-1', name: 'My Project', tool: 'opencode', model: 'opencode/kimi-k2.6', folder: '/tmp/proj1', yolo: true, mode: 'interactive' },
-  { id: 'launch-2', name: 'API Refactor', tool: 'opencode', model: 'opencode/kimi-k2.6', folder: '/tmp/proj2', yolo: false, mode: 'interactive' },
+  { id: 'launch-1', name: 'My Project', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/proj1', yolo: true, mode: 'interactive' },
+  { id: 'launch-2', name: 'API Refactor', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/proj2', yolo: false, mode: 'interactive' },
 ];
 
 const SAMPLE_HISTORY = [
-  { id: 'h1', launchId: 'launch-1', launchName: 'My Project', tool: 'opencode', model: 'opencode/googlegemini-2.5-flash', prompt: 'Refactor the auth module to use JWT tokens', timestamp: Date.now() - 60000, folder: '/tmp/proj1', yolo: true, mode: 'interactive' },
-  { id: 'h2', launchId: 'launch-1', launchName: 'My Project', tool: 'opencode', model: 'opencode/kimi-k2.6', prompt: 'Add rate limiting to the API endpoints', timestamp: Date.now() - 120000, folder: '/tmp/proj1', yolo: true, mode: 'interactive' },
-  { id: 'h3', launchId: 'launch-2', launchName: 'API Refactor', tool: 'opencode', model: 'opencode/kimi-k2.6', prompt: 'Rewrite the database layer with connection pooling', timestamp: Date.now() - 300000, folder: '/tmp/proj2', yolo: false, mode: 'interactive' },
+  { id: 'h1', launchId: 'launch-1', launchName: 'My Project', tool: 'opencode', model: 'opencode/minimax-m2.5-free', prompt: 'Refactor the auth module to use JWT tokens', timestamp: Date.now() - 60000, folder: '/tmp/proj1', yolo: true, mode: 'interactive' },
+  { id: 'h2', launchId: 'launch-1', launchName: 'My Project', tool: 'opencode', model: 'opencode/minimax-m2.5-free', prompt: 'Add rate limiting to the API endpoints', timestamp: Date.now() - 120000, folder: '/tmp/proj1', yolo: true, mode: 'interactive' },
+  { id: 'h3', launchId: 'launch-2', launchName: 'API Refactor', tool: 'opencode', model: 'opencode/minimax-m2.5-free', prompt: 'Rewrite the database layer with connection pooling', timestamp: Date.now() - 300000, folder: '/tmp/proj2', yolo: false, mode: 'interactive' },
 ];
 
 test.describe('Launch History panel', () => {
@@ -183,9 +183,9 @@ test.describe('Launch History panel', () => {
       await page.locator('.activity-btn').nth(2).click();
       await expect(page.locator('.history-panel')).toBeVisible();
 
-      // Search for a unique model token from one entry
+      // Search for a unique launch name token
       const searchInput = page.locator('.history-search-input');
-      await searchInput.fill('googlegemini');
+      await searchInput.fill('api refactor');
       await page.waitForTimeout(200);
 
       // Should show 1 entry from launch-2
@@ -229,7 +229,7 @@ test.describe('Launch History panel', () => {
 
       // The new tab should contain the prompt text
       const editor = page.locator('.editor-textarea');
-      const content = await editor.inputValue();
+      const content = await editor.innerText();
       expect(content).toContain('Refactor the auth module');
 
       await app.close();

@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { modelsForTool, getModelCostInfo } from '../types';
 import { t } from '../i18n';
 import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry, CostTier } from '../types';
+import { ToolIcon, TOOL_LABELS } from './ToolIcon';
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -302,7 +303,6 @@ export function ModelPicker() {
 
   if (!pendingLaunch) return null;
 
-  const toolLabel = tool === 'opencode' ? '⚡ OpenCode' : tool === 'antigravity' ? '🌌 Antigravity' : tool === 'claude-code' ? '🧠 Claude Code' : tool === 'codex' ? '💡 Codex' : '🤖 GitHub Copilot';
   const isLoading = loadingModels[tool];
   const getShortcutLabel = (idx: number): string => `${(idx + 1) % 10}`;
 
@@ -312,7 +312,10 @@ export function ModelPicker() {
         <div className="model-picker-header">
           <div className="model-picker-title">{t('selectModelToLaunch')}</div>
           <div className="model-picker-launch-name">{pendingLaunch.launch.name}</div>
-          <div className="model-picker-tool-badge">{toolLabel}</div>
+          <div className="model-picker-tool-badge">
+            <span className="launch-tool-icon"><ToolIcon tool={tool} /></span>
+            <span>{TOOL_LABELS[tool]}</span>
+          </div>
           <button
             className="model-picker-refresh-btn"
             onClick={e => { e.stopPropagation(); void refreshModels(); }}

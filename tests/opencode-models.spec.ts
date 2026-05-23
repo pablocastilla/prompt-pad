@@ -217,7 +217,7 @@ test.describe('OpenCode Models Feature', () => {
           id: 'stale-pin-launch',
           name: 'Stale Pin Test',
           tool: 'opencode',
-          model: 'opencode/kimi-k2.6',
+          model: 'opencode/minimax-m2.5-free',
           folder: process.cwd(),
           yolo: true,
           mode: 'interactive',
@@ -229,7 +229,7 @@ test.describe('OpenCode Models Feature', () => {
         language: 'auto',
         pinnedModels: {
           copilot: [],
-          opencode: ['opencode/kimi-k2.6', 'nonexistent-model-xyz'],
+          opencode: ['opencode/minimax-m2.5-free', 'nonexistent-model-xyz'],
         },
       };
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify(launches, null, 2), 'utf-8');

@@ -200,7 +200,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Zero Launch', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '0' },
+        { id: 'l1', name: 'Zero Launch', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '0' },
       ]);
       savePhrases(testDir, []);
 
@@ -228,6 +228,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
         id: `l${i}`,
         name: `Launch ${i + 1}`,
         tool: 'opencode' as const,
+        model: 'opencode/minimax-m2.5-free',
         folder: '/tmp',
         yolo: true,
         mode: 'interactive' as const,
@@ -259,7 +260,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Launch 1', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
+        { id: 'l1', name: 'Launch 1', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
       ]);
       savePhrases(testDir, []);
 

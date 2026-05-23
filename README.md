@@ -186,6 +186,7 @@ The Gaudy theme is best experienced live. It features:
 ### Editor
 - **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close.
 - **Auto-session**: tab state (title, content, path) is saved every 600 ms and restored on the next launch.
+- **Plain-text contenteditable core**: editor now uses a `contenteditable` surface with strict plain-text sync, so launches always send plain text/markdown (no rich-text styles or HTML).
 - **Save/Open**: `Ctrl+S` (save), `Ctrl+Shift+S` (save as), `Ctrl+O` (open).
 - **Copy prompt**: copies the entire active tab's content to the clipboard.
 - **File attachments**: drag & drop files onto the editor or paste clipboard images (Snipping Tool, PrintScreen). Attached files are sent alongside your prompt when launching.
@@ -194,7 +195,7 @@ The Gaudy theme is best experienced live. It features:
 ### Phrase Catalog
 - **Reusable snippets**: create named text templates you type once and reuse everywhere.
 - **Keyboard insertion**: `Ctrl/⌘+1` through `Ctrl/⌘+9` (and `+0`) insert phrase at the current cursor position.
-- **Catalog insertion highlight**: when a phrase is inserted from the catalog, the inserted text is temporarily highlighted with theme-aware colors in the editor.
+- **Catalog insertion highlight**: when a phrase is inserted from the catalog, only the inserted fragment is temporarily highlighted with theme-aware colors in the editor.
 - **Drag-to-reorder**: grab the ⠿ handle and drop a phrase to a new position. The `Ctrl+N` shortcuts adjust automatically and the new order is auto-saved.
 - **Search**: filter phrases by name or content with the search bar.
 
@@ -217,6 +218,7 @@ The Gaudy theme is best experienced live. It features:
 ### Model Picker
 - **Dynamic model lists**: fetches available models from both Copilot CLI (`copilot help config`) and OpenCode (`opencode models`) at runtime.
 - **Dual tool support**: automatically shows the correct model list based on whether the launch config uses Copilot or OpenCode.
+- **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode square mark) with theme-aware contrast.
 - **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
 - **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) and usage limits.
 - **Expensive model confirmation**: launching tier 4-5 models prompts a confirmation dialog to prevent accidental high-cost launches.

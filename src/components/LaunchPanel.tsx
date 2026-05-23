@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import type { LaunchConfig, LaunchTool, Settings } from '../types';
+import { ToolIcon, TOOL_LABELS } from './ToolIcon';
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -9,14 +10,6 @@ function uid(): string {
 
 const DEFAULT: Omit<LaunchConfig, 'id'> = {
   name: '', tool: 'copilot', folder: '', yolo: true, mode: 'interactive',
-};
-
-const TOOL_LABELS: Record<LaunchTool, string> = {
-  copilot: 'GitHub Copilot',
-  opencode: 'OpenCode',
-  antigravity: 'Antigravity',
-  'claude-code': 'Claude Code',
-  codex: 'Codex',
 };
 
 function IconRocket() {
@@ -48,43 +41,6 @@ function IconTrash() {
   return (
     <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
       <path d="M4 7h16M9 7V5h6v2m-8 0 1 12h8l1-12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-function LaunchToolIcon({ tool }: { tool: LaunchTool }) {
-  if (tool === 'copilot') {
-    return (
-      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-        <path d="M12 2.5a9.5 9.5 0 1 0 0 19 9.5 9.5 0 0 0 0-19Zm-5 8.2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm10 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-7 6.2h4a2 2 0 0 0 2-2v-.5a3 3 0 0 0-3-3H11a3 3 0 0 0-3 3v.5a2 2 0 0 0 2 2Z" fill="currentColor"/>
-      </svg>
-    );
-  }
-  if (tool === 'opencode') {
-    return (
-      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-        <path d="m7 8-4 4 4 4m10-8 4 4-4 4M14 5l-4 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    );
-  }
-  if (tool === 'antigravity') {
-    return (
-      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-        <circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.8"/>
-        <path d="M2.5 12h19" fill="none" stroke="currentColor" strokeWidth="1.8"/>
-      </svg>
-    );
-  }
-  if (tool === 'claude-code') {
-    return (
-      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-        <path d="M12 3 4.5 21h3l1.4-3.5h6.2l1.4 3.5h3L12 3Zm-2 11.8L12 9l2 5.8h-4Z" fill="currentColor"/>
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-      <path d="M12 3.5 5 7.5v9l7 4 7-4v-9l-7-4Zm0 2.2 4.8 2.7L12 11.1 7.2 8.4 12 5.7Zm-5 4.1 4 2.3v5l-4-2.3v-5Zm10 0v5l-4 2.3v-5l4-2.3Z" fill="currentColor"/>
     </svg>
   );
 }
@@ -261,7 +217,10 @@ export function LaunchPanel() {
                   })()}
                 </div>
                 <div className="launch-list-item-meta">
-                  <span className="launch-tool-chip"><LaunchToolIcon tool={launch.tool} /> {TOOL_LABELS[launch.tool]}</span>
+                  <span className="launch-tool-chip">
+                    <span className="launch-tool-icon"><ToolIcon tool={launch.tool} /></span>
+                    <span className="launch-tool-label">{TOOL_LABELS[launch.tool]}</span>
+                  </span>
                   {` · ${launch.yolo ? 'YOLO' : 'safe'}`}
                   {launch.tool === 'copilot' ? ` · ${launch.mode === 'interactive' ? '-i' : '-p'}` : ''}
                 </div>
@@ -311,7 +270,7 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder, launchShor
               onClick={() => onChange({ ...data, tool })}
               type="button"
             >
-              <span className="tool-btn-icon"><LaunchToolIcon tool={tool} /></span>
+              <span className="tool-btn-icon"><span className="launch-tool-icon"><ToolIcon tool={tool} /></span></span>
               <span className="tool-btn-label">{TOOL_LABELS[tool]}</span>
             </button>
           ))}

@@ -216,8 +216,8 @@ test.describe('File Attachment feature', () => {
         Object.defineProperty(event, 'clipboardData', { value: dataTransfer });
 
         const target = document.querySelector('.editor-textarea');
-        if (!(target instanceof HTMLTextAreaElement)) {
-          throw new Error('Editor textarea not found');
+        if (!(target instanceof HTMLElement)) {
+          throw new Error('Editor element not found');
         }
 
         target.dispatchEvent(event);

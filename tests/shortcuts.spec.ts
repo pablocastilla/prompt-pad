@@ -24,9 +24,9 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
-        { id: 'l2', name: 'Project B', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: '9' },
-        { id: 'l3', name: 'Project C', tool: 'opencode', folder: '/tmp/c', yolo: true, mode: 'interactive', shortcut: '3' },
+        { id: 'l1', name: 'Project A', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
+        { id: 'l2', name: 'Project B', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: '9' },
+        { id: 'l3', name: 'Project C', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/c', yolo: true, mode: 'interactive', shortcut: '3' },
       ]);
       savePhrases(testDir, []);
 
@@ -98,12 +98,12 @@ test.describe('Custom Shortcuts', () => {
 
       await page.keyboard.press('Control+3');
       await page.waitForTimeout(200);
-      await expect(editor).toHaveValue('Hello from phrase');
+        await expect(editor).toContainText('Hello from phrase');
 
       await editor.fill('');
       await page.keyboard.press('Control+0');
       await page.waitForTimeout(200);
-      await expect(editor).toHaveValue('Goodbye');
+        await expect(editor).toContainText('Goodbye');
 
       await app.close();
     } finally {
@@ -115,8 +115,8 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
-        { id: 'l2', name: 'Project B', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: '9' },
+        { id: 'l1', name: 'Project A', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
+        { id: 'l2', name: 'Project B', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: '9' },
       ]);
       savePhrases(testDir, []);
 
@@ -151,7 +151,7 @@ test.describe('Custom Shortcuts', () => {
         { id: 'p1', name: 'Phrase Nine', content: 'PHRASE-9', shortcut: '9' },
       ]);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Launch Nine', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '9' },
+        { id: 'l1', name: 'Launch Nine', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '9' },
       ]);
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
@@ -166,7 +166,7 @@ test.describe('Custom Shortcuts', () => {
       await page.waitForTimeout(350);
 
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
-      await expect(editor).toHaveValue('prompt-content');
+        await expect(editor).toContainText('prompt-content');
 
       await app.close();
     } finally {
@@ -192,10 +192,10 @@ test.describe('Custom Shortcuts', () => {
       await page.locator('.phrase-item').first().click();
 
       const editor = page.locator('.editor-textarea');
-      await expect(editor).toHaveValue('Hello from catalog');
+        await expect(editor).toContainText('Hello from catalog');
       await expect(editor).toHaveClass(/phrase-catalog-highlight/);
 
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(3600);
       await expect(editor).not.toHaveClass(/phrase-catalog-highlight/);
 
       await app.close();
@@ -211,7 +211,7 @@ test.describe('Custom Shortcuts', () => {
         { id: 'p1', name: 'Greeting', content: 'Hello', shortcut: '3' },
       ]);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
+        { id: 'l1', name: 'Project A', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
       ]);
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
@@ -224,7 +224,7 @@ test.describe('Custom Shortcuts', () => {
 
       await page.keyboard.press('Control+1');
       await page.waitForTimeout(200);
-      await expect(editor).toHaveValue('Existing content');
+        await expect(editor).toContainText('Existing content');
 
       await page.keyboard.press('Control+Shift+1');
       await page.waitForTimeout(200);
@@ -279,9 +279,9 @@ test.describe('Custom Shortcuts', () => {
     try {
       // Old format: no shortcut field
       saveLaunches(testDir, [
-        { id: 'l1', name: 'First', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive' },
-        { id: 'l2', name: 'Second', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive' },
-        { id: 'l3', name: 'Third', tool: 'opencode', folder: '/tmp/c', yolo: true, mode: 'interactive' },
+        { id: 'l1', name: 'First', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive' },
+        { id: 'l2', name: 'Second', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/b', yolo: false, mode: 'interactive' },
+        { id: 'l3', name: 'Third', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/c', yolo: true, mode: 'interactive' },
       ]);
       savePhrases(testDir, [
         { id: 'p1', name: 'Alpha', content: 'A' },
@@ -367,7 +367,7 @@ test.describe('Custom Shortcuts', () => {
       // Verify keyboard now works with new shortcut
       await page.keyboard.press('Control+7');
       await page.waitForTimeout(200);
-      await expect(page.locator('.editor-textarea')).toHaveValue('Hello');
+      await expect(page.locator('.editor-textarea')).toContainText('Hello');
 
       await app.close();
     } finally {

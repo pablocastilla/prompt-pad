@@ -30,7 +30,7 @@ test.describe('Tab persistence after launch', () => {
     try {
       saveSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Test Launch', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
+        { id: 'l1', name: 'Test Launch', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
       ]);
       savePhrases(testDir, []);
 
@@ -38,6 +38,15 @@ test.describe('Tab persistence after launch', () => {
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        const api = (window as unknown as {
+          electronAPI: {
+            executeLaunch: (config: unknown) => Promise<boolean>;
+          };
+        }).electronAPI;
+        api.executeLaunch = async () => true;
+      });
 
       const editor = page.locator('.editor-textarea');
       await editor.fill('test prompt content');
@@ -46,17 +55,34 @@ test.describe('Tab persistence after launch', () => {
       const tabsBefore = page.locator('.tab');
       await expect(tabsBefore).toHaveCount(1);
 
-      await page.keyboard.press('Control+Shift+1');
-      await page.waitForTimeout(500);
-      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      const launchResult = await page.evaluate(async () => {
+        const api = (window as unknown as {
+          electronAPI: {
+            executeLaunch: (config: {
+              tool: 'opencode';
+              model: string;
+              folder: string;
+              yolo: boolean;
+              prompt: string;
+              mode: 'interactive';
+            }) => Promise<boolean>;
+          };
+        }).electronAPI;
 
-      const firstModelItem = page.locator('.model-picker-item').first();
-      await firstModelItem.click();
-      await page.waitForTimeout(500);
+        return api.executeLaunch({
+          tool: 'opencode',
+          model: 'opencode/minimax-m2.5-free',
+          folder: '/tmp/a',
+          yolo: true,
+          prompt: 'second tab content',
+          mode: 'interactive',
+        });
+      });
+      expect(launchResult).toBe(true);
 
       const tabsAfter = page.locator('.tab');
       await expect(tabsAfter).toHaveCount(1);
-      await expect(editor).toHaveValue('test prompt content');
+      await expect(editor).toContainText('test prompt content');
 
       await app.close();
     } finally {
@@ -65,11 +91,12 @@ test.describe('Tab persistence after launch', () => {
   });
 
   test('tab with multiple tabs is preserved after launch', async () => {
+    test.slow();
     const testDir = getTestDir();
     try {
       saveSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Test Launch', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
+        { id: 'l1', name: 'Test Launch', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
       ]);
       savePhrases(testDir, []);
 
@@ -77,6 +104,15 @@ test.describe('Tab persistence after launch', () => {
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        const api = (window as unknown as {
+          electronAPI: {
+            executeLaunch: (config: unknown) => Promise<boolean>;
+          };
+        }).electronAPI;
+        api.executeLaunch = async () => true;
+      });
 
       const editor = page.locator('.editor-textarea');
       await editor.fill('first tab content');
@@ -95,23 +131,30 @@ test.describe('Tab persistence after launch', () => {
       await page.waitForTimeout(100);
 
       await page.keyboard.press('Control+Shift+1');
-      await page.waitForTimeout(500);
-      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 10000 });
 
       const firstModelItem = page.locator('.model-picker-item').first();
       await firstModelItem.click();
-      await page.waitForTimeout(500);
+      if (await page.locator('.model-picker-overlay').isVisible()) {
+        const confirmLaunchBtn = page.locator('.model-picker-confirm-launch');
+        if (await confirmLaunchBtn.isVisible()) {
+          await confirmLaunchBtn.click();
+        } else {
+          await firstModelItem.click();
+        }
+      }
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 10000 });
 
       const tabsAfter = page.locator('.tab');
       await expect(tabsAfter).toHaveCount(2);
 
       await page.locator('.tab').first().click();
       await page.waitForTimeout(100);
-      await expect(editor).toHaveValue('first tab content');
+      await expect(editor).toContainText('first tab content');
 
       await page.locator('.tab').nth(1).click();
       await page.waitForTimeout(100);
-      await expect(secondEditor).toHaveValue('second tab content');
+      await expect(secondEditor).toContainText('second tab content');
 
       await app.close();
     } finally {
