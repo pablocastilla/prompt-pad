@@ -216,8 +216,8 @@ test.describe('OpenCode Models Feature', () => {
         {
           id: 'stale-pin-launch',
           name: 'Stale Pin Test',
-          tool: 'copilot',
-          model: 'auto',
+          tool: 'opencode',
+          model: 'opencode/kimi-k2.6',
           folder: process.cwd(),
           yolo: true,
           mode: 'interactive',
@@ -228,8 +228,8 @@ test.describe('OpenCode Models Feature', () => {
         theme: 'light',
         language: 'auto',
         pinnedModels: {
-          copilot: ['auto', 'nonexistent-model-xyz'],
-          opencode: [],
+          copilot: [],
+          opencode: ['opencode/kimi-k2.6', 'nonexistent-model-xyz'],
         },
       };
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify(launches, null, 2), 'utf-8');
@@ -252,9 +252,9 @@ test.describe('OpenCode Models Feature', () => {
       await new Promise(r => setTimeout(r, 500));
 
       const savedSettings = JSON.parse(fs.readFileSync(path.join(testDir, 'settings.json'), 'utf-8'));
-      const copilotPins = savedSettings.pinnedModels?.copilot ?? [];
-      console.log(`Copilot pinned after cleanup: ${JSON.stringify(copilotPins)}`);
-      expect(copilotPins).not.toContain('nonexistent-model-xyz');
+      const opencodePins = savedSettings.pinnedModels?.opencode ?? [];
+      console.log(`OpenCode pinned after cleanup: ${JSON.stringify(opencodePins)}`);
+      expect(opencodePins).not.toContain('nonexistent-model-xyz');
     } finally {
       fs.rmSync(testDir, { recursive: true, force: true });
     }

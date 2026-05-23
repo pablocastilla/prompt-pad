@@ -51,8 +51,8 @@ interface AppState {
   toasts: { id: string; message: string }[];
   addToast: (message: string) => void;
   removeToast: (id: string) => void;
-  insertionSignal: { tabId: string; text: string } | null;
-  requestInsertion: (tabId: string, text: string) => void;
+  insertionSignal: { tabId: string; text: string; source: 'catalog' | 'shortcut' } | null;
+  requestInsertion: (tabId: string, text: string, source?: 'catalog' | 'shortcut') => void;
   clearInsertion: () => void;
   pendingLaunch: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[] } | null;
   setPendingLaunch: (data: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[] } | null) => void;
@@ -140,7 +140,7 @@ export const useStore = create<AppState>((set, get) => ({
   deleteLaunchHistoryByLaunchId: (launchId) => set(s => ({
     launchHistory: s.launchHistory.filter(e => e.launchId !== launchId),
   })),
-  settings: { theme: 'light', language: 'auto', useOneDrive: true, phraseShortcutKeys: 'digit', launchShortcutKeys: 'digit', phraseShortcutModifier: 'ctrl', launchShortcutModifier: 'ctrl+shift' },
+  settings: { theme: 'light', language: 'auto', useOneDrive: true, phraseShortcutModifier: 'ctrl', launchShortcutModifier: 'ctrl+shift', openVsCodeShortcutModifier: 'ctrl+alt+shift' },
   setSettings: (settings) => set({ settings }),
   activePanel: null,
   setActivePanel: (panel) => set({ activePanel: panel }),
@@ -153,7 +153,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
   insertionSignal: null,
-  requestInsertion: (tabId, text) => set({ insertionSignal: { tabId, text } }),
+  requestInsertion: (tabId, text, source = 'shortcut') => set({ insertionSignal: { tabId, text, source } }),
   clearInsertion: () => set({ insertionSignal: null }),
   pendingLaunch: null,
   setPendingLaunch: (data) => set({ pendingLaunch: data }),

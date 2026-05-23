@@ -41,13 +41,10 @@ export function SettingsPanel() {
     await window.electronAPI.saveSettings(next);
   };
 
-  const updateShortcutKeys = async (key: 'phraseShortcutKeys' | 'launchShortcutKeys', value: 'digit' | 'letter') => {
-    const next = { ...settings, [key]: value };
-    setSettings(next);
-    await window.electronAPI.saveSettings(next);
-  };
-
-  const updateShortcutModifier = async (key: 'phraseShortcutModifier' | 'launchShortcutModifier', value: Settings['phraseShortcutModifier'] | Settings['launchShortcutModifier']) => {
+  const updateShortcutModifier = async (
+    key: 'phraseShortcutModifier' | 'launchShortcutModifier' | 'openVsCodeShortcutModifier',
+    value: Settings['phraseShortcutModifier'] | Settings['launchShortcutModifier'] | Settings['openVsCodeShortcutModifier']
+  ) => {
     const next = { ...settings, [key]: value };
     setSettings(next);
     await window.electronAPI.saveSettings(next);
@@ -122,11 +119,12 @@ export function SettingsPanel() {
 
       <div className="settings-section">
         <h4>{t('shortcutKeys')}</h4>
-        <div className="settings-info" style={{ marginBottom: 8 }}>{t('shortcutKeysInfo')}</div>
+        <div className="settings-info settings-info-spaced">{t('shortcutKeysInfo')}</div>
         <div className="form-group">
           <label>{t('phraseShortcuts')}</label>
           <select
             className="settings-select"
+            title={t('phraseShortcuts')}
             value={settings.phraseShortcutModifier}
             onChange={e => updateShortcutModifier('phraseShortcutModifier', e.target.value as Settings['phraseShortcutModifier'])}
           >
@@ -137,20 +135,10 @@ export function SettingsPanel() {
           </select>
         </div>
         <div className="form-group">
-          <label>{t('phraseShortcutsKeyType')}</label>
-          <select
-            className="settings-select"
-            value={settings.phraseShortcutKeys}
-            onChange={e => updateShortcutKeys('phraseShortcutKeys', e.target.value as 'digit' | 'letter')}
-          >
-            <option value="digit">{t('digits')}</option>
-            <option value="letter">{t('letters')}</option>
-          </select>
-        </div>
-        <div className="form-group">
           <label>{t('launchShortcuts')}</label>
           <select
             className="settings-select"
+            title={t('launchShortcuts')}
             value={settings.launchShortcutModifier}
             onChange={e => updateShortcutModifier('launchShortcutModifier', e.target.value as Settings['launchShortcutModifier'])}
           >
@@ -160,14 +148,16 @@ export function SettingsPanel() {
           </select>
         </div>
         <div className="form-group">
-          <label>{t('launchShortcutsKeyType')}</label>
+          <label>{t('openVsCodeShortcuts')}</label>
           <select
             className="settings-select"
-            value={settings.launchShortcutKeys}
-            onChange={e => updateShortcutKeys('launchShortcutKeys', e.target.value as 'digit' | 'letter')}
+            title={t('openVsCodeShortcuts')}
+            value={settings.openVsCodeShortcutModifier}
+            onChange={e => updateShortcutModifier('openVsCodeShortcutModifier', e.target.value as Settings['openVsCodeShortcutModifier'])}
           >
-            <option value="digit">{t('digits')}</option>
-            <option value="letter">{t('letters')}</option>
+            <option value="ctrl+shift">{t('modifierCtrlShift')}</option>
+            <option value="ctrl+alt">{t('modifierCtrlAlt')}</option>
+            <option value="ctrl+alt+shift">{t('modifierCtrlAltShift')}</option>
           </select>
         </div>
       </div>

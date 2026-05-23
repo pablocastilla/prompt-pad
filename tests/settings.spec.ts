@@ -194,4 +194,37 @@ test.describe('Settings panel', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  test('Settings shows VS Code shortcut selector and hides key-type selectors', async () => {
+    const testDir = getTestDir();
+    try {
+      cleanSettings(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await openSettings(page);
+
+      await expect(page.getByText(/Open VS Code shortcuts|Atajos para abrir VS Code/i)).toBeVisible();
+      const vsCodeShortcutSelect = page.locator('.settings-section').filter({ hasText: /Shortcut keys|Teclas de atajo/i }).locator('.form-group').nth(2).locator('select');
+      await expect(vsCodeShortcutSelect).toBeVisible();
+      await expect(vsCodeShortcutSelect).toHaveValue('ctrl+alt+shift');
+
+      await expect(page.getByText(/Phrase key type|Tipo de tecla de frase/i)).toHaveCount(0);
+      await expect(page.getByText(/Launch key type|Tipo de tecla de lanzamiento/i)).toHaveCount(0);
+
+      await vsCodeShortcutSelect.selectOption('ctrl+alt');
+      await page.waitForTimeout(200);
+
+      const settings = await page.evaluate(() => {
+        return (window as unknown as { electronAPI: { loadSettings: () => Promise<{ openVsCodeShortcutModifier: string }> } })
+          .electronAPI.loadSettings();
+      });
+      expect(settings.openVsCodeShortcutModifier).toBe('ctrl+alt');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });

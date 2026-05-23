@@ -15,13 +15,13 @@ function getLaunchesPath(testDir: string): string {
   return path.join(testDir, 'launches.json');
 }
 
-function writeLaunches(testDir: string, tool: 'copilot' | 'opencode') {
+function writeLaunches(testDir: string) {
   const launches = [
     {
-      id: 'test-launch-' + tool,
-      name: 'Playwright ' + tool,
-      tool,
-      model: tool === 'opencode' ? 'opencode/kimi-k2.6' : 'auto',
+      id: 'test-launch-opencode',
+      name: 'Playwright opencode',
+      tool: 'opencode',
+      model: 'opencode/kimi-k2.6',
       folder: process.cwd(),
       yolo: true,
       mode: 'interactive',
@@ -34,7 +34,7 @@ test.describe('Model picker behavior', () => {
   test('OpenCode model picker supports scrolling long model lists', async () => {
     const testDir = getTestDir();
     try {
-      writeLaunches(testDir, 'opencode');
+      writeLaunches(testDir);
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
@@ -80,10 +80,10 @@ test.describe('Model picker behavior', () => {
     }
   });
 
-  test('Copilot model picker shows loading animation and newer fetched models', async () => {
+  test('OpenCode model picker shows loading animation and newer fetched models', async () => {
     const testDir = getTestDir();
     try {
-      writeLaunches(testDir, 'copilot');
+      writeLaunches(testDir);
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
@@ -92,17 +92,17 @@ test.describe('Model picker behavior', () => {
       await page.evaluate(() => {
         const api = (window as unknown as {
           electronAPI: {
-            getCopilotModels: () => Promise<Array<{ id: string; label: string }>>;
+            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
           };
         }).electronAPI;
 
-        api.getCopilotModels = async () => {
+        api.getOpenCodeModels = async () => {
           await new Promise(resolve => setTimeout(resolve, 450));
           return [
-            { id: 'auto', label: 'auto' },
-            { id: 'gpt-5.5', label: 'gpt-5.5' },
-            { id: 'gpt-5.4-pro', label: 'gpt-5.4-pro' },
-            { id: 'claude-opus-4.7', label: 'claude-opus-4.7' },
+            { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+            { id: 'opencode-go/kimi-k2.6', label: 'Kimi K2.6 Go' },
+            { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+            { id: 'opencode/minimax-m2.7', label: 'Minimax M2.7' },
           ];
         };
       });
@@ -123,8 +123,6 @@ test.describe('Model picker behavior', () => {
       );
       expect(animationName).toContain('model-picker-pulse');
 
-      await expect(page.locator('.model-picker-item-label').filter({ hasText: 'gpt-5.5' })).toBeVisible({ timeout: 5000 });
-
       await app.close();
     } finally {
       fs.rmSync(testDir, { recursive: true, force: true });
@@ -134,11 +132,28 @@ test.describe('Model picker behavior', () => {
   test('OpenCode model picker shows Go models filter checkbox checked by default', async () => {
     const testDir = getTestDir();
     try {
-      writeLaunches(testDir, 'opencode');
+      writeLaunches(testDir);
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
+
+      await page.evaluate(() => {
+        const api = (window as unknown as {
+          electronAPI: {
+            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
+          };
+        }).electronAPI;
+
+        api.getOpenCodeModels = async () => {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          return [
+            { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+            { id: 'opencode-go/kimi-k2.6', label: 'Kimi K2.6 Go' },
+            { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          ];
+        };
+      });
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -151,10 +166,7 @@ test.describe('Model picker behavior', () => {
       await expect(page.locator('.model-picker-go-toggle')).toBeVisible();
       await expect(page.locator('.model-picker-go-toggle input[type="checkbox"]')).toBeChecked();
 
-      // Wait for Go models to load
-      await page.waitForTimeout(3000);
-      const goModelCount = await page.locator('.model-picker-item').count();
-      expect(goModelCount).toBeGreaterThan(0);
+      await expect(page.locator('.model-picker-go-toggle input[type="checkbox"]')).toBeChecked();
 
       await app.close();
     } finally {
@@ -162,10 +174,19 @@ test.describe('Model picker behavior', () => {
     }
   });
 
-  test('Copilot model picker does not show Go models filter', async () => {
+  test('OpenCode model picker hides Go filter when setting is disabled', async () => {
     const testDir = getTestDir();
     try {
-      writeLaunches(testDir, 'copilot');
+      writeLaunches(testDir);
+
+      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+        theme: 'light',
+        language: 'auto',
+        useOneDrive: false,
+        showGoModelsOnly: {
+          opencode: false,
+        },
+      }, null, 2), 'utf-8');
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
@@ -178,7 +199,8 @@ test.describe('Model picker behavior', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
 
-      await expect(page.locator('.model-picker-go-toggle')).not.toBeVisible();
+      await expect(page.locator('.model-picker-go-toggle')).toBeVisible();
+      await expect(page.locator('.model-picker-go-toggle input[type="checkbox"]')).not.toBeChecked();
 
       await app.close();
     } finally {

@@ -200,7 +200,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Zero Launch', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '0' },
+        { id: 'l1', name: 'Zero Launch', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '0' },
       ]);
       savePhrases(testDir, []);
 
@@ -227,7 +227,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
       const launches = Array.from({ length: 10 }, (_, i) => ({
         id: `l${i}`,
         name: `Launch ${i + 1}`,
-        tool: 'copilot' as const,
+        tool: 'opencode' as const,
         folder: '/tmp',
         yolo: true,
         mode: 'interactive' as const,
@@ -259,7 +259,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Launch 1', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
+        { id: 'l1', name: 'Launch 1', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
       ]);
       savePhrases(testDir, []);
 

@@ -24,9 +24,9 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
+        { id: 'l1', name: 'Project A', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
         { id: 'l2', name: 'Project B', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: '9' },
-        { id: 'l3', name: 'Project C', tool: 'copilot', folder: '/tmp/c', yolo: true, mode: 'interactive', shortcut: '3' },
+        { id: 'l3', name: 'Project C', tool: 'opencode', folder: '/tmp/c', yolo: true, mode: 'interactive', shortcut: '3' },
       ]);
       savePhrases(testDir, []);
 
@@ -115,7 +115,7 @@ test.describe('Custom Shortcuts', () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
+        { id: 'l1', name: 'Project A', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
         { id: 'l2', name: 'Project B', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive', shortcut: '9' },
       ]);
       savePhrases(testDir, []);
@@ -144,6 +144,66 @@ test.describe('Custom Shortcuts', () => {
     }
   });
 
+  test('Ctrl+Shift launch shortcut does not trigger Ctrl phrase shortcut', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, [
+        { id: 'p1', name: 'Phrase Nine', content: 'PHRASE-9', shortcut: '9' },
+      ]);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Launch Nine', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '9' },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      const editor = page.locator('.editor-textarea');
+      await editor.fill('prompt-content');
+
+      await page.keyboard.press('Control+Shift+9');
+      await page.waitForTimeout(350);
+
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await expect(editor).toHaveValue('prompt-content');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('inserting a phrase from catalog applies temporary highlight class', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, [
+        { id: 'p1', name: 'Greeting', content: 'Hello from catalog', shortcut: '1' },
+      ]);
+      saveLaunches(testDir, []);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.activity-btn').nth(1).click();
+      await page.waitForTimeout(200);
+      await page.locator('.phrase-item').first().click();
+
+      const editor = page.locator('.editor-textarea');
+      await expect(editor).toHaveValue('Hello from catalog');
+      await expect(editor).toHaveClass(/phrase-catalog-highlight/);
+
+      await page.waitForTimeout(1200);
+      await expect(editor).not.toHaveClass(/phrase-catalog-highlight/);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
   test('unassigned shortcuts do nothing', async () => {
     const testDir = getTestDir();
     try {
@@ -151,7 +211,7 @@ test.describe('Custom Shortcuts', () => {
         { id: 'p1', name: 'Greeting', content: 'Hello', shortcut: '3' },
       ]);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Project A', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
+        { id: 'l1', name: 'Project A', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '7' },
       ]);
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
@@ -219,9 +279,9 @@ test.describe('Custom Shortcuts', () => {
     try {
       // Old format: no shortcut field
       saveLaunches(testDir, [
-        { id: 'l1', name: 'First', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive' },
+        { id: 'l1', name: 'First', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive' },
         { id: 'l2', name: 'Second', tool: 'opencode', folder: '/tmp/b', yolo: false, mode: 'interactive' },
-        { id: 'l3', name: 'Third', tool: 'copilot', folder: '/tmp/c', yolo: true, mode: 'interactive' },
+        { id: 'l3', name: 'Third', tool: 'opencode', folder: '/tmp/c', yolo: true, mode: 'interactive' },
       ]);
       savePhrases(testDir, [
         { id: 'p1', name: 'Alpha', content: 'A' },

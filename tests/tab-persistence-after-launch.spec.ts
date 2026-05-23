@@ -30,7 +30,7 @@ test.describe('Tab persistence after launch', () => {
     try {
       saveSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Test Launch', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
+        { id: 'l1', name: 'Test Launch', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
       ]);
       savePhrases(testDir, []);
 
@@ -69,7 +69,7 @@ test.describe('Tab persistence after launch', () => {
     try {
       saveSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Test Launch', tool: 'copilot', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
+        { id: 'l1', name: 'Test Launch', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
       ]);
       savePhrases(testDir, []);
 

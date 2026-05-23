@@ -69,7 +69,9 @@ export function Editor() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteBurst, setDeleteBurst] = useState<BurstPosition | null>(null);
   const [isFileDragOver, setIsFileDragOver] = useState(false);
+  const [catalogInsertHighlight, setCatalogInsertHighlight] = useState(false);
   const prevLengthRef = useRef(activeTab?.content.length ?? 0);
+  const catalogInsertTimerRef = useRef<number | null>(null);
 
   // ── File attachment via drag-and-drop / paste onto textarea ──────────
   const attachPaths = useCallback((items: { name: string; path: string; size: number }[]) => {
@@ -176,6 +178,11 @@ export function Editor() {
   useEffect(() => {
     contentRef.current = activeTab?.content || '';
     prevLengthRef.current = activeTab?.content.length ?? 0;
+    setCatalogInsertHighlight(false);
+    if (catalogInsertTimerRef.current !== null) {
+      window.clearTimeout(catalogInsertTimerRef.current);
+      catalogInsertTimerRef.current = null;
+    }
     if (textareaRef.current) {
       textareaRef.current.value = contentRef.current;
     }
@@ -201,14 +208,28 @@ export function Editor() {
     const before = ta.value.substring(0, start);
     const after = ta.value.substring(end);
     const newContent = before + insertionSignal.text + after;
+    const insertStart = start;
+    const insertEnd = start + insertionSignal.text.length;
 
     ta.value = newContent;
     contentRef.current = newContent;
     updateTabContent(activeTabId, newContent);
 
-    const newPos = start + insertionSignal.text.length;
-    ta.selectionStart = newPos;
-    ta.selectionEnd = newPos;
+    if (insertionSignal.source === 'catalog') {
+      ta.selectionStart = insertStart;
+      ta.selectionEnd = insertEnd;
+      setCatalogInsertHighlight(true);
+      if (catalogInsertTimerRef.current !== null) window.clearTimeout(catalogInsertTimerRef.current);
+      catalogInsertTimerRef.current = window.setTimeout(() => {
+        ta.selectionStart = insertEnd;
+        ta.selectionEnd = insertEnd;
+        setCatalogInsertHighlight(false);
+      }, 950);
+    } else {
+      ta.selectionStart = insertEnd;
+      ta.selectionEnd = insertEnd;
+    }
+
     ta.focus();
 
     clearInsertion();
@@ -266,6 +287,7 @@ export function Editor() {
 
   useEffect(() => () => {
     if (typingTimeoutRef.current !== null) window.clearTimeout(typingTimeoutRef.current);
+    if (catalogInsertTimerRef.current !== null) window.clearTimeout(catalogInsertTimerRef.current);
   }, []);
 
   // Ctrl+S shortcut
@@ -305,7 +327,11 @@ export function Editor() {
       )}
       <textarea
         ref={textareaRef}
-        className={'editor-textarea' + (isFileDragOver ? ' file-drag-over' : '')}
+        className={
+          'editor-textarea' +
+          (isFileDragOver ? ' file-drag-over' : '') +
+          (catalogInsertHighlight ? ' phrase-catalog-highlight' : '')
+        }
         defaultValue={activeTab.content}
         onChange={handleChange}
         onDragOver={handleTextareaDragOver}

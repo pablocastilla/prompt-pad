@@ -48,10 +48,9 @@ export interface Settings {
   useOneDrive?: boolean;
   pinnedModels?: Partial<Record<LaunchTool, string[]>>;
   showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
-  phraseShortcutKeys: 'digit' | 'letter';
-  launchShortcutKeys: 'digit' | 'letter';
   phraseShortcutModifier: ShortcutModifier;
   launchShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
+  openVsCodeShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
 }
 
 export type CostTier = 'free' | 1 | 2 | 3 | 4 | 5;

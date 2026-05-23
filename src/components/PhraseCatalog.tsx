@@ -47,7 +47,7 @@ export function PhraseCatalog() {
 
   const gaudy = (key: Parameters<typeof t>[0]) => { if (settings.theme === 'gaudy') addToast(t(key)); };
 
-  const handleInsert = (phrase: Phrase) => { requestInsertion(activeTabId, phrase.content); gaudy('gaudyPhrase'); };
+  const handleInsert = (phrase: Phrase) => { requestInsertion(activeTabId, phrase.content, 'catalog'); gaudy('gaudyPhrase'); };
   const handleAdd    = () => { setEditing({ id: uid(), name: '', content: '' }); setIsNew(true); };
   const handleEdit   = (phrase: Phrase) => { setEditing({ ...phrase }); setIsNew(false); };
 
@@ -105,17 +105,17 @@ export function PhraseCatalog() {
           <div className="phrase-form-title">{isNew ? t('addPhrase') : t('editPhrase')}</div>
           <div className="form-group">
             <label>{t('phraseName')}</label>
-            <input type="text" value={editing.name}
+            <input type="text" title={t('phraseName')} value={editing.name}
               onChange={e => setEditing({ ...editing, name: e.target.value })} autoFocus />
           </div>
           <div className="form-group">
             <label>{t('phraseContent')}</label>
-            <textarea value={editing.content} rows={4}
+            <textarea title={t('phraseContent')} value={editing.content} rows={4}
               onChange={e => setEditing({ ...editing, content: e.target.value })} />
 </div>
           <div className="form-group">
             <label>{t('shortcut')}</label>
-            <select value={editing.shortcut ?? ''}
+            <select title={t('shortcut')} value={editing.shortcut ?? ''}
               onChange={e => setEditing({ ...editing, shortcut: e.target.value === '' ? undefined : e.target.value })}>
               <option value="">{t('shortcutNone')}</option>
               {Array.from('1234567890QWERTYUIOPASDFGHJKLZXCVBNM').map(n => (

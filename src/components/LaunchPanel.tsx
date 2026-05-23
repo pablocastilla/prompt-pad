@@ -12,20 +12,82 @@ const DEFAULT: Omit<LaunchConfig, 'id'> = {
 };
 
 const TOOL_LABELS: Record<LaunchTool, string> = {
-  copilot: '🤖 GitHub Copilot',
-  opencode: '⚡ OpenCode',
-  antigravity: '🌌 Antigravity',
-  'claude-code': '🧠 Claude Code',
-  codex: '💡 Codex',
+  copilot: 'GitHub Copilot',
+  opencode: 'OpenCode',
+  antigravity: 'Antigravity',
+  'claude-code': 'Claude Code',
+  codex: 'Codex',
 };
 
-const TOOL_ICONS: Record<LaunchTool, string> = {
-  copilot: '🤖',
-  opencode: '⚡',
-  antigravity: '🌌',
-  'claude-code': '🧠',
-  codex: '💡',
-};
+function IconRocket() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path d="M14.8 3.3a7.8 7.8 0 0 1 5.9 5.9l-4.5 4.5-2.8-.3-.3-2.8 4.5-4.5ZM11.6 12.4l-5 5 .2-3.4 1.7-1.7 3.1.1Zm-2.3 6.4-2.7 2.7c-.6.6-1.7.6-2.3 0a1.6 1.6 0 0 1 0-2.3l2.7-2.7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="15.5" cy="8.5" r="1.3" fill="currentColor"/>
+    </svg>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function IconEdit() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+      <path d="M4 20h4l10-10a2 2 0 1 0-4-4L4 16v4Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+      <path d="M4 7h16M9 7V5h6v2m-8 0 1 12h8l1-12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function LaunchToolIcon({ tool }: { tool: LaunchTool }) {
+  if (tool === 'copilot') {
+    return (
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+        <path d="M12 2.5a9.5 9.5 0 1 0 0 19 9.5 9.5 0 0 0 0-19Zm-5 8.2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm10 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-7 6.2h4a2 2 0 0 0 2-2v-.5a3 3 0 0 0-3-3H11a3 3 0 0 0-3 3v.5a2 2 0 0 0 2 2Z" fill="currentColor"/>
+      </svg>
+    );
+  }
+  if (tool === 'opencode') {
+    return (
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+        <path d="m7 8-4 4 4 4m10-8 4 4-4 4M14 5l-4 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    );
+  }
+  if (tool === 'antigravity') {
+    return (
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+        <circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.8"/>
+        <path d="M2.5 12h19" fill="none" stroke="currentColor" strokeWidth="1.8"/>
+      </svg>
+    );
+  }
+  if (tool === 'claude-code') {
+    return (
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+        <path d="M12 3 4.5 21h3l1.4-3.5h6.2l1.4 3.5h3L12 3Zm-2 11.8L12 9l2 5.8h-4Z" fill="currentColor"/>
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+      <path d="M12 3.5 5 7.5v9l7 4 7-4v-9l-7-4Zm0 2.2 4.8 2.7L12 11.1 7.2 8.4 12 5.7Zm-5 4.1 4 2.3v5l-4-2.3v-5Zm10 0v5l-4 2.3v-5l4-2.3Z" fill="currentColor"/>
+    </svg>
+  );
+}
 
 export function LaunchPanel() {
   const launches            = useStore(s => s.launches);
@@ -148,8 +210,8 @@ export function LaunchPanel() {
               onClick={handleLaunch}
               disabled={!selectedLaunch || !activeTab?.content.trim()}
               title={t('noLaunchSelected')}
-            >🚀</button>
-            <button className="btn-icon" onClick={handleStartAdd} title={t('addLaunch')}>＋</button>
+            ><IconRocket /></button>
+            <button className="btn-icon" onClick={handleStartAdd} title={t('addLaunch')}><IconPlus /></button>
           </div>
         </div>
 
@@ -199,12 +261,14 @@ export function LaunchPanel() {
                   })()}
                 </div>
                 <div className="launch-list-item-meta">
-                  {TOOL_ICONS[launch.tool]} {launch.tool === 'opencode' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : launch.tool === 'antigravity' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : launch.tool === 'claude-code' || launch.tool === 'codex' ? `· ${launch.yolo ? 'YOLO' : 'safe'}` : `· ${launch.yolo ? 'YOLO' : 'safe'} · ${launch.mode === 'interactive' ? '-i' : '-p'}`}
+                  <span className="launch-tool-chip"><LaunchToolIcon tool={launch.tool} /> {TOOL_LABELS[launch.tool]}</span>
+                  {` · ${launch.yolo ? 'YOLO' : 'safe'}`}
+                  {launch.tool === 'copilot' ? ` · ${launch.mode === 'interactive' ? '-i' : '-p'}` : ''}
                 </div>
               </div>
               <div className="launch-list-item-actions">
-                <button className="btn-icon" onClick={e => { e.stopPropagation(); handleStartEdit(launch); }}>✏️</button>
-                <button className="btn-icon" onClick={e => { e.stopPropagation(); handleDelete(launch.id); }}>🗑️</button>
+                <button className="btn-icon" title={t('editLaunch')} onClick={e => { e.stopPropagation(); handleStartEdit(launch); }}><IconEdit /></button>
+                <button className="btn-icon" title={t('deleteLaunch')} onClick={e => { e.stopPropagation(); handleDelete(launch.id); }}><IconTrash /></button>
               </div>
             </div>
           )
@@ -247,7 +311,8 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder, launchShor
               onClick={() => onChange({ ...data, tool })}
               type="button"
             >
-              {TOOL_LABELS[tool]}
+              <span className="tool-btn-icon"><LaunchToolIcon tool={tool} /></span>
+              <span className="tool-btn-label">{TOOL_LABELS[tool]}</span>
             </button>
           ))}
         </div>
@@ -279,7 +344,7 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder, launchShor
       )}
       <div className="form-group">
         <label>{t('shortcut')}</label>
-          <select value={data.shortcut ?? ''}
+          <select title={t('shortcut')} value={data.shortcut ?? ''}
             onChange={e => onChange({ ...data, shortcut: e.target.value === '' ? undefined : e.target.value })}>
             <option value="">{t('shortcutNone')}</option>
             {Array.from('1234567890QWERTYUIOPASDFGHJKLZXCVBNM').map(n => (

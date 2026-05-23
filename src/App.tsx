@@ -11,6 +11,18 @@ import { LaunchSplash } from './components/LaunchSplash';
 import type { LaunchConfig, Phrase, Settings, Tab } from './types';
 import './App.css';
 
+function shortcutKeyFromEvent(e: KeyboardEvent): string | null {
+  const rawKey = e.key;
+  if (rawKey && /^[0-9]$/.test(rawKey)) return rawKey;
+  if (rawKey && /^[a-zA-Z]$/.test(rawKey)) return rawKey.toUpperCase();
+
+  // Use KeyboardEvent.code so Shift+9 still resolves to "9" (not "(").
+  const code = e.code || '';
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  return null;
+}
+
 export default function App() {
   const settings    = useStore(s => s.settings);
   const setSettings = useStore(s => s.setSettings);
@@ -45,10 +57,9 @@ export default function App() {
           theme: 'light' as const,
           language: 'auto' as const,
           pinnedModels: { copilot: [], opencode: [] },
-          phraseShortcutKeys: 'digit' as const,
-          launchShortcutKeys: 'digit' as const,
           phraseShortcutModifier: 'ctrl' as const,
           launchShortcutModifier: 'ctrl+shift' as const,
+          openVsCodeShortcutModifier: 'ctrl+alt+shift' as const,
         },
         ...loadedSettings,
         pinnedModels: {
@@ -156,29 +167,23 @@ export default function App() {
       if (needCtrl && !(e.ctrlKey || e.metaKey)) return;
       if (needShift && !e.shiftKey) return;
       if (needAlt && !e.altKey) return;
+      if (!needShift && e.shiftKey) return;
+      if (!needAlt && e.altKey) return;
       if (!needCtrl && (e.ctrlKey || e.metaKey)) return;
       if (e.repeat) return;
-      const rawKey = e.key;
-      if (!rawKey) return;
-
-      const isDigit = /^[0-9]$/.test(rawKey);
-      const isLetter = /^[a-zA-Z]$/.test(rawKey);
-
-      if (settings.phraseShortcutKeys === 'digit' && !isDigit) return;
-      if (settings.phraseShortcutKeys === 'letter' && !isLetter) return;
-
-      const key = settings.phraseShortcutKeys === 'letter' ? rawKey.toUpperCase() : rawKey;
+      const key = shortcutKeyFromEvent(e);
+      if (!key) return;
       const phrase = phraseByShortcut.get(key);
       if (!phrase) return;
 
       e.preventDefault();
-      requestInsertion(activeTabId, phrase.content);
+      requestInsertion(activeTabId, phrase.content, 'shortcut');
       if (settings.theme === 'gaudy') addToast(t('gaudyPhrase'));
     };
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [phraseByShortcut, activeTabId, requestInsertion, settings.theme, settings.phraseShortcutKeys, settings.phraseShortcutModifier, addToast]);
+  }, [phraseByShortcut, activeTabId, requestInsertion, settings.theme, settings.phraseShortcutModifier, addToast]);
 
   const launchByShortcut = useMemo(() => {
     const map = new Map<string, LaunchConfig>();
@@ -199,17 +204,11 @@ export default function App() {
       if (needCtrl && !(e.ctrlKey || e.metaKey)) return;
       if (needShift && !e.shiftKey) return;
       if (needAlt && !e.altKey) return;
+      if (!needShift && e.shiftKey) return;
+      if (!needAlt && e.altKey) return;
       if (e.repeat) return;
-      const rawKey = e.key;
-      if (!rawKey) return;
-
-      const isDigit = /^[0-9]$/.test(rawKey);
-      const isLetter = /^[a-zA-Z]$/.test(rawKey);
-
-      if (settings.launchShortcutKeys === 'digit' && !isDigit) return;
-      if (settings.launchShortcutKeys === 'letter' && !isLetter) return;
-
-      const key = settings.launchShortcutKeys === 'letter' ? rawKey.toUpperCase() : rawKey;
+      const key = shortcutKeyFromEvent(e);
+      if (!key) return;
       const launch = launchByShortcut.get(key);
       if (!launch || !activeTab?.content.trim()) return;
 
@@ -224,14 +223,22 @@ export default function App() {
 
     window.addEventListener('keydown', handleLaunchShortcut, { capture: true });
     return () => window.removeEventListener('keydown', handleLaunchShortcut, { capture: true });
-  }, [launchByShortcut, activeTab, setPendingLaunch, settings.launchShortcutKeys, settings.launchShortcutModifier]);
+  }, [launchByShortcut, activeTab, setPendingLaunch, settings.launchShortcutModifier]);
 
   // Ctrl+Alt+letter opens VS Code in the launch's folder
   useEffect(() => {
     const handleVsCodeShortcut = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || !e.altKey || !e.shiftKey) return;
+      const mod = settings.openVsCodeShortcutModifier;
+      const needCtrl = mod === 'ctrl+shift' || mod === 'ctrl+alt' || mod === 'ctrl+alt+shift';
+      const needShift = mod === 'ctrl+shift' || mod === 'ctrl+alt+shift';
+      const needAlt = mod === 'ctrl+alt' || mod === 'ctrl+alt+shift';
+      if (needCtrl && !(e.ctrlKey || e.metaKey)) return;
+      if (needShift && !e.shiftKey) return;
+      if (needAlt && !e.altKey) return;
+      if (!needShift && e.shiftKey) return;
+      if (!needAlt && e.altKey) return;
       if (e.repeat) return;
-      const key = e.key.toUpperCase();
+      const key = shortcutKeyFromEvent(e);
       if (!key) return;
 
       const launch = launchByShortcut.get(key);
@@ -244,7 +251,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleVsCodeShortcut, { capture: true });
     return () => window.removeEventListener('keydown', handleVsCodeShortcut, { capture: true });
-  }, [launchByShortcut]);
+  }, [launchByShortcut, settings.openVsCodeShortcutModifier]);
 
   return (
     <div className="app">
