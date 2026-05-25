@@ -200,6 +200,16 @@ export function LaunchPanel() {
                 (dropIdx === idx && dragIdx !== idx ? ' drop-target' : '')
               }
               onClick={() => setSelectedLaunchId(launch.id)}
+              onDoubleClick={() => {
+                setSelectedLaunchId(launch.id);
+                if (activeTab?.content.trim()) {
+                  setPendingLaunch({
+                    launch,
+                    prompt: activeTab.content,
+                    attachedFilePaths: (activeTab.attachedFiles ?? []).map(f => f.path),
+                  });
+                }
+              }}
               onDragStart={e => handleDragStart(e, idx)}
               onDragOver={e => handleDragOver(e, idx)}
               onDrop={e => handleDrop(e, idx)}
