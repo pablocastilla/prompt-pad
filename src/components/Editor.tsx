@@ -196,6 +196,7 @@ export function Editor() {
   const contentRef = useRef(activeTab?.content || '');
   const typingTimeoutRef = useRef<number | null>(null);
   const paletteIndexRef = useRef(0);
+  const suppressInputRef = useRef(false);
   const [isTyping, setIsTyping] = useState(false);
   const [burst, setBurst] = useState<BurstPosition | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -342,6 +343,7 @@ export function Editor() {
     event.preventDefault();
 
     if (pastedText && !hasFiles && !hasImages && !hasNativeImage) {
+      suppressInputRef.current = true;
       insertPlainTextAtSelection(pastedText, 'shortcut');
       return;
     }
@@ -388,11 +390,16 @@ export function Editor() {
 
   useEffect(() => {
     if (!insertionSignal || insertionSignal.tabId !== activeTabId) return;
+    suppressInputRef.current = true;
     insertPlainTextAtSelection(insertionSignal.text, insertionSignal.source);
     clearInsertion();
   }, [insertionSignal, activeTabId, insertPlainTextAtSelection, clearInsertion]);
 
   const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
+    if (suppressInputRef.current) {
+      suppressInputRef.current = false;
+      return;
+    }
     const editor = e.currentTarget;
     const selection = getSelectionOffsets(editor);
     const newContent = getPlainTextFromEditor(editor);
@@ -445,11 +452,13 @@ export function Editor() {
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      suppressInputRef.current = true;
       insertPlainTextAtSelection('\n', 'shortcut');
       return;
     }
     if (e.key === 'Tab') {
       e.preventDefault();
+      suppressInputRef.current = true;
       insertPlainTextAtSelection('  ', 'shortcut');
     }
   }, [insertPlainTextAtSelection]);

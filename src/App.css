@@ -48,7 +48,7 @@ html, body, #root {
   --phrase-catalog-highlight-editor-fg: #065f46;
   --launch-tool-icon-fg: #1f2937;
   --launch-tool-logo-filter: none;
-  --launch-tool-logo-bg: rgba(24, 24, 27, .06);
+  --launch-tool-logo-bg: transparent;
 }
 
 [data-theme="dark"] {
@@ -85,8 +85,8 @@ html, body, #root {
   --phrase-catalog-highlight-fg: #02120c;
   --phrase-catalog-highlight-editor-fg: #6ee7b7;
   --launch-tool-icon-fg: #f4f4f5;
-  --launch-tool-logo-filter: brightness(0) invert(1);
-  --launch-tool-logo-bg: rgba(244, 244, 245, .08);
+  --launch-tool-logo-filter: none;
+  --launch-tool-logo-bg: transparent;
 }
 
 [data-theme="gaudy"] {
@@ -123,8 +123,8 @@ html, body, #root {
   --phrase-catalog-highlight-fg: #3b132c;
   --phrase-catalog-highlight-editor-fg: #ffe28a;
   --launch-tool-icon-fg: #ffe6a8;
-  --launch-tool-logo-filter: brightness(1.1) saturate(1.12);
-  --launch-tool-logo-bg: rgba(255, 226, 138, .16);
+  --launch-tool-logo-filter: none;
+  --launch-tool-logo-bg: transparent;
 }
 
 [data-theme="cyberpunk"] {
@@ -161,8 +161,8 @@ html, body, #root {
   --phrase-catalog-highlight-fg: #170212;
   --phrase-catalog-highlight-editor-fg: #ff8de6;
   --launch-tool-icon-fg: #dff8ff;
-  --launch-tool-logo-filter: brightness(0) invert(1);
-  --launch-tool-logo-bg: rgba(71, 233, 255, .12);
+  --launch-tool-logo-filter: none;
+  --launch-tool-logo-bg: transparent;
 }
 
 /* ── LAYOUT ──────────────────────────────────────── */

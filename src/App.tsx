@@ -54,7 +54,7 @@ export default function App() {
       ]);
       const s = {
         ...{
-          theme: 'light' as const,
+          theme: 'dark' as const,
           language: 'auto' as const,
           pinnedModels: { copilot: [], opencode: [] },
           phraseShortcutModifier: 'ctrl' as const,

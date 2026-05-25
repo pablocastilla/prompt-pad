@@ -312,7 +312,7 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(
 
 // Settings
 ipcMain.handle('settings:load', () => {
-  const settings = readJson(getSettingsPath(), { theme: 'light', language: 'auto', useOneDrive: true });
+  const settings = readJson(getSettingsPath(), { theme: 'dark', language: 'auto', useOneDrive: true });
   if (TEST_DIR) return settings; // Never force OneDrive in test mode
   if (detectOneDrivePath()) {
     return { ...settings, useOneDrive: true };
@@ -550,7 +550,7 @@ async function executeLaunchOpenCode(config: {
   const isInteractive = mode === 'interactive';
   const id = Date.now().toString();
 
-  const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
+  const launchTmpDir = path.join(workDir, '.prompt-pad-' + id);
   fs.mkdirSync(launchTmpDir, { recursive: true });
 
   const promptFileName = 'pp-prompt-' + id + '.txt';
