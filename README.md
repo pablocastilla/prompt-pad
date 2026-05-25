@@ -218,7 +218,7 @@ The Gaudy theme is best experienced live. It features:
 ### Model Picker
 - **Dynamic model lists**: fetches available models from both Copilot CLI (`copilot help config`) and OpenCode (`opencode models`) at runtime.
 - **Dual tool support**: automatically shows the correct model list based on whether the launch config uses Copilot or OpenCode.
-- **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode brand mark) with theme-aware contrast.
+- **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode brand mark) with theme-aware contrast. OpenCode now uses a minimal two-image square logo set (light-theme and dark-theme variants).
 - **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
 - **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) and usage limits.
 - **Expensive model confirmation**: launching tier 4-5 models prompts a confirmation dialog to prevent accidental high-cost launches.

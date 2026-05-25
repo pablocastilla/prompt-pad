@@ -21,7 +21,14 @@ function saveLaunches(testDir: string, launches: unknown[]) {
 
 function saveSettings(testDir: string) {
   const p = path.join(testDir, 'settings.json');
-  fs.writeFileSync(p, JSON.stringify({ theme: 'light', language: 'auto', useOneDrive: false }, null, 2));
+  fs.writeFileSync(p, JSON.stringify({
+    theme: 'light',
+    language: 'auto',
+    useOneDrive: false,
+    showGoModelsOnly: {
+      opencode: false,
+    },
+  }, null, 2));
 }
 
 test.describe('Tab persistence after launch', () => {

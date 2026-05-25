@@ -1,7 +1,8 @@
 import React from 'react';
 import type { LaunchTool } from '../types';
 import { siGithubcopilot, siClaude, siOpenaigym } from 'simple-icons';
-import opencodeIconDark from '../assets/cli-icons/opencode-square.png';
+import opencodeIconDarkTheme from '../assets/cli-icons/opencode-logo-light-square.png';
+import opencodeIconLightTheme from '../assets/cli-icons/opencode-logo-dark-square.png';
 
 interface ToolIconProps {
   tool: LaunchTool;
@@ -17,6 +18,15 @@ export const TOOL_LABELS: Record<LaunchTool, string> = {
   codex: 'Codex',
 };
 
+function getOpenCodeIconForTheme(): string {
+  if (typeof document === 'undefined') {
+    return opencodeIconLightTheme;
+  }
+
+  const theme = document.documentElement.getAttribute('data-theme') ?? 'light';
+  return theme === 'light' ? opencodeIconLightTheme : opencodeIconDarkTheme;
+}
+
 export function ToolIcon({ tool, size = 14, className }: ToolIconProps) {
   if (tool === 'copilot') {
     return (
@@ -28,7 +38,7 @@ export function ToolIcon({ tool, size = 14, className }: ToolIconProps) {
   if (tool === 'opencode') {
     return (
       <img
-        src={opencodeIconDark}
+        src={getOpenCodeIconForTheme()}
         alt="OpenCode"
         className={`tool-icon-image ${className ?? ''}`.trim()}
         width={size}
