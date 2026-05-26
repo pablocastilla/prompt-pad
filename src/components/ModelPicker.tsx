@@ -170,13 +170,15 @@ export function ModelPicker() {
   useEffect(() => {
     if (pendingLaunch) {
       void loadModels(tool);
-      if (allModels.length > 0) {
-        const ms = allModels;
-        const idx = Math.max(0, ms.findIndex(m => m.id === pendingLaunch.launch.model));
-        setSelectedIdx(idx);
-      }
     }
   }, [pendingLaunch?.launch.id, tool]);
+
+  // Recalculate selectedIdx when allModels changes (e.g. after async fetch completes)
+  useEffect(() => {
+    if (!pendingLaunch || allModels.length === 0) return;
+    const idx = Math.max(0, allModels.findIndex(m => m.id === pendingLaunch.launch.model));
+    setSelectedIdx(idx);
+  }, [allModels, pendingLaunch]);
 
   // Never auto-scroll; keep list at top. User scrolls manually if needed.
   useEffect(() => {

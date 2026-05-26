@@ -15,9 +15,13 @@ const FALLBACK_COPILOT_MODELS = [
   { id: 'gpt-4.5', label: 'gpt-4.5' },
 ];
 const FALLBACK_OPENCODE_MODELS = [
-  { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+  { id: 'opencode/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
   { id: 'opencode/minimax-m2.7', label: 'Minimax M2.7' },
-  { id: 'opencode/minimax-m2.5-free', label: 'Minimax M2.5 Free' },
+  { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+  { id: 'opencode/deepseek-v4-flash-free', label: 'Deepseek V4 Flash Free' },
+  { id: 'opencode-go/deepseek-v4-pro', label: 'Deepseek V4 Pro' },
+  { id: 'opencode-go/minimax-m2.5', label: 'Minimax M2.5' },
+  { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
 ];
 const FALLBACK_ANTIGRAVITY_MODELS = [
   { id: 'antigravity/default', label: 'Antigravity Default' },
