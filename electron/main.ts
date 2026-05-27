@@ -521,7 +521,7 @@ async function executeLaunchOpenCode(config: {
   const isInteractive = mode === 'interactive';
   const id = Date.now().toString();
 
-  const launchTmpDir = path.join(workDir, '.prompt-pad-' + id);
+  const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
   fs.mkdirSync(launchTmpDir, { recursive: true });
 
   const promptFileName = 'pp-prompt-' + id + '.txt';
