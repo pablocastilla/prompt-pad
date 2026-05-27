@@ -1510,6 +1510,17 @@ html, body, #root {
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 38%, transparent);
   animation: model-picker-pulse 1s ease-in-out infinite;
 }
+
+.model-picker-error {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e74c3c;
+  font-size: 13px;
+  padding: 12px 16px;
+  text-align: center;
+}
 [data-theme="gaudy"] .model-picker-loading {
   font-family: "Goudy Old Style", Georgia, serif;
   color: #ffd85a;

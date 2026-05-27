@@ -233,34 +233,6 @@ export function getModelCostInfo(modelId: string): ModelCostInfo | undefined {
   if (/claude/.test(id))      return { tier: 3, tooltip: tierTooltips['3'](id) };
 }
 
-// ── Default model fallbacks ──
-export const COPILOT_MODELS = [
-  { id: 'auto', label: 'auto' },
-  { id: 'claude-sonnet-4.6', label: 'claude-sonnet-4.6' },
-  { id: 'claude-opus-4.6', label: 'Claude Opus 4.6 (Smart)' },
-  { id: 'gpt-4.5', label: 'gpt-4.5' },
-] as const;
-
-export const OPENCODE_MODELS = [
-  { id: 'opencode/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-  { id: 'opencode/minimax-m2.7', label: 'Minimax M2.7' },
-  { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
-  { id: 'opencode/deepseek-v4-flash-free', label: 'Deepseek V4 Flash Free' },
-  { id: 'opencode-go/deepseek-v4-pro', label: 'Deepseek V4 Pro' },
-  { id: 'opencode-go/minimax-m2.5', label: 'Minimax M2.5' },
-  { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
-  { id: 'opencode-go/qwen3.7-max', label: 'Qwen3.7 Max' },
-] as const;
-
-export const ANTIGRAVITY_MODELS = [
-  { id: 'antigravity/default', label: 'Antigravity Default' },
-] as const;
-
-export function modelsForTool(tool: LaunchTool): ReadonlyArray<{ id: string; label: string }> {
-  if (tool === 'antigravity') return ANTIGRAVITY_MODELS;
-  return tool === 'opencode' ? OPENCODE_MODELS : COPILOT_MODELS;
-}
-
 // ── Electron API type ──
 export interface ElectronAPI {
   loadSettings: () => Promise<Settings>;

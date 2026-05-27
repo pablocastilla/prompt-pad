@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { modelsForTool, getModelCostInfo } from '../types';
+import { getModelCostInfo } from '../types';
 import { t } from '../i18n';
 import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry, CostTier } from '../types';
 import { ToolIcon, TOOL_LABELS } from './ToolIcon';
@@ -33,6 +33,13 @@ export function ModelPicker() {
     'claude-code': false,
     codex: false,
   });
+  const [modelError, setModelError] = useState<Record<LaunchTool, string | null>>({
+    copilot: null,
+    opencode: null,
+    antigravity: null,
+    'claude-code': null,
+    codex: null,
+  });
   const listRef = useRef<HTMLDivElement | null>(null);
   const [dragPinnedIdx, setDragPinnedIdx] = useState<number | null>(null);
   const [dropPinnedIdx, setDropPinnedIdx] = useState<number | null>(null);
@@ -40,8 +47,7 @@ export function ModelPicker() {
   const [confirmExpensiveIdx, setConfirmExpensiveIdx] = useState<number | null>(null);
 
   const tool: LaunchTool = pendingLaunch?.launch.tool ?? 'copilot';
-  const fallbackModels = modelsForTool(tool);
-  const availableModels = modelCache[tool] ?? fallbackModels;
+  const availableModels = modelCache[tool] ?? [];
   const pinnedIds = settings.pinnedModels?.[tool] ?? [];
   const showGoOnly = settings.showGoModelsOnly?.[tool] ?? (tool === 'opencode' ? true : false);
 
@@ -126,7 +132,7 @@ export function ModelPicker() {
   const loadModels = async (selectedTool: LaunchTool, force = false) => {
     if (!force && (modelCache[selectedTool] || loadingModels[selectedTool])) return;
     setLoadingModels(prev => ({ ...prev, [selectedTool]: true }));
-    const fallback = modelsForTool(selectedTool);
+    setModelError(prev => ({ ...prev, [selectedTool]: null }));
     try {
       let fetched: ModelOption[] = [];
       if (selectedTool === 'opencode') {
@@ -137,7 +143,7 @@ export function ModelPicker() {
         fetched = await window.electronAPI.getAntigravityModels();
       }
       if (!Array.isArray(fetched) || fetched.length === 0) {
-        setModelCache(prev => ({ ...prev, [selectedTool]: fallback }));
+        setModelError(prev => ({ ...prev, [selectedTool]: t('modelsUnavailable') }));
         return;
       }
 
@@ -154,7 +160,7 @@ export function ModelPicker() {
       setModelCache(prev => ({ ...prev, [selectedTool]: normalized }));
       void cleanStalePins(selectedTool, normalized.map(m => m.id));
     } catch {
-      setModelCache(prev => ({ ...prev, [selectedTool]: fallback }));
+      setModelError(prev => ({ ...prev, [selectedTool]: t('modelsUnavailable') }));
     } finally {
       setLoadingModels(prev => ({ ...prev, [selectedTool]: false }));
     }
@@ -335,7 +341,11 @@ export function ModelPicker() {
         <div className="model-picker-list" ref={listRef}>
           {isLoading && <div className="model-picker-loading"><span className="model-picker-loading-dot" />{t('loadingModels')}</div>}
           {allModels.length === 0 ? (
-            <div className="model-picker-loading">{t('loadingModels')}</div>
+            modelError[tool] ? (
+              <div className="model-picker-error">{modelError[tool]}</div>
+            ) : (
+              <div className="model-picker-loading">{t('loadingModels')}</div>
+            )
           ) : (
             <>
               {pinnedModels.length > 0 && <div className="model-picker-section-header">{t('pinnedModelsTitle')}</div>}

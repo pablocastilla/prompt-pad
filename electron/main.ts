@@ -8,25 +8,6 @@ import { spawn } from 'child_process';
 const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
 const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
-const FALLBACK_COPILOT_MODELS = [
-  { id: 'auto', label: 'auto' },
-  { id: 'claude-sonnet-4.6', label: 'claude-sonnet-4.6' },
-  { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
-  { id: 'gpt-4.5', label: 'gpt-4.5' },
-];
-const FALLBACK_OPENCODE_MODELS = [
-  { id: 'opencode/claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-  { id: 'opencode/minimax-m2.7', label: 'Minimax M2.7' },
-  { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
-  { id: 'opencode/deepseek-v4-flash-free', label: 'Deepseek V4 Flash Free' },
-  { id: 'opencode-go/deepseek-v4-pro', label: 'Deepseek V4 Pro' },
-  { id: 'opencode-go/minimax-m2.5', label: 'Minimax M2.5' },
-  { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
-  { id: 'opencode-go/qwen3.7-max', label: 'Qwen3.7 Max' },
-];
-const FALLBACK_ANTIGRAVITY_MODELS = [
-  { id: 'antigravity/default', label: 'Antigravity Default' },
-];
 const DEFAULT_MODEL = 'claude-sonnet-4.6';
 const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.7';
 const DEFAULT_ANTIGRAVITY_MODEL = 'antigravity/default';
@@ -393,34 +374,24 @@ let antigravityModelsCache: { id: string; label: string }[] | null = null;
 
 ipcMain.handle('models:get-opencode', async () => {
   if (openCodeModelsCache && openCodeModelsCache.length > 0) return openCodeModelsCache;
-  try {
-    const output = await runCommand('opencode', ['models']);
-    const parsed = parseOpenCodeModels(output);
-    if (parsed.length > 0) {
-      openCodeModelsCache = parsed;
-      return parsed;
-    }
-  } catch {
-    // fallback below
+  const output = await runCommand('opencode', ['models']);
+  const parsed = parseOpenCodeModels(output);
+  if (parsed.length === 0) {
+    throw new Error('No models returned from opencode CLI');
   }
-  openCodeModelsCache = FALLBACK_OPENCODE_MODELS;
-  return openCodeModelsCache;
+  openCodeModelsCache = parsed;
+  return parsed;
 });
 
 ipcMain.handle('models:get-antigravity', async () => {
   if (antigravityModelsCache && antigravityModelsCache.length > 0) return antigravityModelsCache;
-  try {
-    const output = await runCommand('agy.exe', ['models'], 8000);
-    const parsed = parseAntigravityModels(output);
-    if (parsed.length > 0) {
-      antigravityModelsCache = parsed;
-      return parsed;
-    }
-  } catch {
-    // fallback below
+  const output = await runCommand('agy.exe', ['models'], 8000);
+  const parsed = parseAntigravityModels(output);
+  if (parsed.length === 0) {
+    throw new Error('No models returned from antigravity CLI');
   }
-  antigravityModelsCache = FALLBACK_ANTIGRAVITY_MODELS;
-  return antigravityModelsCache;
+  antigravityModelsCache = parsed;
+  return parsed;
 });
 
 ipcMain.handle('models:clear-cache', () => {
@@ -431,19 +402,14 @@ ipcMain.handle('models:clear-cache', () => {
 
 ipcMain.handle('models:get-copilot', async () => {
   if (copilotModelsCache && copilotModelsCache.length > 0) return copilotModelsCache;
-  try {
-    const cmd = process.platform === 'win32' ? 'copilot.exe' : 'copilot';
-    const output = await runCommand(cmd, ['help', 'config'], 8000);
-    const parsed = parseCopilotModels(output);
-    if (parsed.length > 0) {
-      copilotModelsCache = parsed;
-      return parsed;
-    }
-  } catch {
-    // fallback below
+  const cmd = process.platform === 'win32' ? 'copilot.exe' : 'copilot';
+  const output = await runCommand(cmd, ['help', 'config'], 8000);
+  const parsed = parseCopilotModels(output);
+  if (parsed.length === 0) {
+    throw new Error('No models returned from copilot CLI');
   }
-  copilotModelsCache = FALLBACK_COPILOT_MODELS;
-  return copilotModelsCache;
+  copilotModelsCache = parsed;
+  return parsed;
 });
 
 // File operations

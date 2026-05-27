@@ -78,7 +78,7 @@ test.describe('Model Cost Indicators', () => {
     }
   });
 
-  test('cost indicators show on all model items', async () => {
+  test('cost indicators show on all model items with real CLI data', async () => {
     const testDir = getTestDir();
     try {
       saveLaunches(testDir, [
@@ -91,29 +91,13 @@ test.describe('Model Cost Indicators', () => {
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
 
-      await page.evaluate(() => {
-        const api = (window as unknown as {
-          electronAPI: {
-            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
-          };
-        }).electronAPI;
-
-        api.getOpenCodeModels = async () => [
-          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
-          { id: 'opencode/gpt-5-nano', label: 'GPT 5 Nano' },
-          { id: 'opencode/claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
-          { id: 'opencode/claude-opus-4.7', label: 'Claude Opus 4.7' },
-          { id: 'opencode/gpt-5.5-pro', label: 'GPT 5.5 Pro' },
-          { id: 'opencode-go/deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1' },
-        ];
-      });
-
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
       await page.locator('.editor-textarea').fill('test');
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+
+      await page.waitForTimeout(3000);
 
       const goToggle = page.locator('.model-picker-go-toggle');
       await expect(goToggle).toBeVisible({ timeout: 3000 });
@@ -123,12 +107,13 @@ test.describe('Model Cost Indicators', () => {
         await page.waitForTimeout(500);
       }
 
-      // Every model item should have either a cost badge or cost bars
       const items = page.locator('.model-picker-item');
       const itemCount = await items.count();
+      console.log(`Model items (Go filter off): ${itemCount}`);
       expect(itemCount).toBeGreaterThan(0);
 
       const indicatorCount = await page.locator('.model-cost-badge, .model-cost-bars').count();
+      console.log(`Cost indicators: ${indicatorCount}`);
       expect(indicatorCount).toBeGreaterThan(0);
 
       await app.close();
