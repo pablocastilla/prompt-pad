@@ -314,4 +314,126 @@ test.describe('OpenCode fallback models with Go filter', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  test('qwen3.7-max model label is parsed correctly', async () => {
+    const testDir = getTestDir();
+    try {
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'Qwen Max Test', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+      ], null, 2));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        const api = (window as any).electronAPI;
+        api.getOpenCodeModels = async () => [
+          { id: 'opencode-go/qwen3.7-max', label: 'Qwen3.7 Max' },
+          { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
+          { id: 'opencode-go/qwen3.5-plus', label: 'Qwen3.5 Plus' },
+        ];
+      });
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('qwen max test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+
+      await page.waitForTimeout(2000);
+
+      const bodyText = await page.locator('.model-picker-card').innerText();
+      expect(bodyText).toContain('Qwen3.7 Max');
+
+      const modelItems = page.locator('.model-picker-item');
+      const count = await modelItems.count();
+      console.log(`Models visible with qwen3.7-max: ${count}`);
+      expect(count).toBeGreaterThanOrEqual(3);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('qwen3.7-max receives cost indicator in Go mode', async () => {
+    const testDir = getTestDir();
+    try {
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'Qwen Max Cost Test', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+      ], null, 2));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        const api = (window as any).electronAPI;
+        api.getOpenCodeModels = async () => [
+          { id: 'opencode-go/qwen3.7-max', label: 'Qwen3.7 Max' },
+          { id: 'opencode-go/deepseek-v4-flash', label: 'Deepseek V4 Flash' },
+        ];
+      });
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('qwen max cost test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+
+      await page.waitForTimeout(2000);
+
+      const costBars = page.locator('.model-cost-bars');
+      const barsCount = await costBars.count();
+      console.log(`Cost bars for qwen3.7-max: ${barsCount}`);
+      expect(barsCount).toBeGreaterThanOrEqual(1);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('qwen3.7-max appears in Go-only filtered fallback', async () => {
+    const testDir = getTestDir();
+    try {
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'Qwen Max Fallback', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+      ], null, 2));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        const api = (window as any).electronAPI;
+        api.getOpenCodeModels = async () => [];
+      });
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('qwen max fallback test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+
+      await page.waitForTimeout(2000);
+
+      const bodyText = await page.locator('.model-picker-card').innerText();
+      expect(bodyText).toContain('Qwen3.7 Max');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });

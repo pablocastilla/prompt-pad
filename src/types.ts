@@ -220,6 +220,7 @@ export function getModelCostInfo(modelId: string): ModelCostInfo | undefined {
     if (/pro/.test(id))       return { tier: 3, tooltip: tierTooltips['3'](id) };
     if (/kimi/.test(id))      return { tier: 3, tooltip: tierTooltips['3'](id) };
     if (/mimo/.test(id))      return { tier: 3, tooltip: tierTooltips['3'](id) };
+    if (/max/.test(id))       return { tier: 4, tooltip: tierTooltips['4'](id) };
     if (/glm/.test(id))       return { tier: 4, tooltip: tierTooltips['4'](id) };
     return { tier: 3, tooltip: tierTooltips['3'](id) };
   }
@@ -248,6 +249,7 @@ export const OPENCODE_MODELS = [
   { id: 'opencode-go/deepseek-v4-pro', label: 'Deepseek V4 Pro' },
   { id: 'opencode-go/minimax-m2.5', label: 'Minimax M2.5' },
   { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
+  { id: 'opencode-go/qwen3.7-max', label: 'Qwen3.7 Max' },
 ] as const;
 
 export const ANTIGRAVITY_MODELS = [

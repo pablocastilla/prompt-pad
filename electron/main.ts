@@ -22,6 +22,7 @@ const FALLBACK_OPENCODE_MODELS = [
   { id: 'opencode-go/deepseek-v4-pro', label: 'Deepseek V4 Pro' },
   { id: 'opencode-go/minimax-m2.5', label: 'Minimax M2.5' },
   { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
+  { id: 'opencode-go/qwen3.7-max', label: 'Qwen3.7 Max' },
 ];
 const FALLBACK_ANTIGRAVITY_MODELS = [
   { id: 'antigravity/default', label: 'Antigravity Default' },
