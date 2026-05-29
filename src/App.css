@@ -1580,15 +1580,16 @@ html, body, #root {
 
 .model-tier-badge {
   flex-shrink: 0;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: .03em;
   text-transform: uppercase;
-  padding: 0 5px;
-  border-radius: 4px;
-  line-height: 16px;
+  padding: 0 3px;
+  border-radius: 3px;
+  line-height: 13px;
   cursor: default;
   transition: all .15s;
+  margin-left: -2px;
 }
 
 .model-tier-go {
@@ -1604,7 +1605,7 @@ html, body, #root {
 }
 
 .model-picker-item:hover .model-tier-badge {
-  transform: scale(1.04);
+  transform: scale(1.06);
 }
 
 [data-theme="gaudy"] .model-tier-go {
