@@ -309,6 +309,16 @@ export function ModelPicker() {
     return <span className="model-cost-bars" title={tooltip}>{bars.join('')}</span>;
   }
 
+  function TierBadge({ modelId }: { modelId: string }) {
+    if (modelId.startsWith('opencode-go/')) {
+      return <span className="model-tier-badge model-tier-go">Go</span>;
+    }
+    if (modelId.startsWith('opencode/')) {
+      return <span className="model-tier-badge model-tier-zen">Zen</span>;
+    }
+    return null;
+  }
+
   if (!pendingLaunch) return null;
 
   const isLoading = loadingModels[tool];
@@ -385,6 +395,7 @@ export function ModelPicker() {
                   <span className="model-picker-drag-handle" title={t('dragHandleTitle')}>⠿</span>
                   <span className="model-picker-item-dot" />
                   <span className="model-picker-item-label">{m.label}</span>
+                  <TierBadge modelId={m.id} />
                   <CostIndicator modelId={m.id} />
                   <span className="model-picker-shortcut">{getShortcutLabel(idx)}</span>
                   <button
@@ -407,6 +418,7 @@ export function ModelPicker() {
                   >
                     <span className="model-picker-item-dot" />
                     <span className="model-picker-item-label">{m.label}</span>
+                    <TierBadge modelId={m.id} />
                     <CostIndicator modelId={m.id} />
                     <button
                       className="model-picker-pin-btn"
@@ -427,7 +439,10 @@ export function ModelPicker() {
             <div className="model-picker-confirm-card">
               <div className="model-picker-confirm-icon">⚠️</div>
               <div className="model-picker-confirm-text">{t('expensiveModelConfirm')}</div>
-              <div className="model-picker-confirm-model">{allModels[confirmExpensiveIdx]?.label}</div>
+              <div className="model-picker-confirm-model">
+                {allModels[confirmExpensiveIdx]?.label}
+                {allModels[confirmExpensiveIdx] && <TierBadge modelId={allModels[confirmExpensiveIdx].id} />}
+              </div>
               <div className="model-picker-confirm-actions">
                 <button className="model-picker-confirm-btn model-picker-confirm-cancel" onClick={() => setConfirmExpensiveIdx(null)}>{t('cancelBtn')}</button>
                 <button className="model-picker-confirm-btn model-picker-confirm-launch" onClick={() => execute(confirmExpensiveIdx)}>{t('launch')}</button>

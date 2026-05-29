@@ -1576,6 +1576,51 @@ html, body, #root {
   transform: scale(1.04);
 }
 
+/* ── MODEL TIER BADGES (Go / Zen) ────────────────── */
+
+.model-tier-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 0 5px;
+  border-radius: 4px;
+  line-height: 16px;
+  cursor: default;
+  transition: all .15s;
+}
+
+.model-tier-go {
+  background: rgba(234, 88, 12, .15);
+  color: #f97316;
+  border: 1px solid rgba(234, 88, 12, .2);
+}
+
+.model-tier-zen {
+  background: rgba(99, 102, 241, .12);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, .2);
+}
+
+.model-picker-item:hover .model-tier-badge {
+  transform: scale(1.04);
+}
+
+[data-theme="gaudy"] .model-tier-go {
+  background: linear-gradient(135deg, rgba(255, 120, 200, .12), rgba(255, 226, 138, .15));
+  border-color: rgba(255, 120, 200, .25);
+  color: #ff78c8;
+  text-shadow: 0 0 6px rgba(255, 120, 200, .3);
+}
+
+[data-theme="gaudy"] .model-tier-zen {
+  background: linear-gradient(135deg, rgba(255, 226, 138, .12), rgba(99, 102, 241, .15));
+  border-color: rgba(255, 226, 138, .25);
+  color: #ffe28a;
+  text-shadow: 0 0 6px rgba(255, 226, 138, .3);
+}
+
 /* ── GAUDY MODEL COST INDICATORS ─────────────────── */
 
 [data-theme="gaudy"] .model-cost-free {
