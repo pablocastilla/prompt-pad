@@ -7,6 +7,15 @@ interface BurstPosition {
   id: number;
 }
 
+interface HistoryEntry {
+  content: string;
+  phraseRanges: Array<{ start: number; end: number }>;
+  selectionStart: number;
+  selectionEnd: number;
+  afterContent?: string;
+  afterPhraseRanges?: Array<{ start: number; end: number }>;
+}
+
 const GAUDY_PALETTES = [
   { burstA: 'rgba(255, 226, 138, .95)', burstB: 'rgba(103, 245, 230, .95)', burstC: 'rgba(255, 120, 200, .9)' },
   { burstA: 'rgba(255, 172, 111, .92)', burstB: 'rgba(255, 120, 200, .92)', burstC: 'rgba(155, 239, 255, .88)' },
@@ -204,6 +213,113 @@ export function Editor() {
   const [isFileDragOver, setIsFileDragOver] = useState(false);
   const [isEditorEmpty, setIsEditorEmpty] = useState(!(activeTab?.content ?? '').length);
   const prevLengthRef = useRef(activeTab?.content.length ?? 0);
+  
+  // Undo/Redo history
+  const historyRef = useRef<HistoryEntry[]>([]);
+  const historyIndexRef = useRef(-1);
+  const isUndoRedoRef = useRef(false);
+  const lastContentRef = useRef(activeTab?.content || '');
+  const typingTimerRef = useRef<number | null>(null);
+  const preTypingStateRef = useRef<{ content: string; phraseRanges: Array<{ start: number; end: number }> } | null>(null);
+
+  const finalizeTypingBatch = useCallback(() => {
+    typingTimerRef.current = null;
+    const preState = preTypingStateRef.current;
+    preTypingStateRef.current = null;
+    if (!preState) return;
+    const currentContent = contentRef.current;
+    const tab = activeTabRef.current;
+    if (!tab) return;
+    // Only push if content actually changed
+    if (preState.content !== currentContent) {
+      // Remove any future history if we're in the middle of the stack
+      if (historyIndexRef.current < historyRef.current.length - 1) {
+        historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+      }
+      // Add entry with both before and after states
+      historyRef.current.push({
+        content: preState.content,
+        phraseRanges: preState.phraseRanges,
+        selectionStart: 0,
+        selectionEnd: 0,
+        afterContent: currentContent,
+        afterPhraseRanges: tab.phraseRanges,
+      });
+      // Limit history size
+      if (historyRef.current.length > 100) {
+        historyRef.current.shift();
+      }
+      historyIndexRef.current = historyRef.current.length - 1;
+    }
+  }, []);
+
+  const pushToHistory = useCallback((content: string, phraseRanges: Array<{ start: number; end: number }>, _selectionStart: number, _selectionEnd: number) => {
+    // Debounce: group rapid keystrokes into one undo step
+    if (typingTimerRef.current !== null) {
+      window.clearTimeout(typingTimerRef.current);
+    }
+    // Save pre-typing state on first keystroke of a batch
+    if (!preTypingStateRef.current) {
+      preTypingStateRef.current = { content, phraseRanges };
+    }
+    typingTimerRef.current = window.setTimeout(finalizeTypingBatch, 500);
+  }, [finalizeTypingBatch]);
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current < 0) return;
+    isUndoRedoRef.current = true;
+    
+    // Finalize any pending typing batch first
+    if (typingTimerRef.current !== null) {
+      window.clearTimeout(typingTimerRef.current);
+      finalizeTypingBatch();
+    }
+    
+    const editor = editorSurfaceRef.current;
+    if (!editor || !activeTab) { isUndoRedoRef.current = false; return; }
+    
+    const entry = historyRef.current[historyIndexRef.current];
+    // Restore the "before" state of this entry
+    renderEditorText(editor, entry.content, entry.phraseRanges);
+    syncEditorValue(editor, entry.content);
+    setSelectionOffsets(editor, entry.selectionStart, entry.selectionEnd);
+    
+    contentRef.current = entry.content;
+    prevLengthRef.current = entry.content.length;
+    setIsEditorEmpty(entry.content.length === 0);
+    updateTabContent(activeTabId, entry.content);
+    setTabPhraseRanges(activeTabId, entry.phraseRanges);
+    lastContentRef.current = entry.content;
+    historyIndexRef.current--;
+    editor.focus();
+    isUndoRedoRef.current = false;
+  }, [activeTabId, activeTab, updateTabContent, setTabPhraseRanges, finalizeTypingBatch]);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+    isUndoRedoRef.current = true;
+    historyIndexRef.current++;
+    
+    const editor = editorSurfaceRef.current;
+    if (!editor || !activeTab) { isUndoRedoRef.current = false; return; }
+    
+    const entry = historyRef.current[historyIndexRef.current];
+    // Restore the "after" state of this entry
+    const afterContent = entry.afterContent ?? entry.content;
+    const afterRanges = entry.afterPhraseRanges ?? entry.phraseRanges;
+    renderEditorText(editor, afterContent, afterRanges);
+    syncEditorValue(editor, afterContent);
+    setSelectionOffsets(editor, entry.selectionStart, entry.selectionEnd);
+    
+    contentRef.current = afterContent;
+    prevLengthRef.current = afterContent.length;
+    setIsEditorEmpty(afterContent.length === 0);
+    updateTabContent(activeTabId, afterContent);
+    setTabPhraseRanges(activeTabId, afterRanges);
+    lastContentRef.current = afterContent;
+    editor.focus();
+    isUndoRedoRef.current = false;
+  }, [activeTabId, activeTab, updateTabContent, setTabPhraseRanges]);
 
   const attachPaths = useCallback((items: { name: string; path: string; size: number }[]) => {
     let added = 0;
@@ -245,6 +361,32 @@ export function Editor() {
 
     const current = getPlainTextFromEditor(editor);
     const selection = getSelectionOffsets(editor) ?? { start: current.length, end: current.length };
+    
+    // Clear any pending typing batch since this is an atomic operation
+    if (typingTimerRef.current !== null) {
+      window.clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+      preTypingStateRef.current = null;
+    }
+    
+    // Push to history before making changes (atomic operation)
+    if (!isUndoRedoRef.current) {
+      // Remove any future history if we're in the middle of the stack
+      if (historyIndexRef.current < historyRef.current.length - 1) {
+        historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+      }
+      historyRef.current.push({
+        content: current,
+        phraseRanges: tab.phraseRanges,
+        selectionStart: selection.start,
+        selectionEnd: selection.end,
+      });
+      if (historyRef.current.length > 100) {
+        historyRef.current.shift();
+      }
+      historyIndexRef.current = historyRef.current.length - 1;
+    }
+    
     const newText = current.slice(0, selection.start) + insertText + current.slice(selection.end);
     const insertStart = selection.start;
     const insertEnd = selection.start + insertText.length;
@@ -271,6 +413,7 @@ export function Editor() {
     updateTabContent(activeTabId, newText);
     setTabPhraseRanges(activeTabId, newRanges);
     syncEditorValue(editor, newText);
+    lastContentRef.current = newText;
     editor.focus();
   }, [activeTabId, updateTabContent, setTabPhraseRanges]);
 
@@ -362,22 +505,33 @@ export function Editor() {
   useEffect(() => {
     contentRef.current = activeTab?.content || '';
     prevLengthRef.current = activeTab?.content.length ?? 0;
+    lastContentRef.current = activeTab?.content || '';
     setIsEditorEmpty((activeTab?.content.length ?? 0) === 0);
     if (editorSurfaceRef.current) {
       renderEditorText(editorSurfaceRef.current, contentRef.current, activeTab?.phraseRanges);
       syncEditorValue(editorSurfaceRef.current, contentRef.current);
     }
+    // Reset history for this tab
+    historyRef.current = [{ content: contentRef.current, phraseRanges: activeTab?.phraseRanges || [], selectionStart: 0, selectionEnd: 0 }];
+    historyIndexRef.current = 0;
+    // Clear any pending typing timer
+    if (typingTimerRef.current !== null) {
+      window.clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+    preTypingStateRef.current = null;
   }, [activeTabId]);
 
   useEffect(() => {
     const editor = editorSurfaceRef.current;
-    if (!editor) return;
+    if (!editor || isUndoRedoRef.current) return;
     const nextContent = activeTab?.content || '';
     if (nextContent === contentRef.current) return;
 
     const selection = getSelectionOffsets(editor);
     contentRef.current = nextContent;
     prevLengthRef.current = nextContent.length;
+    lastContentRef.current = nextContent;
     setIsEditorEmpty(nextContent.length === 0);
     renderEditorText(editor, nextContent, activeTab?.phraseRanges);
     syncEditorValue(editor, nextContent);
@@ -396,7 +550,7 @@ export function Editor() {
   }, [insertionSignal, activeTabId, insertPlainTextAtSelection, clearInsertion]);
 
   const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-    if (suppressInputRef.current) {
+    if (suppressInputRef.current || isUndoRedoRef.current) {
       suppressInputRef.current = false;
       return;
     }
@@ -406,6 +560,13 @@ export function Editor() {
     const newLen = newContent.length;
     const wasDeleting = newLen < prevLengthRef.current;
     const oldText = contentRef.current;
+    
+    // Push to history if content actually changed
+    if (oldText !== newContent && activeTabRef.current) {
+      const sel = selection ?? { start: newContent.length, end: newContent.length };
+      pushToHistory(oldText, activeTabRef.current.phraseRanges, sel.start, sel.end);
+    }
+    
     prevLengthRef.current = newLen;
     contentRef.current = newContent;
     updateTabContent(activeTabId, newContent);
@@ -447,9 +608,23 @@ export function Editor() {
         }, 180);
       }
     }
-  }, [activeTabId, theme, updateTabContent, setTabPhraseRanges]);
+  }, [activeTabId, theme, updateTabContent, setTabPhraseRanges, pushToHistory]);
 
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Handle Undo (Ctrl+Z)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    
+    // Handle Redo (Ctrl+Y or Ctrl+Shift+Z)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      e.preventDefault();
+      redo();
+      return;
+    }
+    
     if (e.key === 'Enter') {
       e.preventDefault();
       suppressInputRef.current = true;
@@ -461,7 +636,7 @@ export function Editor() {
       suppressInputRef.current = true;
       insertPlainTextAtSelection('  ', 'shortcut');
     }
-  }, [insertPlainTextAtSelection]);
+  }, [insertPlainTextAtSelection, undo, redo]);
 
   useEffect(() => {
     if (theme === 'gaudy') return;
@@ -477,6 +652,7 @@ export function Editor() {
 
   useEffect(() => () => {
     if (typingTimeoutRef.current !== null) window.clearTimeout(typingTimeoutRef.current);
+    if (typingTimerRef.current !== null) window.clearTimeout(typingTimerRef.current);
   }, []);
 
   useEffect(() => {

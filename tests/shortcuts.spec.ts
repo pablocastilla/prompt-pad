@@ -440,4 +440,161 @@ test.describe('Custom Shortcuts', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  test('Ctrl+Z undoes typing', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, []);
+      saveLaunches(testDir, []);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      const editor = page.locator('.editor-textarea');
+      await editor.click();
+      await page.keyboard.type('hello');
+      await page.waitForTimeout(200);
+      await expect(editor).toContainText('hello');
+
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(200);
+      await expect(editor).not.toContainText('hello');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('Ctrl+Y redoes after undo', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, []);
+      saveLaunches(testDir, []);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      const editor = page.locator('.editor-textarea');
+      await editor.click();
+      await page.keyboard.type('hello');
+      await page.waitForTimeout(200);
+
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(200);
+      await expect(editor).not.toContainText('hello');
+
+      await page.keyboard.press('Control+y');
+      await page.waitForTimeout(200);
+      await expect(editor).toContainText('hello');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('Ctrl+Shift+Z redoes after undo', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, []);
+      saveLaunches(testDir, []);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      const editor = page.locator('.editor-textarea');
+      await editor.click();
+      await page.keyboard.type('hello');
+      await page.waitForTimeout(200);
+
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(200);
+      await expect(editor).not.toContainText('hello');
+
+      await page.keyboard.press('Control+Shift+z');
+      await page.waitForTimeout(200);
+      await expect(editor).toContainText('hello');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('multiple undo steps work correctly', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, []);
+      saveLaunches(testDir, []);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      const editor = page.locator('.editor-textarea');
+      await editor.click();
+      await page.keyboard.type('a');
+      await page.waitForTimeout(600);
+      await page.keyboard.type('b');
+      await page.waitForTimeout(600);
+      await page.keyboard.type('c');
+      await page.waitForTimeout(600);
+      await expect(editor).toContainText('abc');
+
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(300);
+      await expect(editor).toContainText('ab');
+      await expect(editor).not.toContainText('abc');
+
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(300);
+      await expect(editor).toContainText('a');
+      await expect(editor).not.toContainText('ab');
+
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(300);
+      await expect(editor).not.toContainText('a');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('undo after phrase insertion works', async () => {
+    const testDir = getTestDir();
+    try {
+      savePhrases(testDir, [
+        { id: 'p1', name: 'Greeting', content: 'Hello', shortcut: '1' },
+      ]);
+      saveLaunches(testDir, []);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      const editor = page.locator('.editor-textarea');
+      await editor.click();
+      await page.keyboard.press('Control+1');
+      await page.waitForTimeout(200);
+      await expect(editor).toContainText('Hello');
+
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(200);
+      await expect(editor).not.toContainText('Hello');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });
