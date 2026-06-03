@@ -482,6 +482,13 @@ ipcMain.handle('file:save-blob', (_e, bytes: number[], ext: string) => {
 // Helper – sanitize a string for safe use inside single-quoted PS1 strings
 function escapeSingleQuotePS(s: string): string { return s.replace(/'/g, "''"); }
 
+// Write a .ps1 script with a UTF-8 BOM so PowerShell correctly interprets
+// non-ASCII paths (accents, tildes, ñ, etc.) even with powershell.exe which
+// defaults to ANSI/Windows-1252 when no BOM is present.
+function writePS1(filePath: string, content: string): void {
+  fs.writeFileSync(filePath, '\uFEFF' + content, 'utf-8');
+}
+
 // Launch Copilot CLI or OpenCode – opens a real terminal window
 ipcMain.handle('launch:execute', async (_e, config: {
   tool?: string; model: string; folder: string; yolo: boolean; prompt: string; mode: string;
@@ -572,7 +579,7 @@ async function executeLaunchOpenCode(config: {
       "& opencode @ocArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
-    fs.writeFileSync(psPath, script, 'utf-8');
+    writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
       'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
@@ -659,7 +666,7 @@ async function executeLaunchAntigravity(config: {
       "& agy.exe @agArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
-    fs.writeFileSync(psPath, script, 'utf-8');
+    writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
       'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
@@ -740,7 +747,7 @@ async function executeLaunchClaudeCode(config: {
       "& claude @claudeArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
-    fs.writeFileSync(psPath, script, 'utf-8');
+    writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
       'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
@@ -827,7 +834,7 @@ async function executeLaunchCodex(config: {
       "& codex @codexArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
-    fs.writeFileSync(psPath, script, 'utf-8');
+    writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
       'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
@@ -914,7 +921,7 @@ async function executeLaunchGemini(config: {
       "& gemini @geminiArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
-    fs.writeFileSync(psPath, script, 'utf-8');
+    writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
       'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
@@ -1023,7 +1030,7 @@ async function executeLaunchCopilot(config: {
       "& $copilotPath @copilotArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
-    fs.writeFileSync(psPath, script, 'utf-8');
+    writePS1(psPath, script);
 
     // Try Windows Terminal first, then fall back to cmd /c start powershell
     const wt = spawn('wt.exe', [
