@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../store';
 import { t } from '../i18n';
-import type { LaunchHistoryEntry } from '../types';
+import type { LaunchHistoryEntry, LaunchTool } from '../types';
+import { TOOL_LABELS } from './ToolIcon';
 
 function formatTimestamp(ts: number): string {
   const d = new Date(ts);
@@ -134,9 +135,7 @@ export function HistoryPanel() {
                     {entry.prompt}
                   </div>
                   <div className="history-entry-meta">
-                    <span>{entry.tool === 'opencode' ? '⚡ opencode' : '🤖 copilot'}</span>
-                    <span>{entry.yolo ? 'YOLO' : 'safe'}</span>
-                    <span>{entry.mode === 'interactive' ? '-i' : '-p'}</span>
+                    <span>{TOOL_LABELS[entry.tool as LaunchTool] ?? entry.tool}</span>
                   </div>
                 </div>
               ))}

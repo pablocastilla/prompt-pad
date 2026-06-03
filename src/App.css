@@ -1487,6 +1487,57 @@ html, body, #root {
   padding: 0 4px;
 }
 
+/* ── PROVIDER PICKER ──────────────────────────────── */
+.provider-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.provider-picker-item {
+  gap: 12px;
+  padding: 11px 14px;
+}
+
+.provider-picker-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: background .12s, color .12s, border-color .12s, transform .12s;
+}
+
+.provider-picker-item:hover .provider-picker-shortcut,
+.provider-picker-item.selected .provider-picker-shortcut {
+  background: var(--accent);
+  color: var(--accent-t);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+.model-picker-back-btn {
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 4px;
+  color: var(--text2);
+  transition: background .12s, color .12s;
+}
+.model-picker-back-btn:hover { background: var(--bg3); color: var(--accent); }
+
 .model-picker-loading {
   min-height: 44px;
   display: flex;

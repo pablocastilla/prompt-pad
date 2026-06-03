@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { selectOpenCodeProvider } from './helpers';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -19,12 +20,22 @@ function savePhrases(testDir: string, phrases: unknown[]) {
   fs.writeFileSync(path.join(testDir, 'phrases.json'), JSON.stringify(phrases, null, 2));
 }
 
+function saveTestSettings(testDir: string) {
+  fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+    theme: 'light',
+    language: 'en',
+    useOneDrive: false,
+    showGoModelsOnly: { opencode: false },
+  }, null, 2));
+}
+
 test.describe('Model Cost Indicators', () => {
   test('shows free badge for free models in model picker', async () => {
     const testDir = getTestDir();
     try {
+      saveTestSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Test', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive' },
+        { id: 'l1', name: 'Test', folder: '/tmp/a' },
       ]);
       savePhrases(testDir, []);
 
@@ -53,6 +64,7 @@ test.describe('Model Cost Indicators', () => {
       await page.locator('.editor-textarea').fill('test');
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       // Toggle "Show Go models only" off to see all models
       const goToggle = page.locator('.model-picker-go-toggle');
@@ -81,8 +93,9 @@ test.describe('Model Cost Indicators', () => {
   test('cost indicators show on all model items with real CLI data', async () => {
     const testDir = getTestDir();
     try {
+      saveTestSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Test', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive' },
+        { id: 'l1', name: 'Test', folder: '/tmp/a' },
       ]);
       savePhrases(testDir, []);
 
@@ -96,6 +109,7 @@ test.describe('Model Cost Indicators', () => {
       await page.locator('.editor-textarea').fill('test');
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       await page.waitForTimeout(3000);
 
@@ -125,8 +139,9 @@ test.describe('Model Cost Indicators', () => {
   test('cost indicator tooltips show pricing info on hover', async () => {
     const testDir = getTestDir();
     try {
+      saveTestSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Test', tool: 'opencode', folder: '/tmp/a', yolo: true, mode: 'interactive' },
+        { id: 'l1', name: 'Test', folder: '/tmp/a' },
       ]);
       savePhrases(testDir, []);
 
@@ -153,6 +168,7 @@ test.describe('Model Cost Indicators', () => {
       await page.locator('.editor-textarea').fill('test');
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       const goToggle = page.locator('.model-picker-go-toggle');
       await expect(goToggle).toBeVisible({ timeout: 3000 });
@@ -181,11 +197,12 @@ test.describe('Model Cost Indicators', () => {
 });
 
 test.describe('Ctrl+Shift+0 Shortcut', () => {
-  test('launch shortcut 0 opens model picker with Digit0 key', async () => {
+  test('launch shortcut 0 opens provider picker with Digit0 key', async () => {
     const testDir = getTestDir();
     try {
+      saveTestSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Zero Launch', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: '0' },
+        { id: 'l1', name: 'Zero Launch', folder: '/tmp/a', shortcut: '0' },
       ]);
       savePhrases(testDir, []);
 
@@ -199,6 +216,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
       await page.keyboard.press('Control+Shift+0');
       await page.waitForTimeout(500);
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
 
       await app.close();
     } finally {
@@ -209,14 +227,11 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
   test('migration assigns shortcut 0 to 10th launch when unspecified', async () => {
     const testDir = getTestDir();
     try {
+      saveTestSettings(testDir);
       const launches = Array.from({ length: 10 }, (_, i) => ({
         id: `l${i}`,
         name: `Launch ${i + 1}`,
-        tool: 'opencode' as const,
-        model: 'opencode/minimax-m2.5-free',
         folder: '/tmp',
-        yolo: true,
-        mode: 'interactive' as const,
       }));
       saveLaunches(testDir, launches);
       savePhrases(testDir, []);
@@ -234,6 +249,7 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
       await page.keyboard.press('Control+Shift+0');
       await page.waitForTimeout(500);
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
 
       await app.close();
     } finally {
@@ -244,8 +260,9 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
   test('Ctrl+Shift+0 does nothing when no launch has shortcut 0', async () => {
     const testDir = getTestDir();
     try {
+      saveTestSettings(testDir);
       saveLaunches(testDir, [
-        { id: 'l1', name: 'Launch 1', tool: 'opencode', model: 'opencode/minimax-m2.5-free', folder: '/tmp/a', yolo: true, mode: 'interactive', shortcut: 1 },
+        { id: 'l1', name: 'Launch 1', folder: '/tmp/a', shortcut: '1' },
       ]);
       savePhrases(testDir, []);
 

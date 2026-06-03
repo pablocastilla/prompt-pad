@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { selectOpenCodeProvider } from './helpers';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -20,14 +21,19 @@ function writeLaunches(testDir: string) {
     {
       id: 'test-launch-opencode',
       name: 'Playwright opencode',
-      tool: 'opencode',
-      model: 'opencode/minimax-m2.5-free',
       folder: process.cwd(),
-      yolo: true,
-      mode: 'interactive',
     },
   ];
   fs.writeFileSync(getLaunchesPath(testDir), JSON.stringify(launches, null, 2), 'utf-8');
+}
+
+function writeTestSettings(testDir: string, extra: Record<string, unknown> = {}) {
+  fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+    theme: 'light',
+    language: 'en',
+    useOneDrive: false,
+    ...extra,
+  }, null, 2), 'utf-8');
 }
 
 test.describe('Model picker behavior', () => {
@@ -80,6 +86,7 @@ test.describe('Model picker behavior', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       // Wait for Go models to load (filter enabled by default)
       await page.waitForTimeout(3000);
@@ -135,6 +142,7 @@ test.describe('Model picker behavior', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page, { waitForList: false });
 
       const loading = page.locator('.model-picker-loading').first();
       await expect(loading).toBeVisible();
@@ -183,6 +191,7 @@ test.describe('Model picker behavior', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       // Checkbox should be visible and checked by default
       await expect(page.locator('.model-picker-go-toggle')).toBeVisible();
@@ -220,6 +229,7 @@ test.describe('Model picker behavior', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       await expect(page.locator('.model-picker-go-toggle')).toBeVisible();
       await expect(page.locator('.model-picker-go-toggle input[type="checkbox"]')).not.toBeChecked();
@@ -252,6 +262,7 @@ test.describe('Model picker behavior', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       // Wait for model items to load
       await page.waitForFunction(() => {
@@ -312,6 +323,7 @@ test.describe('Model picker behavior', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       // Wait for model items to load
       await page.waitForFunction(() => {
@@ -369,6 +381,7 @@ test.describe('Model picker behavior', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       // Wait for model items to load
       await page.waitForFunction(() => {

@@ -91,20 +91,12 @@ function sanitizeLaunches(launches: unknown[]): unknown[] {
   return launches.map((item) => {
     if (!item || typeof item !== 'object') return item;
     const launch = item as Record<string, unknown>;
-    const tool = launch.tool === 'opencode' ? 'opencode' :
-                 launch.tool === 'antigravity' ? 'antigravity' :
-                 launch.tool === 'claude-code' ? 'claude-code' :
-                 launch.tool === 'codex' ? 'codex' : 'copilot';
-    if (tool === 'opencode') {
-      return { ...launch, tool, model: normalizeOpenCodeModel(launch.model) };
-    } else if (tool === 'antigravity') {
-      return { ...launch, tool, model: normalizeAntigravityModel(launch.model) };
-    } else if (tool === 'claude-code') {
-      return { ...launch, tool, model: normalizeOpenCodeModel(launch.model) };
-    } else if (tool === 'codex') {
-      return { ...launch, tool, model: normalizeOpenCodeModel(launch.model) };
-    }
-    return { ...launch, tool, model: normalizeModel(launch.model) };
+    return {
+      id: launch.id,
+      name: launch.name,
+      folder: launch.folder,
+      shortcut: launch.shortcut,
+    };
   });
 }
 
@@ -498,7 +490,24 @@ ipcMain.handle('launch:execute', async (_e, config: {
   const tool = config.tool === 'opencode' ? 'opencode' :
                config.tool === 'antigravity' ? 'antigravity' :
                config.tool === 'claude-code' ? 'claude-code' :
-               config.tool === 'codex' ? 'codex' : 'copilot';
+               config.tool === 'codex' ? 'codex' :
+               config.tool === 'gemini' ? 'gemini' : 'copilot';
+
+  // In test mode we never spawn real terminals. We capture the call so tests can assert on it.
+  if (TEST_DIR) {
+    try {
+      const id = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
+      fs.writeFileSync(
+        path.join(APP_DIR, 'launch-call-' + id + '.json'),
+        JSON.stringify({ ...config, tool }, null, 2),
+        'utf-8'
+      );
+    } catch {
+      // best-effort capture only
+    }
+    return true;
+  }
+
   if (tool === 'opencode') {
     return executeLaunchOpenCode(config);
   } else if (tool === 'antigravity') {
@@ -507,6 +516,8 @@ ipcMain.handle('launch:execute', async (_e, config: {
     return executeLaunchClaudeCode(config);
   } else if (tool === 'codex') {
     return executeLaunchCodex(config);
+  } else if (tool === 'gemini') {
+    return executeLaunchGemini(config);
   }
   return executeLaunchCopilot(config);
 });
@@ -688,7 +699,7 @@ async function executeLaunchClaudeCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
 }) {
-  const { folder, yolo, prompt, attachedFilePaths = [] } = config;
+  const { folder, prompt, attachedFilePaths = [] } = config;
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
   const id = Date.now().toString();
 
@@ -713,17 +724,20 @@ async function executeLaunchClaudeCode(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  const message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
-  const safeDir = escapeSingleQuotePS(workDir);
-  const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
+  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  if (attachedFileNames.length > 0) {
+    message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
+  }
 
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-claude-' + id + '.ps1');
+    const safeDir = escapeSingleQuotePS(workDir);
+    const safeMsg = escapeSingleQuotePS(message);
+    const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
-      "$claudeArgs = @('cli', 'prompt', '--prompt-file', '" + safeTmpDir + "')",
-      ...(yolo ? ["$claudeArgs += '--dangerously-skip-permissions'"] : []),
-      "& claude-code @claudeArgs",
+      "$claudeArgs = @('--dangerously-skip-permissions', '" + safeMsg + "')",
+      "& claude @claudeArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
     fs.writeFileSync(psPath, script, 'utf-8');
@@ -743,7 +757,7 @@ async function executeLaunchClaudeCode(config: {
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'claude-code cli prompt --prompt-file ' + JSON.stringify(launchTmpDir) + (yolo ? ' --dangerously-skip-permissions' : ''),
+      'claude --dangerously-skip-permissions ' + JSON.stringify(message),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');
@@ -772,7 +786,7 @@ async function executeLaunchCodex(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
 }) {
-  const { folder, yolo, prompt, attachedFilePaths = [] } = config;
+  const { folder, prompt, attachedFilePaths = [] } = config;
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
   const id = Date.now().toString();
 
@@ -797,16 +811,19 @@ async function executeLaunchCodex(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  const message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
-  const safeDir = escapeSingleQuotePS(workDir);
-  const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
+  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  if (attachedFileNames.length > 0) {
+    message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
+  }
 
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-codex-' + id + '.ps1');
+    const safeDir = escapeSingleQuotePS(workDir);
+    const safeMsg = escapeSingleQuotePS(message);
+    const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
-      "$codexArgs = @('cli', 'prompt', '--prompt-file', '" + safeTmpDir + "')",
-      ...(yolo ? ["$codexArgs += '--dangerously-skip-permissions'"] : []),
+      "$codexArgs = @('--dangerously-bypass-approvals-and-sandbox', '" + safeMsg + "')",
       "& codex @codexArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
@@ -827,7 +844,94 @@ async function executeLaunchCodex(config: {
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'codex cli prompt --prompt-file ' + JSON.stringify(launchTmpDir) + (yolo ? ' --dangerously-skip-permissions' : ''),
+      'codex --dangerously-bypass-approvals-and-sandbox ' + JSON.stringify(message),
+      'rm -rf ' + JSON.stringify(launchTmpDir),
+      'rm -f "$0"',
+    ].join('\n');
+    fs.writeFileSync(shPath, script, { mode: 0o755 });
+    if (process.platform === 'darwin') {
+      const appleScript = [
+        'tell application "Terminal"',
+        '  do script "bash ' + shPath.replace(/'/g, "'\\''" ) + '"',
+        '  activate',
+        'end tell',
+      ].join('\n');
+      spawn('osascript', ['-e', appleScript], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      spawnTerminalLinux([
+        ['gnome-terminal', ['--', 'bash', shPath]],
+        ['konsole',        ['-e', 'bash', shPath]],
+        ['xfce4-terminal', ['--command', 'bash "' + shPath + '"']],
+        ['xterm',          ['-e', 'bash "' + shPath + '"']],
+      ]);
+    }
+  }
+  return true;
+}
+
+async function executeLaunchGemini(config: {
+  model: string; folder: string; yolo: boolean; prompt: string; mode: string;
+  attachedFilePaths?: string[];
+}) {
+  const { folder, prompt, attachedFilePaths = [] } = config;
+  const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
+  const id = Date.now().toString();
+
+  const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
+  fs.mkdirSync(launchTmpDir, { recursive: true });
+
+  const promptFileName = 'pp-prompt-' + id + '.txt';
+  const promptPath = path.join(launchTmpDir, promptFileName);
+  fs.writeFileSync(promptPath, prompt, 'utf-8');
+
+  const copiedNames = new Set<string>([promptFileName]);
+  const attachedFileNames: string[] = [];
+  for (const srcPath of attachedFilePaths) {
+    if (!srcPath || !fs.existsSync(srcPath)) continue;
+    let destName = path.basename(srcPath);
+    if (copiedNames.has(destName)) {
+      const ext = path.extname(destName);
+      destName = path.basename(destName, ext) + '-' + id + ext;
+    }
+    copiedNames.add(destName);
+    attachedFileNames.push(destName);
+    fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
+  }
+
+  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  if (attachedFileNames.length > 0) {
+    message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
+  }
+
+  if (process.platform === 'win32') {
+    const psPath = path.join(os.tmpdir(), 'pp-gemini-' + id + '.ps1');
+    const safeDir = escapeSingleQuotePS(workDir);
+    const safeMsg = escapeSingleQuotePS(message);
+    const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
+    const script = [
+      "Set-Location -LiteralPath '" + safeDir + "'",
+      "$geminiArgs = @('--yolo', '-i', '" + safeMsg + "')",
+      "& gemini @geminiArgs",
+      "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
+    ].join('\n');
+    fs.writeFileSync(psPath, script, 'utf-8');
+    const wt = spawn('wt.exe', [
+      'new-tab', '--title', 'Prompt Pad',
+      'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
+    ], { detached: true, stdio: 'ignore' });
+    wt.on('error', () => {
+      spawn('cmd.exe', [
+        '/c', 'start', '"Prompt Pad"', 'powershell.exe',
+        '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
+      ], { detached: true, stdio: 'ignore' }).unref();
+    });
+    wt.unref();
+  } else {
+    const shPath = path.join(os.tmpdir(), 'pp-gemini-' + id + '.sh');
+    const script = [
+      '#!/bin/bash',
+      'cd ' + JSON.stringify(workDir),
+      'gemini --yolo -i ' + JSON.stringify(message),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');

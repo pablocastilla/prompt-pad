@@ -7,17 +7,28 @@ export interface Phrase {
 }
 
 // ── Launch Configuration ──
-export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex';
+// 'copilot' and 'antigravity' are kept for backward compatibility with old launch history entries.
+export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex' | 'gemini';
 
 export interface LaunchConfig {
   id: string;
   name: string;
-  tool: LaunchTool;
-  model?: string;  // chosen at launch time, not stored in config form
   folder: string;
-  yolo: boolean;
-  mode: 'interactive' | 'non-interactive';
   shortcut?: string;
+}
+
+// ── Settings ──
+export type ShortcutModifier = 'ctrl' | 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
+
+export interface Settings {
+  theme: 'light' | 'dark' | 'gaudy' | 'cyberpunk';
+  language: 'auto' | 'es' | 'en';
+  useOneDrive?: boolean;
+  pinnedModels?: Partial<Record<LaunchTool, string[]>>;
+  showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
+  phraseShortcutModifier: ShortcutModifier;
+  launchShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
+  openVsCodeShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
 }
 
 // ── Attached file (transient – not persisted in session) ──
@@ -43,20 +54,6 @@ export interface Tab {
   lastSavedAt: number | null;
   attachedFiles: AttachedFile[];
   phraseRanges: PhraseRange[];
-}
-
-// ── Settings ──
-export type ShortcutModifier = 'ctrl' | 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
-
-export interface Settings {
-  theme: 'light' | 'dark' | 'gaudy' | 'cyberpunk';
-  language: 'auto' | 'es' | 'en';
-  useOneDrive?: boolean;
-  pinnedModels?: Partial<Record<LaunchTool, string[]>>;
-  showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
-  phraseShortcutModifier: ShortcutModifier;
-  launchShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
-  openVsCodeShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
 }
 
 export type CostTier = 'free' | 1 | 2 | 3 | 4 | 5;
@@ -285,8 +282,6 @@ export interface LaunchHistoryEntry {
   prompt: string;
   timestamp: number;
   folder: string;
-  yolo: boolean;
-  mode: 'interactive' | 'non-interactive';
 }
 
 // ── Session (persisted across restarts) ──

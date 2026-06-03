@@ -2,12 +2,33 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { getModelCostInfo } from '../types';
 import { t } from '../i18n';
-import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry, CostTier } from '../types';
+import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry } from '../types';
 import { ToolIcon, TOOL_LABELS } from './ToolIcon';
+
+// Providers offered when launching. Order matters: numeric shortcuts 1..N map by position.
+const ALL_TOOLS: LaunchTool[] = ['claude-code', 'opencode', 'codex', 'gemini'];
+
+// Providers that expose a CLI-driven model list; others launch with the CLI's default model.
+const TOOLS_WITH_MODEL_PICKER: LaunchTool[] = ['opencode', 'copilot', 'antigravity'];
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
+
+export type ProviderPickerStep = 'provider' | 'model';
+
+const EMPTY_PROVIDER_NUMERIC_SHORTCUT: Record<string, number> = {
+  Digit1: 0, Numpad1: 0,
+  Digit2: 1, Numpad2: 1,
+  Digit3: 2, Numpad3: 2,
+  Digit4: 3, Numpad4: 3,
+  Digit5: 4, Numpad5: 4,
+  Digit6: 5, Numpad6: 5,
+  Digit7: 6, Numpad7: 6,
+  Digit8: 7, Numpad8: 7,
+  Digit9: 8, Numpad9: 8,
+  Digit0: 9, Numpad0: 9,
+};
 
 export function ModelPicker() {
   const pendingLaunch    = useStore(s => s.pendingLaunch);
@@ -19,34 +40,28 @@ export function ModelPicker() {
   const launchHistory    = useStore(s => s.launchHistory);
   const triggerLaunchSplash = useStore(s => s.triggerLaunchSplash);
 
-  const [modelCache, setModelCache] = useState<Record<LaunchTool, ModelOption[] | null>>({
-    copilot: null,
-    opencode: null,
-    antigravity: null,
-    'claude-code': null,
-    codex: null,
+  const [providerStep, setProviderStep] = useState<ProviderPickerStep>('provider');
+  const [providerIdx, setProviderIdx] = useState(0);
+  const [selectedProvider, setSelectedProvider] = useState<LaunchTool | null>(null);
+
+  const emptyToolRecord = <T,>(value: T): Record<LaunchTool, T> => ({
+    copilot: value,
+    opencode: value,
+    antigravity: value,
+    'claude-code': value,
+    codex: value,
+    gemini: value,
   });
-  const [loadingModels, setLoadingModels] = useState<Record<LaunchTool, boolean>>({
-    copilot: false,
-    opencode: false,
-    antigravity: false,
-    'claude-code': false,
-    codex: false,
-  });
-  const [modelError, setModelError] = useState<Record<LaunchTool, string | null>>({
-    copilot: null,
-    opencode: null,
-    antigravity: null,
-    'claude-code': null,
-    codex: null,
-  });
+
+  const [modelCache, setModelCache] = useState<Record<LaunchTool, ModelOption[] | null>>(() => emptyToolRecord<ModelOption[] | null>(null));
+  const [loadingModels, setLoadingModels] = useState<Record<LaunchTool, boolean>>(() => emptyToolRecord(false));
+  const [modelError, setModelError] = useState<Record<LaunchTool, string | null>>(() => emptyToolRecord<string | null>(null));
   const listRef = useRef<HTMLDivElement | null>(null);
   const [dragPinnedIdx, setDragPinnedIdx] = useState<number | null>(null);
   const [dropPinnedIdx, setDropPinnedIdx] = useState<number | null>(null);
-  const userScrolledRef = useRef(false);
   const [confirmExpensiveIdx, setConfirmExpensiveIdx] = useState<number | null>(null);
 
-  const tool: LaunchTool = pendingLaunch?.launch.tool ?? 'copilot';
+  const tool: LaunchTool = selectedProvider ?? ALL_TOOLS[0];
   const availableModels = modelCache[tool] ?? [];
   const pinnedIds = settings.pinnedModels?.[tool] ?? [];
   const showGoOnly = settings.showGoModelsOnly?.[tool] ?? (tool === 'opencode' ? true : false);
@@ -66,21 +81,14 @@ export function ModelPicker() {
   );
   const allModels = useMemo(() => [...pinnedModels, ...unpinnedModels], [pinnedModels, unpinnedModels]);
 
-  const defaultIdx = pendingLaunch
-    ? Math.max(0, allModels.findIndex(m => m.id === pendingLaunch.launch.model))
-    : 0;
-
-  const [selectedIdx, setSelectedIdx] = useState(defaultIdx);
+  const [selectedIdx, setSelectedIdx] = useState(0);
 
   const setPinnedForTool = async (nextIds: string[]) => {
+    const existingPinned = settings.pinnedModels ?? {};
     const nextSettings: Settings = {
       ...settings,
       pinnedModels: {
-        copilot: settings.pinnedModels?.copilot ?? [],
-        opencode: settings.pinnedModels?.opencode ?? [],
-        antigravity: settings.pinnedModels?.antigravity ?? [],
-        'claude-code': settings.pinnedModels?.['claude-code'] ?? [],
-        codex: settings.pinnedModels?.codex ?? [],
+        ...existingPinned,
         [tool]: nextIds,
       },
     };
@@ -130,6 +138,7 @@ export function ModelPicker() {
   };
 
   const loadModels = async (selectedTool: LaunchTool, force = false) => {
+    if (!TOOLS_WITH_MODEL_PICKER.includes(selectedTool)) return;
     if (!force && (modelCache[selectedTool] || loadingModels[selectedTool])) return;
     setLoadingModels(prev => ({ ...prev, [selectedTool]: true }));
     setModelError(prev => ({ ...prev, [selectedTool]: null }));
@@ -168,23 +177,24 @@ export function ModelPicker() {
 
   const refreshModels = async () => {
     await window.electronAPI.clearModelCache();
-    setModelCache({ copilot: null, opencode: null, antigravity: null, 'claude-code': null, codex: null });
+    setModelCache(emptyToolRecord<ModelOption[] | null>(null));
     await loadModels(tool, true);
   };
 
-  // Reset selection when a new pending launch arrives
+  // Trigger model loading once a provider with model picker support is selected
   useEffect(() => {
-    if (pendingLaunch) {
-      void loadModels(tool);
+    if (pendingLaunch && selectedProvider && TOOLS_WITH_MODEL_PICKER.includes(selectedProvider)) {
+      void loadModels(selectedProvider);
     }
-  }, [pendingLaunch?.launch.id, tool]);
+  }, [pendingLaunch?.launch.id, selectedProvider]);
 
-  // Recalculate selectedIdx when allModels changes (e.g. after async fetch completes)
+  // Reset provider step when a new pending launch arrives
   useEffect(() => {
-    if (!pendingLaunch || allModels.length === 0) return;
-    const idx = Math.max(0, allModels.findIndex(m => m.id === pendingLaunch.launch.model));
-    setSelectedIdx(idx);
-  }, [allModels, pendingLaunch]);
+    setProviderStep('provider');
+    setProviderIdx(0);
+    setSelectedProvider(null);
+    setSelectedIdx(0);
+  }, [pendingLaunch?.launch.id]);
 
   // Never auto-scroll; keep list at top. User scrolls manually if needed.
   useEffect(() => {
@@ -193,6 +203,37 @@ export function ModelPicker() {
     if (!listEl) return;
     listEl.scrollTop = 0;
   }, [pendingLaunch, allModels.length, tool]);
+
+  const launchWithModel = async (toolForLaunch: LaunchTool, model: string) => {
+    if (!pendingLaunch) return;
+    setPendingLaunch(null);
+    const entry: LaunchHistoryEntry = {
+      id: uid(),
+      launchId: pendingLaunch.launch.id,
+      launchName: pendingLaunch.launch.name,
+      tool: toolForLaunch,
+      model,
+      prompt: pendingLaunch.prompt,
+      timestamp: Date.now(),
+      folder: pendingLaunch.launch.folder,
+    };
+    addLaunchHistoryEntry(entry);
+    const updated = [entry, ...launchHistory].slice(0, 100);
+    await window.electronAPI.saveLaunchHistory(updated);
+    await window.electronAPI.executeLaunch({
+      tool: toolForLaunch,
+      model,
+      folder: pendingLaunch.launch.folder,
+      yolo: true,
+      prompt: pendingLaunch.prompt,
+      mode: 'interactive',
+      attachedFilePaths: pendingLaunch.attachedFilePaths,
+    });
+    if (settings.theme === 'gaudy') {
+      triggerLaunchSplash();
+      addToast(t('gaudyLaunch'));
+    }
+  };
 
   const execute = async (idx: number) => {
     if (!pendingLaunch) return;
@@ -205,35 +246,17 @@ export function ModelPicker() {
       return;
     }
     setConfirmExpensiveIdx(null);
-    setPendingLaunch(null);
-    const entry: LaunchHistoryEntry = {
-      id: uid(),
-      launchId: pendingLaunch.launch.id,
-      launchName: pendingLaunch.launch.name,
-      tool: pendingLaunch.launch.tool,
-      model,
-      prompt: pendingLaunch.prompt,
-      timestamp: Date.now(),
-      folder: pendingLaunch.launch.folder,
-      yolo: pendingLaunch.launch.yolo,
-      mode: pendingLaunch.launch.mode,
-    };
-    addLaunchHistoryEntry(entry);
-    const updated = [entry, ...launchHistory].slice(0, 100);
-    await window.electronAPI.saveLaunchHistory(updated);
-    await window.electronAPI.executeLaunch({
-      tool: pendingLaunch.launch.tool ?? 'copilot',
-      model,
-      folder: pendingLaunch.launch.folder,
-      yolo: pendingLaunch.launch.yolo,
-      prompt: pendingLaunch.prompt,
-      mode: pendingLaunch.launch.mode,
-      attachedFilePaths: pendingLaunch.attachedFilePaths,
-    });
-    if (settings.theme === 'gaudy') {
-      triggerLaunchSplash();
-      addToast(t('gaudyLaunch'));
+    await launchWithModel(tool, model);
+  };
+
+  const selectProvider = (provider: LaunchTool) => {
+    if (TOOLS_WITH_MODEL_PICKER.includes(provider)) {
+      setSelectedProvider(provider);
+      setProviderStep('model');
+      return;
     }
+    // Providers without a model picker: launch directly with default model
+    void launchWithModel(provider, '');
   };
 
   // Reset confirmation when picker closes
@@ -241,22 +264,39 @@ export function ModelPicker() {
     if (!pendingLaunch) setConfirmExpensiveIdx(null);
   }, [pendingLaunch]);
 
+  // Keyboard handler for the provider step (numeric 1..N, arrows, Enter, Esc)
   useEffect(() => {
-    if (!pendingLaunch) return;
+    if (!pendingLaunch || providerStep !== 'provider') return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setProviderIdx(i => (i + 1) % ALL_TOOLS.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setProviderIdx(i => (i - 1 + ALL_TOOLS.length) % ALL_TOOLS.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectProvider(ALL_TOOLS[providerIdx]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setPendingLaunch(null);
+      } else if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+        const idx = EMPTY_PROVIDER_NUMERIC_SHORTCUT[e.code];
+        if (idx === undefined || idx >= ALL_TOOLS.length) return;
+        e.preventDefault();
+        setProviderIdx(idx);
+        selectProvider(ALL_TOOLS[idx]);
+      }
+    };
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
+  }, [pendingLaunch, providerStep, providerIdx, launchHistory, settings]);
+
+  // Keyboard handler for the model step (existing behaviour)
+  useEffect(() => {
+    if (!pendingLaunch || providerStep !== 'model') return;
     const ms = allModels;
     if (!ms.length) return;
-    const digitByCode: Record<string, number> = {
-      Digit1: 0, Numpad1: 0,
-      Digit2: 1, Numpad2: 1,
-      Digit3: 2, Numpad3: 2,
-      Digit4: 3, Numpad4: 3,
-      Digit5: 4, Numpad5: 4,
-      Digit6: 5, Numpad6: 5,
-      Digit7: 6, Numpad7: 6,
-      Digit8: 7, Numpad8: 7,
-      Digit9: 8, Numpad9: 8,
-      Digit0: 9, Numpad0: 9,
-    };
     const handler = (e: KeyboardEvent) => {
       if (confirmExpensiveIdx !== null) {
         if (e.key === 'Enter') { e.preventDefault(); execute(confirmExpensiveIdx); }
@@ -274,14 +314,14 @@ export function ModelPicker() {
         execute(selectedIdx);
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        setPendingLaunch(null);
+        setProviderStep('provider');
       } else if (e.ctrlKey && !e.altKey && !e.shiftKey) {
-        const idx = digitByCode[e.code];
+        const idx = EMPTY_PROVIDER_NUMERIC_SHORTCUT[e.code];
         if (idx === undefined || !ms[idx]) return;
         e.preventDefault();
         togglePin(ms[idx].id);
       } else if (!e.ctrlKey && !e.altKey && !e.shiftKey) {
-        const idx = digitByCode[e.code];
+        const idx = EMPTY_PROVIDER_NUMERIC_SHORTCUT[e.code];
         if (idx === undefined || idx >= pinnedModels.length) return;
         e.preventDefault();
         execute(idx);
@@ -289,7 +329,7 @@ export function ModelPicker() {
     };
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [pendingLaunch, selectedIdx, allModels, pinnedModels.length, pinnedIds, confirmExpensiveIdx]);
+  }, [pendingLaunch, providerStep, selectedIdx, allModels, pinnedModels.length, pinnedIds, confirmExpensiveIdx]);
 
   function CostIndicator({ modelId }: { modelId: string }) {
     const info = getModelCostInfo(modelId);
@@ -324,10 +364,45 @@ export function ModelPicker() {
   const isLoading = loadingModels[tool];
   const getShortcutLabel = (idx: number): string => `${(idx + 1) % 10}`;
 
+  if (providerStep === 'provider') {
+    return (
+      <div className="model-picker-overlay" onClick={() => setPendingLaunch(null)}>
+        <div className="model-picker-card" onClick={e => e.stopPropagation()}>
+          <div className="model-picker-header">
+            <div className="model-picker-title">{t('selectProviderToLaunch')}</div>
+            <div className="model-picker-launch-name">{pendingLaunch.launch.name}</div>
+          </div>
+          <div className="provider-picker-list">
+            {ALL_TOOLS.map((provider, idx) => (
+              <div
+                key={provider}
+                data-provider={provider}
+                data-provider-index={idx}
+                className={'model-picker-item provider-picker-item' + (idx === providerIdx ? ' selected' : '')}
+                onClick={() => { setProviderIdx(idx); selectProvider(provider); }}
+                onMouseEnter={() => setProviderIdx(idx)}
+              >
+                <span className="provider-picker-shortcut">{idx + 1}</span>
+                <span className="launch-tool-icon"><ToolIcon tool={provider} /></span>
+                <span className="model-picker-item-label">{TOOL_LABELS[provider]}</span>
+              </div>
+            ))}
+          </div>
+          <div className="model-picker-hint">{t('providerPickerHint')}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="model-picker-overlay" onClick={() => setPendingLaunch(null)}>
       <div className="model-picker-card" onClick={e => e.stopPropagation()}>
         <div className="model-picker-header">
+          <button
+            className="model-picker-back-btn"
+            onClick={e => { e.stopPropagation(); setProviderStep('provider'); }}
+            title={t('backToProvider')}
+          >←</button>
           <div className="model-picker-title">{t('selectModelToLaunch')}</div>
           <div className="model-picker-launch-name">{pendingLaunch.launch.name}</div>
           <div className="model-picker-tool-badge">

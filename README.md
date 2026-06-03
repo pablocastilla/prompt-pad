@@ -1,21 +1,22 @@
 # Prompt Pad
 
-A native desktop app (Electron + React) for writing, organising, and firing AI prompts at the **GitHub Copilot CLI** or **OpenCode** — without leaving your keyboard.
+A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **Claude Code**, **OpenCode**, **Codex** or **Gemini** — without leaving your keyboard.
 
 ---
 
 ## How to Use It (The Prompt Pad Way)
 
-### The Philosophy: One Launcher Per Folder + CLI
+### The Philosophy: One Launcher Per Folder, Pick a Provider at Launch Time
 
 Prompt Pad was built for people who don't want to juggle terminal tabs, `cd` into the right directory, remember which flags to pass, and then forget which model they were using. Instead:
 
 1. **Write your prompt** in the editor.
-2. **Press `Ctrl+Shift+1`** (or whatever number your launcher is).
-3. **Pick a model** from the picker.
-4. **Done** — a terminal window opens and runs the CLI with your prompt.
+2. **Press `Ctrl+Shift+1`** (or whatever number your launcher is) — the launcher only stores the **folder**, nothing else.
+3. **Pick a provider** (`1` = Claude Code, `2` = OpenCode, `3` = Codex, `4` = Gemini) with a single keystroke.
+4. **Pick a model** (for OpenCode only — Claude/Codex/Gemini launch straight away).
+5. **Done** — a terminal window opens, runs the CLI with `--yolo`/interactive flags, and feeds it your prompt.
 
-That's it. No terminals to manage. No context switching. Just write, fire, and go back to what you were doing.
+That's it. No terminals to manage. No context switching. Launchers are just folders — the provider and model are chosen at launch time, every time.
 
 ### The Multi-Folder Trick: Run Multiple CLIs in Parallel
 
@@ -41,7 +42,7 @@ Create one launcher per folder copy, each pointing to a different `_N` directory
 
 **The workflow:**
 1. Write your prompt: *"Create a PR for the new feature branch"*
-2. Hit `Ctrl+Shift+3` → model picker → Enter
+2. Hit `Ctrl+Shift+3` → provider picker → press `2` for OpenCode → model picker → Enter
 3. Go back to writing prompts for launcher #1 and #2
 4. Come back later — the PR is ready. Review it. Done.
 
@@ -93,14 +94,14 @@ The phrases you set up once pay dividends forever. It's like having a macro keyb
 
 Here's the thing about firing prompts at AI: sometimes you write something brilliant, hit launch, and then immediately forget what you wrote. Or worse — you write something *truly* brilliant, the CLI does its thing, and three weeks later you need that exact prompt again but your brain has moved on to other things.
 
-Enter the **Launch History** panel. Every time you fire a prompt, Prompt Pad remembers it. All of it. The prompt text, the model you used, whether you went YOLO or played it safe, the tool, the mode — the whole forensic record.
+Enter the **Launch History** panel. Every time you fire a prompt, Prompt Pad remembers it. All of it. The prompt text, the model you used, the provider, the folder — the whole forensic record.
 
 #### What You Get
 
 | Feature | What it does |
 |---|---|
 | **Grouped by launcher** | History entries are organized under their launch config name. Expand a group to see all the prompts you've fired through that launcher. |
-| **Search everything** | Search across prompt text, model name, tool, and launcher name. Type "refactor" and find every time you asked the AI to refactor something. |
+| **Search everything** | Search across prompt text, model name, provider, and launcher name. Type "refactor" and find every time you asked the AI to refactor something. |
 | **Double-click to restore** | Found that brilliant prompt from last Tuesday? Double-click it and it opens in a new tab, ready to fire again. |
 | **Auto-collapse** | Groups start collapsed so you're not overwhelmed. Search auto-expands matching groups. Clear the search and they collapse again. |
 | **Deleted launcher handling** | If you delete a launcher, its history entries stick around (you might still need those prompts!) but show the original launcher name. |
@@ -129,8 +130,9 @@ Your launch history is basically a prompt journal you didn't have to write. Ever
 | Terminal Tabs | Prompt Pad |
 |---|---|
 | Open 4 terminals, `cd` 4 times | One window, one editor |
-| Remember which flags each CLI needs | Launchers store everything |
-| Lose track of which model you picked | Model picker every time, fresh choice |
+| Remember which flags each CLI needs | Always `--yolo` + interactive, baked in |
+| Switch CLI = open new terminal + remember command | One keystroke (`1`/`2`/`3`/`4`) picks the provider |
+| Lose track of which model you picked | Provider picker + model picker every time, fresh choice |
 | Scroll back through walls of output | Each CLI gets its own terminal window |
 | Accidentally run command in wrong dir | Each launcher locks to its folder |
 
@@ -146,7 +148,7 @@ Your launch history is basically a prompt journal you didn't have to write. Ever
 
 ![Phrase catalog panel](docs/screenshots/02-phrases-panel.png)
 
-### Launch Configurations — manage pre-configured Copilot CLI / OpenCode runs
+### Launch Configurations — manage pre-configured folder launchers
 
 ![Launch configurations panel](docs/screenshots/03-launches-panel.png)
 
@@ -154,7 +156,11 @@ Your launch history is basically a prompt journal you didn't have to write. Ever
 
 *(Screenshot coming soon — your history is too personal to screenshot anyway)*
 
-### Model Picker — choose the model at launch time (↑↓ + Enter)
+### Provider Picker — pick the CLI at launch time (`1`/`2`/`3`/`4`)
+
+The provider picker is the first dialog that appears after pressing `Ctrl+Shift+N`. Each provider has a numeric shortcut so you can launch with a single keystroke. Claude Code, Codex and Gemini launch straight away; OpenCode hands off to the model picker so you can pick any of its 40+ models.
+
+### Model Picker — choose the OpenCode model (↑↓ + Enter)
 
 ![Model picker overlay](docs/screenshots/04-model-picker.png)
 
@@ -200,26 +206,33 @@ The Gaudy theme is best experienced live. It features:
 - **Search**: filter phrases by name or content with the search bar.
 
 ### Launch Configurations
-- **Pre-configured runs**: each config stores a name, working folder, `--yolo` flag, tool (Copilot CLI or OpenCode), and interactive / non-interactive mode.
-- **Model chosen at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **model picker** appears — navigate with `↑ ↓`, confirm with `Enter`, cancel with `Esc`.
+- **Folder-only launchers**: each config stores just a **name** and a **working folder**. The provider (Claude Code / OpenCode / Codex / Gemini) and the model are chosen at launch time — every launch is a fresh choice.
+- **Always YOLO + interactive**: Prompt Pad always launches the CLI in "yolo" / `--dangerously-skip-permissions` mode and interactive (`-i`) mode. No checkboxes to fiddle with — that decision is baked in.
+- **Provider picker at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **provider picker** appears first. Press `1` for Claude Code, `2` for OpenCode, `3` for Codex, `4` for Gemini, or use ↑↓ + Enter. Claude/Codex/Gemini launch straight away; OpenCode hands off to the model picker.
 - **Drag-to-reorder**: drag the ⠿ handle to reprioritise configs. The `Ctrl+Shift+N` shortcuts follow the list order and are auto-saved.
 - **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
 - **Open folder in VS Code**: each launch shortcut can also open the launch folder in VS Code using a configurable modifier in Settings (`Ctrl+Shift`, `Ctrl+Alt`, or `Ctrl+Alt+Shift`).
-- **Pin favourite models**: pin models in the picker for quick access with number keys.
+- **Pin favourite models**: pin OpenCode models in the picker for quick access with number keys.
 
 ### Launch History
-- **Every launch remembered**: prompt text, model, tool, YOLO flag, and mode — all saved automatically.
+- **Every launch remembered**: prompt text, provider, model, and folder — all saved automatically.
 - **Grouped by launcher**: entries organized under their launch config name with collapsible groups.
-- **Full-text search**: filter by prompt content, model name, tool, or launcher name.
+- **Full-text search**: filter by prompt content, model name, provider, or launcher name.
 - **Double-click to restore**: opens the exact prompt in a new tab, ready to edit or re-fire.
 - **Auto-sync aware**: history syncs via OneDrive when enabled, so your prompt journal follows you across machines.
 - **Gaudy theme toasts**: even clearing history gets a dramatic notification.
 
-### Model Picker
-- **Dynamic model lists**: fetches available models from both Copilot CLI (`copilot help config`) and OpenCode (`opencode models`) at runtime, including Zen (`opencode/`) and Go (`opencode-go/`) tiers.
-- **Dual tool support**: automatically shows the correct model list based on whether the launch config uses Copilot or OpenCode.
+### Provider Picker
+- **Four providers**: Claude Code, OpenCode, Codex, Gemini — pre-numbered `1`–`4`.
+- **One-key launch**: press `1`/`2`/`3`/`4` to pick a provider, or use ↑↓ + Enter for keyboard-arrow lovers.
+- **Direct launch for non-model-API providers**: Claude Code, Codex and Gemini are launched immediately with their default model (CLI handles model selection via login/config).
+- **Hand-off to model picker**: OpenCode opens the model picker because it exposes 40+ models worth choosing from.
+
+### Model Picker (OpenCode)
+- **Dynamic model lists**: fetches available models from the OpenCode CLI (`opencode models`) at runtime, including Zen (`opencode/`) and Go (`opencode-go/`) tiers.
+- **Provider-aware**: only shown for OpenCode launches. Claude Code, Codex and Gemini bypass it and launch with their default model.
 - **Go/Zen filter**: a toggle to show only Go-tier models (opencode-go/) — on by default for OpenCode launches, keeping the list focused on high-capacity models like Qwen3.7 Max, Deepseek V4 Pro, and Kimi K2.6.
-- **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode brand mark) with theme-aware contrast. OpenCode now uses a minimal two-image square logo set (light-theme and dark-theme variants).
+- **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode brand mark) with theme-aware contrast. OpenCode uses a minimal two-image square logo set (light-theme and dark-theme variants).
 - **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
 - **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) and Go usage limits.
 - **Tier badges**: Go models (`opencode-go/`) show an orange "Go" badge and Zen models (`opencode/`) show a purple "Zen" badge next to the model name for quick identification.
@@ -227,6 +240,7 @@ The Gaudy theme is best experienced live. It features:
 - **Pin favourite models**: press `Ctrl+1` through `Ctrl+0` while hovering a model to pin it to the top. Pinned models appear first and can be launched instantly with `1` through `0`. Press the same shortcut again to unpin.
 - **Drag-to-reorder pinned**: drag the ⠿ handle on pinned models to reorder them.
 - **CLI sync**: pinned models are saved to `settings.json` and sync via OneDrive when enabled. The model list is always fresh from the CLI — pins just give you quick access to your favourites.
+- **Back button**: a `←` button returns to the provider picker if you change your mind about which CLI to use.
 
 ### Settings
 - **Language**: auto-detect (from system locale), English, or Spanish.
@@ -249,13 +263,16 @@ Prompt Pad automatically keeps itself up to date:
 | Shortcut | Action |
 |---|---|
 | `Ctrl/⌘ + 1–9, 0` | Insert phrase #1–10 at cursor |
-| `Ctrl/⌘ + Shift + 1–9, 0` | Open model picker for launch config #1–10 |
+| `Ctrl/⌘ + Shift + 1–9, 0` | Open provider picker for launch config #1–10 |
+| `1`/`2`/`3`/`4` (in provider picker) | Launch Claude Code / OpenCode / Codex / Gemini |
+| `↑↓ + Enter` (in provider picker) | Navigate and select provider |
 | `Ctrl/⌘ + S` | Save current tab |
 | `Ctrl/⌘ + Shift + S` | Save current tab as… |
 | `Ctrl/⌘ + O` | Open file into current tab |
 | `Ctrl/⌘ + T` | New tab |
 | `Ctrl + 1–0` (in model picker) | Pin/unpin model |
 | `1–0` (in model picker) | Launch pinned model |
+| `Esc` (in any picker) | Cancel / go back |
 
 ---
 

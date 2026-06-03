@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { selectOpenCodeProvider } from './helpers';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -11,12 +12,22 @@ function getTestDir(): string {
   return dir;
 }
 
+function writeTestSettings(testDir: string, extra: Record<string, unknown> = {}) {
+  fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+    theme: 'light',
+    language: 'en',
+    useOneDrive: false,
+    ...extra,
+  }, null, 2), 'utf-8');
+}
+
 test.describe('OpenCode fallback models with Go filter', () => {
   test('model picker renders error when getOpenCodeModels throws', async () => {
     const testDir = getTestDir();
     try {
+      writeTestSettings(testDir);
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'Error Display', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+        { id: 'l1', name: 'Error Display', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
@@ -44,7 +55,9 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+      await selectOpenCodeProvider(page);
 
+      // Allow the (stubbed) error to settle; the real CLI is fast, our stub even faster
       await page.waitForTimeout(3000);
 
       const errorEl = page.locator('.model-picker-error');
@@ -65,8 +78,9 @@ test.describe('OpenCode fallback models with Go filter', () => {
   test('selectedIdx updates when models finish loading asynchronously', async () => {
     const testDir = getTestDir();
     try {
+      writeTestSettings(testDir);
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'Async Load', tool: 'opencode', model: 'opencode-go/qwen3.6-plus', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+        { id: 'l1', name: 'Async Load', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
@@ -95,8 +109,10 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+      await selectOpenCodeProvider(page);
 
-      await page.waitForTimeout(2000);
+      // Wait for at least one model to render so we know the fetch is done
+      await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       const selectedItem = page.locator('.model-picker-item.selected');
       const selectedText = await selectedItem.textContent();
@@ -115,8 +131,9 @@ test.describe('OpenCode fallback models with Go filter', () => {
   test('model picker shows Zen models when Go filter is toggled off', async () => {
     const testDir = getTestDir();
     try {
+      writeTestSettings(testDir);
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'Zen + Go', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+        { id: 'l1', name: 'Zen + Go', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
@@ -131,8 +148,10 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+      await selectOpenCodeProvider(page);
 
-      await page.waitForTimeout(3000);
+      // Wait for at least one model to render so we know the fetch is done
+      await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       const goToggle = page.locator('.model-picker-go-toggle');
       await expect(goToggle).toBeVisible({ timeout: 3000 });
@@ -164,8 +183,9 @@ test.describe('OpenCode fallback models with Go filter', () => {
   test('model labels parse correctly for new models', async () => {
     const testDir = getTestDir();
     try {
+      writeTestSettings(testDir);
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'Label Test', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+        { id: 'l1', name: 'Label Test', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
@@ -180,8 +200,10 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+      await selectOpenCodeProvider(page);
 
-      await page.waitForTimeout(3000);
+      // Wait for at least one model to render so we know the fetch is done
+      await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       const goToggle = page.locator('.model-picker-go-toggle');
       await expect(goToggle).toBeVisible({ timeout: 3000 });
@@ -209,8 +231,9 @@ test.describe('OpenCode fallback models with Go filter', () => {
   test('cost indicators work for Go models', async () => {
     const testDir = getTestDir();
     try {
+      writeTestSettings(testDir);
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'Go Cost Test', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+        { id: 'l1', name: 'Go Cost Test', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
@@ -239,8 +262,10 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+      await selectOpenCodeProvider(page);
 
-      await page.waitForTimeout(2000);
+      // Wait for at least one model to render (CLI fetch can be slow under parallel load)
+      await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       const costBars = page.locator('.model-cost-bars');
       const barsCount = await costBars.count();
@@ -265,8 +290,9 @@ test.describe('OpenCode fallback models with Go filter', () => {
   test('qwen3.7-max model label is parsed correctly', async () => {
     const testDir = getTestDir();
     try {
+      writeTestSettings(testDir);
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'Qwen Max Test', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+        { id: 'l1', name: 'Qwen Max Test', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
@@ -290,8 +316,10 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+      await selectOpenCodeProvider(page);
 
-      await page.waitForTimeout(2000);
+      // Wait for at least one model to render (CLI fetch can be slow under parallel load)
+      await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       const bodyText = await page.locator('.model-picker-card').innerText();
       expect(bodyText).toContain('Qwen3.7 Max');
@@ -310,8 +338,9 @@ test.describe('OpenCode fallback models with Go filter', () => {
   test('qwen3.7-max receives cost indicator in Go mode', async () => {
     const testDir = getTestDir();
     try {
+      writeTestSettings(testDir);
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'Qwen Max Cost Test', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+        { id: 'l1', name: 'Qwen Max Cost Test', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
@@ -334,8 +363,10 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+      await selectOpenCodeProvider(page);
 
-      await page.waitForTimeout(2000);
+      // Wait for at least one model to render (CLI fetch can be slow under parallel load)
+      await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       const costBars = page.locator('.model-cost-bars');
       const barsCount = await costBars.count();
@@ -351,8 +382,9 @@ test.describe('OpenCode fallback models with Go filter', () => {
   test('model picker loads real models from opencode CLI', async () => {
     const testDir = getTestDir();
     try {
+      writeTestSettings(testDir);
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'Real CLI Test', tool: 'opencode', model: '', folder: process.cwd(), yolo: true, mode: 'interactive', shortcut: '1' },
+        { id: 'l1', name: 'Real CLI Test', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
@@ -367,8 +399,10 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 5000 });
+      await selectOpenCodeProvider(page);
 
-      await page.waitForTimeout(2000);
+      // Wait for at least one model item to render (real CLI can take a few seconds in parallel runs)
+      await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       const modelItems = page.locator('.model-picker-item');
       const count = await modelItems.count();

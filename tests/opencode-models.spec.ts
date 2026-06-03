@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { selectOpenCodeProvider } from './helpers';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -216,17 +217,14 @@ test.describe('OpenCode Models Feature', () => {
         {
           id: 'stale-pin-launch',
           name: 'Stale Pin Test',
-          tool: 'opencode',
-          model: 'opencode/minimax-m2.5-free',
           folder: process.cwd(),
-          yolo: true,
-          mode: 'interactive',
-          shortcut: 1,
+          shortcut: '1',
         },
       ];
       const settings = {
         theme: 'light',
-        language: 'auto',
+        language: 'en',
+        useOneDrive: false,
         pinnedModels: {
           copilot: [],
           opencode: ['opencode/minimax-m2.5-free', 'nonexistent-model-xyz'],
@@ -245,6 +243,7 @@ test.describe('OpenCode Models Feature', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       await page.waitForTimeout(2500);
 
@@ -267,15 +266,14 @@ test.describe('OpenCode Models Feature', () => {
         {
           id: 'refresh-btn-launch',
           name: 'Refresh Btn Test',
-          tool: 'opencode',
-          model: 'opencode/kimi-k2.6',
           folder: process.cwd(),
-          yolo: true,
-          mode: 'interactive',
-          shortcut: 1,
+          shortcut: '1',
         },
       ];
       fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify(launches, null, 2), 'utf-8');
+      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+        theme: 'light', language: 'en', useOneDrive: false,
+      }, null, 2), 'utf-8');
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
@@ -287,6 +285,7 @@ test.describe('OpenCode Models Feature', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
 
       const refreshBtn = page.locator('.model-picker-refresh-btn');
       await expect(refreshBtn).toBeVisible({ timeout: 3000 });

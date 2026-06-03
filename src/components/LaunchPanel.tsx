@@ -1,15 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { t } from '../i18n';
-import type { LaunchConfig, LaunchTool, Settings } from '../types';
-import { ToolIcon, TOOL_LABELS } from './ToolIcon';
+import type { LaunchConfig, Settings } from '../types';
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
 const DEFAULT: Omit<LaunchConfig, 'id'> = {
-  name: '', tool: 'copilot', folder: '', yolo: true, mode: 'interactive',
+  name: '', folder: '',
 };
 
 function IconRocket() {
@@ -227,12 +226,7 @@ export function LaunchPanel() {
                   })()}
                 </div>
                 <div className="launch-list-item-meta">
-                  <span className="launch-tool-chip">
-                    <span className="launch-tool-icon"><ToolIcon tool={launch.tool} /></span>
-                    <span className="launch-tool-label">{TOOL_LABELS[launch.tool]}</span>
-                  </span>
-                  {` · ${launch.yolo ? 'YOLO' : 'safe'}`}
-                  {launch.tool === 'copilot' ? ` · ${launch.mode === 'interactive' ? '-i' : '-p'}` : ''}
+                  <span className="launch-folder">{launch.folder || 'No folder selected'}</span>
                 </div>
               </div>
               <div className="launch-list-item-actions">
@@ -271,22 +265,6 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder, launchShor
           onChange={e => onChange({ ...data, name: e.target.value })} />
       </div>
       <div className="form-group">
-        <label>{t('launchTool')}</label>
-        <div className="tool-selector">
-          {(['copilot', 'opencode', 'antigravity', 'claude-code', 'codex'] as LaunchTool[]).map(tool => (
-            <button
-              key={tool}
-              className={'tool-btn' + (data.tool === tool ? ' active' : '')}
-              onClick={() => onChange({ ...data, tool })}
-              type="button"
-            >
-              <span className="tool-btn-icon"><span className="launch-tool-icon"><ToolIcon tool={tool} /></span></span>
-              <span className="tool-btn-label">{TOOL_LABELS[tool]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="form-group">
         <label>{t('folder')}</label>
         <div className="folder-input-row">
           <input type="text" value={data.folder} placeholder="~/projects/…"
@@ -294,23 +272,6 @@ function LaunchForm({ data, onChange, onSave, onCancel, onPickFolder, launchShor
           <button className="btn btn-sm" onClick={onPickFolder}>{t('browseFolder')}</button>
         </div>
       </div>
-      <div className="form-group form-checkbox">
-        <label>
-          <input type="checkbox" checked={data.yolo}
-            onChange={e => onChange({ ...data, yolo: e.target.checked })} />
-          {t('yoloMode')}
-        </label>
-      </div>
-      {data.tool === 'copilot' && (
-        <div className="form-group">
-          <label>{t('launchMode')}</label>
-          <select title={t('launchMode')} value={data.mode}
-            onChange={e => onChange({ ...data, mode: e.target.value as 'interactive' | 'non-interactive' })}>
-            <option value="interactive">{t('interactive')}</option>
-            <option value="non-interactive">{t('nonInteractive')}</option>
-          </select>
-        </div>
-      )}
       <div className="form-group">
         <label>{t('shortcut')}</label>
           <select title={t('shortcut')} value={data.shortcut ?? ''}

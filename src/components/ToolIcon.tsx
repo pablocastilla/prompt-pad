@@ -1,6 +1,6 @@
 import React from 'react';
 import type { LaunchTool } from '../types';
-import { siGithubcopilot, siClaude, siOpenaigym } from 'simple-icons';
+import { siGithubcopilot, siClaude, siOpenaigym, siGooglegemini } from 'simple-icons';
 import opencodeIconDarkTheme from '../assets/cli-icons/opencode-logo-light-square.png';
 import opencodeIconLightTheme from '../assets/cli-icons/opencode-logo-dark-square.png';
 
@@ -16,6 +16,7 @@ export const TOOL_LABELS: Record<LaunchTool, string> = {
   antigravity: 'Antigravity',
   'claude-code': 'Claude Code',
   codex: 'Codex',
+  gemini: 'Gemini',
 };
 
 function getOpenCodeIconForTheme(): string {
@@ -58,6 +59,13 @@ export function ToolIcon({ tool, size = 14, className }: ToolIconProps) {
     return (
       <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" className={className}>
         <path d={siClaude.path} fill="currentColor" />
+      </svg>
+    );
+  }
+  if (tool === 'gemini') {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" className={className}>
+        <path d={siGooglegemini.path} fill="currentColor" />
       </svg>
     );
   }
