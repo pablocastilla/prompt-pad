@@ -140,16 +140,8 @@ test.describe('Tab persistence after launch', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.model-picker-overlay')).toBeVisible({ timeout: 10000 });
 
-      const firstModelItem = page.locator('.model-picker-item').first();
-      await firstModelItem.click();
-      if (await page.locator('.model-picker-overlay').isVisible()) {
-        const confirmLaunchBtn = page.locator('.model-picker-confirm-launch');
-        if (await confirmLaunchBtn.isVisible()) {
-          await confirmLaunchBtn.click();
-        } else {
-          await firstModelItem.click();
-        }
-      }
+      // Select claude-code (3) which launches directly without model picker
+      await page.keyboard.press('3');
       await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 10000 });
 
       const tabsAfter = page.locator('.tab');

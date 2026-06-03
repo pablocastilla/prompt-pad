@@ -22,11 +22,43 @@ export async function selectOpenCodeProvider(page: Page, opts: { waitForList?: b
 }
 
 /**
+ * Select Claude Code in the provider picker. Claude Code launches directly
+ * without a model picker, so the overlay closes immediately.
+ */
+export async function selectClaudeCodeProvider(page: Page) {
+  await page.locator('.provider-picker-list .provider-picker-item[data-provider="claude-code"]').click();
+  await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
+}
+
+/**
+ * Select GitHub Copilot in the provider picker, then wait for the model picker list.
+ */
+export async function selectCopilotProvider(page: Page, opts: { waitForList?: boolean } = {}) {
+  const { waitForList = true } = opts;
+  await page.locator('.provider-picker-list .provider-picker-item[data-provider="copilot"]').click();
+  if (waitForList) {
+    await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+  } else {
+    await expect(page.locator('.provider-picker-list')).not.toBeVisible({ timeout: 5000 });
+  }
+}
+
+/**
  * Convenience: press Ctrl+Shift+1 to launch the first config, then select OpenCode.
- * This is the most common flow in tests that exercise the model picker.
+ * This is the most common flow in tests that exercise the OpenCode model picker.
  */
 export async function openModelPickerForFirstLaunch(page: Page) {
   await page.keyboard.press('Control+Shift+1');
   await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
   await selectOpenCodeProvider(page);
+}
+
+/**
+ * Convenience: press Ctrl+Shift+1 to launch the first config, then select Claude Code.
+ * Claude Code has no model picker — the overlay closes immediately.
+ */
+export async function launchWithClaudeCode(page: Page) {
+  await page.keyboard.press('Control+Shift+1');
+  await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+  await selectClaudeCodeProvider(page);
 }

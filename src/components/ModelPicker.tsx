@@ -6,7 +6,7 @@ import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry } from '../t
 import { ToolIcon, TOOL_LABELS } from './ToolIcon';
 
 // Providers offered when launching. Order matters: numeric shortcuts 1..N map by position.
-const ALL_TOOLS: LaunchTool[] = ['claude-code', 'opencode', 'codex', 'gemini'];
+const ALL_TOOLS: LaunchTool[] = ['opencode', 'copilot', 'claude-code', 'codex', 'gemini'];
 
 // Providers that expose a CLI-driven model list; others launch with the CLI's default model.
 const TOOLS_WITH_MODEL_PICKER: LaunchTool[] = ['opencode', 'copilot', 'antigravity'];

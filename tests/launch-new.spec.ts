@@ -294,7 +294,7 @@ test.describe('Launch configuration form', () => {
 });
 
 test.describe('Provider picker navigation', () => {
-  test('provider picker shows exactly 4 providers in claude/opencode/codex/gemini order', async () => {
+  test('provider picker shows exactly 5 providers in opencode/copilot/claude-code/codex/gemini order', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -321,13 +321,13 @@ test.describe('Provider picker navigation', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible();
 
       const providers = page.locator('.provider-picker-list .provider-picker-item');
-      await expect(providers).toHaveCount(4);
+      await expect(providers).toHaveCount(5);
 
       const providerNames = await providers.evaluateAll((els) => els.map((el) => el.getAttribute('data-provider')));
-      expect(providerNames).toEqual(['claude-code', 'opencode', 'codex', 'gemini']);
+      expect(providerNames).toEqual(['opencode', 'copilot', 'claude-code', 'codex', 'gemini']);
 
-      // Each item shows its numeric shortcut (1..4)
-      for (let i = 0; i < 4; i++) {
+      // Each item shows its numeric shortcut (1..5)
+      for (let i = 0; i < 5; i++) {
         const shortcut = providers.nth(i).locator('.provider-picker-shortcut');
         await expect(shortcut).toHaveText(String(i + 1));
       }
@@ -429,7 +429,53 @@ test.describe('Provider picker navigation', () => {
     }
   });
 
-  test('numeric key 1 launches the first provider directly (claude-code, no model picker)', async () => {
+  test('numeric key 2 opens model picker for copilot (it has a model API)', async () => {
+    const testDir = getTestDir();
+    try {
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Test', folder: '/tmp' },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api = (window as any).electronAPI;
+        api.getCopilotModels = async () => [
+          { id: 'gpt-5', label: 'GPT-5' },
+          { id: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
+        ];
+      });
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+
+      await page.keyboard.press('2');
+      await page.waitForTimeout(500);
+
+      // Copilot has a model picker, so the overlay stays visible with the model list
+      await expect(page.locator('.model-picker-list')).toBeVisible();
+      await expect(page.locator('.provider-picker-list')).not.toBeVisible();
+
+      // No launch call should have happened yet (still in model picker)
+      const calls = readLaunchCalls(testDir);
+      expect(calls).toHaveLength(0);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('numeric key 3 launches claude-code directly (no model picker)', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -449,8 +495,8 @@ test.describe('Provider picker navigation', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
-      // Press "1" -> claude-code -> direct launch
-      await page.keyboard.press('1');
+      // Press "3" -> claude-code -> direct launch
+      await page.keyboard.press('3');
       await page.waitForTimeout(500);
 
       await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
@@ -466,42 +512,7 @@ test.describe('Provider picker navigation', () => {
     }
   });
 
-  test('numeric key 3 launches codex directly without model picker', async () => {
-    const testDir = getTestDir();
-    try {
-      saveTestSettings(testDir);
-      savePhrases(testDir, []);
-      saveLaunches(testDir, [
-        { id: 'l1', name: 'Test', folder: '/tmp' },
-      ]);
-
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(500);
-
-      await page.locator('.editor-textarea').fill('test prompt');
-      await page.waitForTimeout(100);
-
-      await page.keyboard.press('Control+Shift+1');
-      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
-
-      await page.keyboard.press('3');
-      await page.waitForTimeout(500);
-
-      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
-
-      const calls = readLaunchCalls(testDir);
-      expect(calls).toHaveLength(1);
-      expect(calls[0].tool).toBe('codex');
-
-      await app.close();
-    } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
-    }
-  });
-
-  test('numeric key 4 launches gemini directly without model picker', async () => {
+  test('numeric key 4 launches codex directly without model picker', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -528,6 +539,41 @@ test.describe('Provider picker navigation', () => {
 
       const calls = readLaunchCalls(testDir);
       expect(calls).toHaveLength(1);
+      expect(calls[0].tool).toBe('codex');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('numeric key 5 launches gemini directly without model picker', async () => {
+    const testDir = getTestDir();
+    try {
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Test', folder: '/tmp' },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+
+      await page.keyboard.press('5');
+      await page.waitForTimeout(500);
+
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+
+      const calls = readLaunchCalls(testDir);
+      expect(calls).toHaveLength(1);
       expect(calls[0].tool).toBe('gemini');
 
       await app.close();
@@ -536,7 +582,7 @@ test.describe('Provider picker navigation', () => {
     }
   });
 
-  test('numeric key 2 opens model picker for opencode (it has a model API)', async () => {
+  test('numeric key 1 opens model picker for opencode (it has a model API)', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -564,7 +610,7 @@ test.describe('Provider picker navigation', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
-      await page.keyboard.press('2');
+      await page.keyboard.press('1');
       await page.waitForTimeout(500);
 
       // OpenCode has a model picker, so the overlay stays visible with the model list
@@ -601,12 +647,13 @@ test.describe('Provider picker navigation', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
-      // Selected starts at index 0 (claude-code). Press Down 2 times -> codex
+      // Selected starts at index 0 (opencode). Press Down 3 times -> codex
+      await page.keyboard.press('ArrowDown');
       await page.keyboard.press('ArrowDown');
       await page.keyboard.press('ArrowDown');
       await page.waitForTimeout(100);
 
-      // The third item (codex) should be selected
+      // The fourth item (codex) should be selected
       const selected = page.locator('.provider-picker-item.selected');
       await expect(selected).toHaveAttribute('data-provider', 'codex');
 
