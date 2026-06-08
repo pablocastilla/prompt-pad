@@ -205,6 +205,123 @@ test.describe('Model picker behavior', () => {
     }
   });
 
+  test('OpenCode model picker shows free models filter checkbox', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.evaluate(() => {
+        const api = (window as unknown as {
+          electronAPI: {
+            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
+          };
+        }).electronAPI;
+
+        api.getOpenCodeModels = async () => {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          return [
+            { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+            { id: 'opencode/deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free' },
+            { id: 'opencode/mimo-v2.5-free', label: 'Mimo V2.5 Free' },
+            { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          ];
+        };
+      });
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      // Both checkboxes should be visible
+      await expect(page.locator('.model-picker-go-toggle')).toHaveCount(2);
+
+      // Free filter checkbox should exist and be unchecked by default
+      const freeCheckbox = page.locator('.model-picker-go-toggle').nth(1);
+      await expect(freeCheckbox).toBeVisible();
+      await expect(freeCheckbox.locator('input[type="checkbox"]')).not.toBeChecked();
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('OpenCode model picker free filter shows only free models when enabled', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.evaluate(() => {
+        const api = (window as unknown as {
+          electronAPI: {
+            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
+          };
+        }).electronAPI;
+
+        api.getOpenCodeModels = async () => {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          return [
+            { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+            { id: 'opencode/deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free' },
+            { id: 'opencode/mimo-v2.5-free', label: 'Mimo V2.5 Free' },
+            { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          ];
+        };
+      });
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      // Wait for models to load
+      await page.waitForFunction(() => {
+        const items = document.querySelectorAll('.model-picker-item');
+        return items.length > 0;
+      }, { timeout: 8000 });
+
+      // First, disable Go filter (enabled by default) so we can see all models
+      const goCheckbox = page.locator('.model-picker-go-toggle').first().locator('input[type="checkbox"]');
+      if (await goCheckbox.isChecked()) {
+        await goCheckbox.click();
+        await page.waitForTimeout(300);
+      }
+
+      // Enable free filter
+      const freeCheckbox = page.locator('.model-picker-go-toggle').nth(1).locator('input[type="checkbox"]');
+      await freeCheckbox.click();
+      await page.waitForTimeout(300);
+
+      // Should only show models with "free" in the name
+      const modelItems = page.locator('.model-picker-item');
+      const modelCount = await modelItems.count();
+      expect(modelCount).toBe(2);
+
+      // Verify the free models are visible
+      await expect(modelItems.nth(0)).toContainText('DeepSeek V4 Flash Free');
+      await expect(modelItems.nth(1)).toContainText('Mimo V2.5 Free');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
   test('OpenCode model picker hides Go filter when setting is disabled', async () => {
     const testDir = getTestDir();
     try {

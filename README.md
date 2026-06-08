@@ -232,6 +232,7 @@ The Gaudy theme is best experienced live. It features:
 - **Dynamic model lists**: fetches available models from the CLI (`opencode models` or `copilot help config`) at runtime, including Zen (`opencode/`) and Go (`opencode-go/`) tiers.
 - **Provider-aware**: only shown for OpenCode and GitHub Copilot launches. Claude Code, Codex and Gemini bypass it and launch with their default model.
 - **Go/Zen filter**: a toggle to show only Go-tier models (opencode-go/) — on by default for OpenCode launches, keeping the list focused on high-capacity models like Qwen3.7 Max, Deepseek V4 Pro, and Kimi K2.6.
+- **Free filter**: a toggle to show only free models — looks for "free" in the model name. Both Go and Free filters can be combined to show only free Go models.
 - **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode brand mark) with theme-aware contrast. OpenCode uses a minimal two-image square logo set (light-theme and dark-theme variants).
 - **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
 - **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) and Go usage limits.

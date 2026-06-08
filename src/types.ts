@@ -26,6 +26,7 @@ export interface Settings {
   useOneDrive?: boolean;
   pinnedModels?: Partial<Record<LaunchTool, string[]>>;
   showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
+  showFreeModelsOnly?: Partial<Record<LaunchTool, boolean>>;
   phraseShortcutModifier: ShortcutModifier;
   launchShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
   openVsCodeShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';

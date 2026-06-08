@@ -65,11 +65,21 @@ export function ModelPicker() {
   const availableModels = modelCache[tool] ?? [];
   const pinnedIds = settings.pinnedModels?.[tool] ?? [];
   const showGoOnly = settings.showGoModelsOnly?.[tool] ?? (tool === 'opencode' ? true : false);
+  const showFreeOnly = settings.showFreeModelsOnly?.[tool] ?? false;
 
   const filteredModels = useMemo(() => {
-    if (!showGoOnly || tool !== 'opencode') return availableModels;
-    return availableModels.filter(m => m.id.startsWith('opencode-go/'));
-  }, [availableModels, showGoOnly, tool]);
+    let result = availableModels;
+    if (tool === 'opencode') {
+      if (showGoOnly && showFreeOnly) {
+        result = availableModels.filter(m => m.id.startsWith('opencode-go/') && (m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free')));
+      } else if (showGoOnly) {
+        result = availableModels.filter(m => m.id.startsWith('opencode-go/'));
+      } else if (showFreeOnly) {
+        result = availableModels.filter(m => m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free'));
+      }
+    }
+    return result;
+  }, [availableModels, showGoOnly, showFreeOnly, tool]);
 
   const pinnedModels = useMemo(
     () => pinnedIds.map(id => filteredModels.find(m => m.id === id)).filter((m): m is ModelOption => !!m),
@@ -110,6 +120,18 @@ export function ModelPicker() {
       showGoModelsOnly: {
         ...settings.showGoModelsOnly,
         [tool]: !showGoOnly,
+      },
+    };
+    setSettings(nextSettings);
+    await window.electronAPI.saveSettings(nextSettings);
+  };
+
+  const toggleFreeOnly = async () => {
+    const nextSettings: Settings = {
+      ...settings,
+      showFreeModelsOnly: {
+        ...settings.showFreeModelsOnly,
+        [tool]: !showFreeOnly,
       },
     };
     setSettings(nextSettings);
@@ -417,11 +439,18 @@ export function ModelPicker() {
           >{isLoading ? '⏳' : '🔄'}</button>
         </div>
         {tool === 'opencode' && (
-          <label className="model-picker-go-toggle">
-            <input type="checkbox" checked={showGoOnly} onChange={toggleGoOnly} />
-            <span className="model-picker-go-checkbox" />
-            <span>{t('showGoModelsOnly')}</span>
-          </label>
+          <>
+            <label className="model-picker-go-toggle">
+              <input type="checkbox" checked={showGoOnly} onChange={toggleGoOnly} />
+              <span className="model-picker-go-checkbox" />
+              <span>{t('showGoModelsOnly')}</span>
+            </label>
+            <label className="model-picker-go-toggle">
+              <input type="checkbox" checked={showFreeOnly} onChange={toggleFreeOnly} />
+              <span className="model-picker-go-checkbox" />
+              <span>{t('showFreeModelsOnly')}</span>
+            </label>
+          </>
         )}
         <div className="model-picker-list" ref={listRef}>
           {isLoading && <div className="model-picker-loading"><span className="model-picker-loading-dot" />{t('loadingModels')}</div>}
