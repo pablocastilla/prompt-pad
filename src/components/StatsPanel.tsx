@@ -32,13 +32,25 @@ function formatModelName(modelId: string): string {
 }
 
 const colorPalette = [
-  '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308'
+  '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899',
+  '#06b6d4', '#eab308', '#22d3ee', '#a855f7', '#fb923c', '#34d399',
+  '#f472b6', '#38bdf8', '#a3e635', '#c084fc', '#fb7185', '#2dd4bf',
 ];
 
+function getNormalizedModelId(modelId: string): string {
+  return modelId
+    .replace(/^opencode(-go)?\//, '')
+    .replace(/^antigravity\//, '')
+    .replace(/^copilot\//, '')
+    .toLowerCase()
+    .trim();
+}
+
 function getModelColor(modelId: string) {
+  const normalized = getNormalizedModelId(modelId);
   let hash = 0;
-  for (let i = 0; i < modelId.length; i++) {
-    hash = modelId.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < normalized.length; i++) {
+    hash = normalized.charCodeAt(i) + ((hash << 5) - hash);
   }
   return colorPalette[Math.abs(hash) % colorPalette.length];
 }

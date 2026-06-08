@@ -190,7 +190,7 @@ The Gaudy theme is best experienced live. It features:
 ## Features
 
 ### Editor
-- **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close.
+- **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close. Statistics opens as a tab too — close it to return to your editor tabs.
 - **Auto-session**: tab state (title, content, path) is saved every 600 ms and restored on the next launch.
 - **Plain-text contenteditable core**: editor now uses a `contenteditable` surface with strict plain-text sync, so launches always send plain text/markdown (no rich-text styles or HTML).
 - **Save/Open**: `Ctrl+S` (save), `Ctrl+Shift+S` (save as), `Ctrl+O` (open).
@@ -249,8 +249,8 @@ The Gaudy theme is best experienced live. It features:
 - **Auto-updates**: automatically checks for new versions on startup and every 4 hours. Downloads and installs updates silently — just restart when prompted. Manual check button also available.
 
 ### Statistics
-- **OpenCode Spending Dashboard**: a dedicated panel to visualize your last 30 days of OpenCode CLI usage.
-- **Stacked Bar Chart**: daily costs are rendered in a stacked bar chart grouped by model.
+- **OpenCode Spending Dashboard**: opens as a tab with a close button (×) for easy switching between stats and editor.
+- **Stacked Bar Chart**: daily costs are rendered in a stacked bar chart grouped by model. Each model gets a consistent color across all days.
 - **Model Breakdown**: hover over any day to see a detailed tooltip showing exactly which models you used, how many times you fired them, and the cost per model.
 - **Native Integration**: securely connects directly to your local `opencode.db` using `better-sqlite3` to ensure your data stays on your machine.
 

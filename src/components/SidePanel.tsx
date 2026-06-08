@@ -11,7 +11,6 @@ const TITLES = {
   phrases:    'phraseCatalog',
   settings:   'settings',
   history:    'launchHistory',
-  statistics: 'statistics',
 } as const;
 
 export function SidePanel() {

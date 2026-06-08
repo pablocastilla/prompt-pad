@@ -107,20 +107,24 @@ export default function App() {
 
       // Restore session if there are saved tabs with content
       if (session && Array.isArray(session.tabs) && session.tabs.length > 0) {
-        const restoredTabs: Tab[] = session.tabs.map((t: Pick<Tab, 'id' | 'title' | 'content' | 'path' | 'phraseRanges'>) => ({
-          id: t.id,
-          title: t.title || 'Untitled',
-          content: t.content || '',
-          path: t.path || null,
-          dirty: false,
-          lastSavedAt: null,
-          attachedFiles: [],
-          phraseRanges: t.phraseRanges || [],
-        }));
-        const validActiveId = restoredTabs.find(t => t.id === session.activeTabId)
-          ? session.activeTabId
-          : restoredTabs[0].id;
-        restoreSession(restoredTabs, validActiveId);
+        const restoredTabs: Tab[] = session.tabs
+          .filter((t: any) => t.content !== '__STATS__')
+          .map((t: Pick<Tab, 'id' | 'title' | 'content' | 'path' | 'phraseRanges'>) => ({
+            id: t.id,
+            title: t.title || 'Untitled',
+            content: t.content || '',
+            path: t.path || null,
+            dirty: false,
+            lastSavedAt: null,
+            attachedFiles: [],
+            phraseRanges: t.phraseRanges || [],
+          }));
+        if (restoredTabs.length > 0) {
+          const validActiveId = restoredTabs.find(t => t.id === session.activeTabId)
+            ? session.activeTabId
+            : restoredTabs[0].id;
+          restoreSession(restoredTabs, validActiveId);
+        }
       }
     })();
   }, []);
@@ -130,13 +134,15 @@ export default function App() {
   useEffect(() => {
     if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
     sessionTimerRef.current = setTimeout(() => {
+      const savedTabs = tabs.filter(t => t.content !== '__STATS__');
+      const activeIsStats = activeTab?.content === '__STATS__';
       window.electronAPI.saveSession({
-        tabs: tabs.map(t => ({ id: t.id, title: t.title, content: t.content, path: t.path, phraseRanges: t.phraseRanges })),
-        activeTabId,
+        tabs: savedTabs.map(t => ({ id: t.id, title: t.title, content: t.content, path: t.path, phraseRanges: t.phraseRanges })),
+        activeTabId: activeIsStats ? (savedTabs[0]?.id || '') : activeTabId,
       });
     }, 600);
     return () => { if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current); };
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, activeTab?.content]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme);
@@ -260,8 +266,8 @@ export default function App() {
       <Header />
       <div className="workspace">
         <ActivityBar />
-        {activePanel && activePanel !== 'statistics' && <SidePanel />}
-        {activePanel === 'statistics' ? <StatsPanel /> : <Editor key={activeTabId} />}
+        {activePanel && <SidePanel />}
+        {activeTab?.content === '__STATS__' ? <StatsPanel /> : <Editor key={activeTabId} />}
       </div>
       {toasts.length > 0 && <GaudyToast />}
 

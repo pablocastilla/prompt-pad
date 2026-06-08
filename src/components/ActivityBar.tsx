@@ -5,6 +5,10 @@ import { t } from '../i18n';
 export function ActivityBar() {
   const activePanel = useStore(s => s.activePanel);
   const togglePanel = useStore(s => s.togglePanel);
+  const tabs = useStore(s => s.tabs);
+  const activeTabId = useStore(s => s.activeTabId);
+  const openStatsTab = useStore(s => s.openStatsTab);
+  const activeIsStats = tabs.some(t => t.id === activeTabId && t.content === '__STATS__');
 
   return (
     <div className="activity-bar">
@@ -24,8 +28,8 @@ export function ActivityBar() {
         title={t('launchHistory')}
       >📜</button>
       <button
-        className={'activity-btn' + (activePanel === 'statistics' ? ' active' : '')}
-        onClick={() => togglePanel('statistics')}
+        className={'activity-btn' + (activeIsStats ? ' active' : '')}
+        onClick={() => openStatsTab()}
         title={t('statistics')}
       >📊</button>
       <div className="activity-spacer" />

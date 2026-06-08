@@ -26,6 +26,7 @@ interface AppState {
   markTabSaved: (id: string, path: string | null, title: string) => void;
   loadFileIntoTab: (id: string, path: string, content: string, title: string) => void;
   restoreSession: (tabs: Tab[], activeTabId: string) => void;
+  openStatsTab: () => void;
   attachFileToTab: (tabId: string, file: AttachedFile) => void;
   removeFileFromTab: (tabId: string, fileId: string) => void;
   phrases: Phrase[];
@@ -72,12 +73,40 @@ export const useStore = create<AppState>((set, get) => ({
     tab.dirty = true;
     set(s => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
   },
+  openStatsTab: () => {
+    const { tabs } = get();
+    const existing = tabs.find(t => t.content === '__STATS__');
+    if (existing) {
+      set({ activeTabId: existing.id, activePanel: null });
+      return;
+    }
+    const tab = createTab();
+    tab.title = '📊 Statistics';
+    tab.content = '__STATS__';
+    set(s => ({
+      tabs: [...s.tabs, tab],
+      activeTabId: tab.id,
+      activePanel: null,
+    }));
+  },
   closeTab: (id) => {
     const { tabs, activeTabId } = get();
-    if (tabs.length <= 1) return;
+    const tab = tabs.find(t => t.id === id);
+    const isStats = tab?.content === '__STATS__';
+    if (tabs.length <= 1) {
+      if (isStats) {
+        const newTab = createTab();
+        set({ tabs: [newTab], activeTabId: newTab.id });
+        return;
+      }
+      return;
+    }
     const idx = tabs.findIndex(t => t.id === id);
     const next = tabs.filter(t => t.id !== id);
-    set({ tabs: next, activeTabId: activeTabId === id ? next[Math.min(idx, next.length - 1)].id : activeTabId });
+    set({
+      tabs: next,
+      activeTabId: activeTabId === id ? next[Math.min(idx, next.length - 1)].id : activeTabId,
+    });
   },
   closeTabsLeft: (id) => {
     const { tabs, activeTabId } = get();
@@ -109,7 +138,12 @@ export const useStore = create<AppState>((set, get) => ({
   setTabPhraseRanges: (id, phraseRanges) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, phraseRanges } : t) })),
   markTabSaved: (id, path, title) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, path, title, dirty: false, lastSavedAt: Date.now() } : t) })),
   loadFileIntoTab: (id, path, content, title) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, path, content, title, dirty: false, lastSavedAt: Date.now() } : t) })),
-  restoreSession: (tabs, activeTabId) => set({ tabs, activeTabId }),
+  restoreSession: (tabs, activeTabId) => {
+    const filtered = tabs.filter(t => t.content !== '__STATS__');
+    const safeTabs = filtered.length > 0 ? filtered : [createTab()];
+    const safeActive = safeTabs.some(t => t.id === activeTabId) ? activeTabId : safeTabs[0].id;
+    set({ tabs: safeTabs, activeTabId: safeActive });
+  },
   attachFileToTab: (tabId, file) => set(s => ({
     tabs: s.tabs.map(t => {
       if (t.id !== tabId) return t;

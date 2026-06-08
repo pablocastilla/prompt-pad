@@ -38,7 +38,7 @@ export function TabBar() {
               {tab.dirty && <span className="tab-dot" />}
               {tab.title || t('untitled')}
             </span>
-            {tabs.length > 1 && (
+            {(tabs.length > 1 || tab.content === '__STATS__') && (
               <button
                 className="tab-close"
                 onClick={e => {
