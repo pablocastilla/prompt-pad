@@ -23,6 +23,11 @@ export function ActivityBar() {
         onClick={() => togglePanel('history')}
         title={t('launchHistory')}
       >📜</button>
+      <button
+        className={'activity-btn' + (activePanel === 'statistics' ? ' active' : '')}
+        onClick={() => togglePanel('statistics')}
+        title={t('statistics')}
+      >📊</button>
       <div className="activity-spacer" />
       <button
         className={'activity-btn' + (activePanel === 'settings' ? ' active' : '')}

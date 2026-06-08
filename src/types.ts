@@ -275,6 +275,31 @@ export function getModelCostInfo(modelId: string): ModelCostInfo | undefined {
   }
 }
 
+// ── OpenCode Statistics ──
+export interface OpenCodeModelCost {
+  modelId: string;
+  cost: number;
+  sessions: number;
+  tokensIn: number;
+  tokensOut: number;
+}
+
+export interface OpenCodeDayCost {
+  date: string;       // 'YYYY-MM-DD'
+  cost: number;
+  sessions: number;
+  tokensIn: number;
+  tokensOut: number;
+  models: OpenCodeModelCost[];
+}
+
+export interface OpenCodeStats {
+  days: OpenCodeDayCost[];
+  totalCost: number;
+  totalSessions: number;
+  dbPath: string | null;
+}
+
 // ── Electron API type ──
 export interface ElectronAPI {
   loadSettings: () => Promise<Settings>;
@@ -315,6 +340,7 @@ export interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   checkForUpdates: () => Promise<boolean>;
   openVsCode: (folder: string) => Promise<boolean>;
+  getOpenCodeStats: () => Promise<OpenCodeStats>;
 }
 
 // ── Launch History ──

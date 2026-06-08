@@ -248,6 +248,12 @@ The Gaudy theme is best experienced live. It features:
 - **OneDrive sync**: `phrases.json` and `launches.json` can be synced via OneDrive. First-enable migrates existing files automatically.
 - **Auto-updates**: automatically checks for new versions on startup and every 4 hours. Downloads and installs updates silently — just restart when prompted. Manual check button also available.
 
+### Statistics
+- **OpenCode Spending Dashboard**: a dedicated panel to visualize your last 30 days of OpenCode CLI usage.
+- **Stacked Bar Chart**: daily costs are rendered in a stacked bar chart grouped by model.
+- **Model Breakdown**: hover over any day to see a detailed tooltip showing exactly which models you used, how many times you fired them, and the cost per model.
+- **Native Integration**: securely connects directly to your local `opencode.db` using `better-sqlite3` to ensure your data stays on your machine.
+
 ### Auto-Updates
 Prompt Pad automatically keeps itself up to date:
 - Checks for updates on every launch

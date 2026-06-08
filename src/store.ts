@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry } from './types';
 
-type ActivePanel = 'launches' | 'phrases' | 'settings' | 'history' | null;
+type ActivePanel = 'launches' | 'phrases' | 'settings' | 'history' | 'statistics' | null;
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);

@@ -8,6 +8,7 @@ import { Editor } from './components/Editor';
 import { GaudyToast } from './components/GaudyToast';
 import { ModelPicker } from './components/ModelPicker';
 import { LaunchSplash } from './components/LaunchSplash';
+import { StatsPanel } from './components/StatsPanel';
 import type { LaunchConfig, Phrase, Settings, Tab } from './types';
 import './App.css';
 
@@ -259,10 +260,11 @@ export default function App() {
       <Header />
       <div className="workspace">
         <ActivityBar />
-        {activePanel && <SidePanel />}
-        <Editor key={activeTabId} />
+        {activePanel && activePanel !== 'statistics' && <SidePanel />}
+        {activePanel === 'statistics' ? <StatsPanel /> : <Editor key={activeTabId} />}
       </div>
       {toasts.length > 0 && <GaudyToast />}
+
       <ModelPicker />
       <LaunchSplash />
     </div>

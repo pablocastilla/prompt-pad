@@ -1,4 +1,4 @@
-﻿import { app, BrowserWindow, ipcMain, dialog, Menu, clipboard, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, clipboard, nativeImage } from 'electron';
 import { setupAutoUpdater, registerUpdateIPC } from './updater';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -1128,3 +1128,125 @@ ipcMain.handle('vscode:open', async (_e, folder: string) => {
     return false;
   }
 });
+
+// ── OpenCode Statistics ───────────────────────────────────────────────────────
+// Locate opencode.db based on OS defaults
+function findOpenCodeDb(): string | null {
+  const candidates: string[] = [];
+  if (process.platform === 'win32') {
+    // Windows: %APPDATA%/opencode/opencode.db  OR  ~/.local/share/opencode/opencode.db
+    const appData = process.env['APPDATA'];
+    if (appData) candidates.push(path.join(appData, 'opencode', 'opencode.db'));
+    candidates.push(path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db'));
+    candidates.push(path.join(os.homedir(), 'AppData', 'Roaming', 'opencode', 'opencode.db'));
+  } else if (process.platform === 'darwin') {
+    candidates.push(path.join(os.homedir(), 'Library', 'Application Support', 'opencode', 'opencode.db'));
+  } else {
+    candidates.push(path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db'));
+  }
+  return candidates.find(p => fs.existsSync(p)) ?? null;
+}
+
+interface DayCostRow {
+  date: string;
+  cost: number;
+  sessions: number;
+  tokensIn: number;
+  tokensOut: number;
+}
+
+ipcMain.handle('stats:opencode', () => {
+  const dbPath = findOpenCodeDb();
+  if (!dbPath) {
+    return { days: [], totalCost: 0, totalSessions: 0, dbPath: null };
+  }
+
+  try {
+    // Use better-sqlite3 (synchronous)
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+
+    // Last 7 days (including today) from midnight UTC 7 days ago
+    const now = Date.now();
+    const thirtyDaysAgoMs = now - 30 * 24 * 60 * 60 * 1000;
+
+    // Group by local date and model using SQLite date function
+    const rawRows = db.prepare(`
+      SELECT
+        date(time_created / 1000, 'unixepoch', 'localtime') AS date,
+        model,
+        SUM(cost)           AS cost,
+        COUNT(*)            AS sessions,
+        SUM(tokens_input)   AS tokensIn,
+        SUM(tokens_output)  AS tokensOut
+      FROM session
+      WHERE time_created >= ?
+      GROUP BY date, model
+      ORDER BY date
+    `).all(thirtyDaysAgoMs) as any[];
+
+    db.close();
+
+    const daysMap = new Map<string, any>();
+    let totalCost = 0;
+    let totalSessions = 0;
+
+    for (const r of rawRows) {
+      if (!r.date) continue;
+      if (!daysMap.has(r.date)) {
+        daysMap.set(r.date, { date: r.date, cost: 0, sessions: 0, tokensIn: 0, tokensOut: 0, models: [] });
+      }
+
+      const day = daysMap.get(r.date);
+      const rowCost = r.cost ?? 0;
+      const rowSessions = r.sessions ?? 0;
+      const rowTokensIn = r.tokensIn ?? 0;
+      const rowTokensOut = r.tokensOut ?? 0;
+
+      day.cost += rowCost;
+      day.sessions += rowSessions;
+      day.tokensIn += rowTokensIn;
+      day.tokensOut += rowTokensOut;
+
+      totalCost += rowCost;
+      totalSessions += rowSessions;
+
+      let modelId = 'unknown';
+      if (r.model) {
+        try {
+          const m = JSON.parse(r.model);
+          modelId = m.id || 'unknown';
+        } catch {
+          modelId = r.model;
+        }
+      }
+
+      let mObj = day.models.find((m: any) => m.modelId === modelId);
+      if (!mObj) {
+        mObj = { modelId, cost: 0, sessions: 0, tokensIn: 0, tokensOut: 0 };
+        day.models.push(mObj);
+      }
+      mObj.cost += rowCost;
+      mObj.sessions += rowSessions;
+      mObj.tokensIn += rowTokensIn;
+      mObj.tokensOut += rowTokensOut;
+    }
+
+    const daysList = Array.from(daysMap.values());
+    for (const day of daysList) {
+      day.models.sort((a: any, b: any) => b.cost - a.cost);
+    }
+
+    return {
+      days: daysList,
+      totalCost,
+      totalSessions,
+      dbPath,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error('Failed to read OpenCode database: ' + msg);
+  }
+});
+

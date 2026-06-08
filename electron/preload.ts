@@ -71,4 +71,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // VS Code
   openVsCode: (folder: string) => ipcRenderer.invoke('vscode:open', folder),
+
+  // Statistics
+  getOpenCodeStats: () => ipcRenderer.invoke('stats:opencode'),
 });
