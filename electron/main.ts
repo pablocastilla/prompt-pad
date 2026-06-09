@@ -1155,6 +1155,42 @@ interface DayCostRow {
   tokensOut: number;
 }
 
+// ── Remote Pricing Data (models.dev) ──────────────────────────────────────────
+const PRICING_FETCH_TIMEOUT = 5000;
+
+ipcMain.handle('pricing:get', async () => {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PRICING_FETCH_TIMEOUT);
+    const response = await fetch('https://models.dev/api.json', { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await response.json();
+    const result: Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> = {};
+
+    for (const providerKey of ['opencode', 'opencode-go']) {
+      const provider = (data as Record<string, any>)[providerKey];
+      if (provider?.models) {
+        for (const [id, model] of Object.entries(provider.models)) {
+          if (typeof model !== 'object' || model === null) continue;
+          const m = model as Record<string, any>;
+          if (!m.cost || (m.cost.input === undefined && m.cost.output === undefined)) continue;
+          const entry: { input: number; output: number; cache_read?: number; cache_write?: number } = {
+            input: m.cost.input ?? 0,
+            output: m.cost.output ?? 0,
+          };
+          if (m.cost.cache_read !== undefined) entry.cache_read = m.cost.cache_read;
+          if (m.cost.cache_write !== undefined) entry.cache_write = m.cost.cache_write;
+          result[id] = entry;
+        }
+      }
+    }
+
+    return result;
+  } catch {
+    return null;
+  }
+});
+
 ipcMain.handle('stats:opencode', () => {
   const dbPath = findOpenCodeDb();
   if (!dbPath) {

@@ -235,7 +235,7 @@ The Gaudy theme is best experienced live. It features:
 - **Free filter**: a toggle to show only free models — looks for "free" in the model name. Both Go and Free filters can be combined to show only free Go models.
 - **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode brand mark) with theme-aware contrast. OpenCode uses a minimal two-image square logo set (light-theme and dark-theme variants).
 - **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
-- **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) and Go usage limits.
+- **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) sourced from [models.dev](https://models.dev/api.json) with fallback to hardcoded data.
 - **Tier badges**: Go models (`opencode-go/`) show an orange "Go" badge and Zen models (`opencode/`) show a purple "Zen" badge next to the model name for quick identification.
 - **Expensive model confirmation**: launching tier 4-5 models (including Go `max` tier models) prompts a confirmation dialog to prevent accidental high-cost launches.
 - **Pin favourite models**: press `Ctrl+1` through `Ctrl+0` while hovering a model to pin it to the top. Pinned models appear first and can be launched instantly with `1` through `0`. Press the same shortcut again to unpin.

@@ -153,7 +153,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
       // Wait for at least one model to render so we know the fetch is done
       await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
-      const goToggle = page.locator('.model-picker-go-toggle');
+      const goToggle = page.locator('.model-picker-go-toggle').first();
       await expect(goToggle).toBeVisible({ timeout: 3000 });
       const isChecked = await goToggle.locator('input[type="checkbox"]').isChecked();
       console.log(`Go filter checked (default): ${isChecked}`);
@@ -205,7 +205,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
       // Wait for at least one model to render so we know the fetch is done
       await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
-      const goToggle = page.locator('.model-picker-go-toggle');
+      const goToggle = page.locator('.model-picker-go-toggle').first();
       await expect(goToggle).toBeVisible({ timeout: 3000 });
       if (await goToggle.locator('input[type="checkbox"]').isChecked()) {
         await goToggle.click();

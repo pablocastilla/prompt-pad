@@ -86,7 +86,7 @@ test.describe('Model Cost Indicators', () => {
       await selectOpenCodeProvider(page);
 
       // Toggle "Show Go models only" off to see all models
-      const goToggle = page.locator('.model-picker-go-toggle');
+      const goToggle = page.locator('.model-picker-go-toggle').first();
       await expect(goToggle).toBeVisible({ timeout: 3000 });
       const isChecked = await goToggle.locator('input[type="checkbox"]').isChecked();
       if (isChecked) {
@@ -132,7 +132,7 @@ test.describe('Model Cost Indicators', () => {
 
       await page.waitForTimeout(3000);
 
-      const goToggle = page.locator('.model-picker-go-toggle');
+      const goToggle = page.locator('.model-picker-go-toggle').first();
       await expect(goToggle).toBeVisible({ timeout: 3000 });
       const isChecked = await goToggle.locator('input[type="checkbox"]').isChecked();
       if (isChecked) {
@@ -189,7 +189,7 @@ test.describe('Model Cost Indicators', () => {
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
       await selectOpenCodeProvider(page);
 
-      const goToggle = page.locator('.model-picker-go-toggle');
+      const goToggle = page.locator('.model-picker-go-toggle').first();
       await expect(goToggle).toBeVisible({ timeout: 3000 });
       const isChecked = await goToggle.locator('input[type="checkbox"]').isChecked();
       if (isChecked) {
@@ -283,7 +283,7 @@ test.describe('Model Cost Indicators', () => {
       await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       // Turn off the Go filter so Zen models show too.
-      const goToggle = page.locator('.model-picker-go-toggle');
+      const goToggle = page.locator('.model-picker-go-toggle').first();
       await expect(goToggle).toBeVisible({ timeout: 3000 });
       if (await goToggle.locator('input[type="checkbox"]').isChecked()) {
         await goToggle.click();
@@ -350,14 +350,13 @@ test.describe('Model Cost Indicators', () => {
       await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
 
       // Turn off the Go filter so Zen models show too.
-      const goToggle = page.locator('.model-picker-go-toggle');
+      const goToggle = page.locator('.model-picker-go-toggle').first();
       await expect(goToggle).toBeVisible({ timeout: 3000 });
       if (await goToggle.locator('input[type="checkbox"]').isChecked()) {
         await goToggle.click();
         await page.waitForTimeout(500);
       }
 
-      // Wait for the full list to be visible (re-render after toggle).
       await page.waitForFunction(() => {
         return document.querySelectorAll('.model-picker-item').length >= 16;
       }, { timeout: 10000 });
@@ -420,7 +419,7 @@ test.describe('Model Cost Indicators', () => {
       await selectOpenCodeProvider(page);
 
       await page.locator('.model-picker-item').first().waitFor({ state: 'visible', timeout: 15000 });
-      const goToggle = page.locator('.model-picker-go-toggle');
+      const goToggle = page.locator('.model-picker-go-toggle').first();
       await expect(goToggle).toBeVisible({ timeout: 3000 });
       if (await goToggle.locator('input[type="checkbox"]').isChecked()) {
         await goToggle.click();

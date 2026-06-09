@@ -9,6 +9,7 @@ import { GaudyToast } from './components/GaudyToast';
 import { ModelPicker } from './components/ModelPicker';
 import { LaunchSplash } from './components/LaunchSplash';
 import { StatsPanel } from './components/StatsPanel';
+import { initPricingData } from './types';
 import type { LaunchConfig, Phrase, Settings, Tab } from './types';
 import './App.css';
 
@@ -104,6 +105,8 @@ export default function App() {
       setLaunches(launches);
       setLaunchHistory(launchHistory ?? []);
       setLanguage(s.language === 'auto' ? detectLanguage(locale) : s.language);
+
+      initPricingData();
 
       // Restore session if there are saved tabs with content
       if (session && Array.isArray(session.tabs) && session.tabs.length > 0) {

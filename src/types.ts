@@ -78,20 +78,20 @@ interface ZenPricing {
   cachedWrite?: number;
 }
 
-interface GoPricing {
-  per5Hour: string;
-  perWeek: string;
-  perMonth: string;
+interface RemotePricing {
+  input: number;
+  output: number;
+  cache_read?: number;
+  cache_write?: number;
 }
 
+// Fallback pricing data used when the remote source cannot be reached.
 const ZEN_PRICING: Record<string, ZenPricing> = {
-  // Free models
   'big-pickle':              { input: 0,     output: 0,      cachedRead: 0 },
   'deepseek-v4-flash-free':  { input: 0,     output: 0,      cachedRead: 0 },
   'mimo-v2.5-free':          { input: 0,     output: 0,      cachedRead: 0 },
   'nemotron-3-super-free':   { input: 0,     output: 0,      cachedRead: 0 },
 
-  // Tier 1 — output < $1.50 / 1M tokens
   'gpt-5-nano':              { input: 0.05,  output: 0.40,   cachedRead: 0.005 },
   'gpt-5.4-nano':            { input: 0.20,  output: 1.25,   cachedRead: 0.02 },
   'minimax-m2.5':            { input: 0.30,  output: 1.20,   cachedRead: 0.06,  cachedWrite: 0.375 },
@@ -100,7 +100,6 @@ const ZEN_PRICING: Record<string, ZenPricing> = {
   'deepseek-v4-flash':       { input: 0.14,  output: 0.28,   cachedRead: 0.03 },
   'mimo-v2.5':               { input: 0.14,  output: 0.28,   cachedRead: 0.0028 },
 
-  // Tier 2 — $1.50 ≤ output < $3.50
   'gpt-5.1-codex-mini':      { input: 0.25,  output: 2.00,   cachedRead: 0.025 },
   'grok-build-0.1':          { input: 1.00,  output: 2.00,   cachedRead: 0.20 },
   'qwen3.7-plus':            { input: 0.40,  output: 1.60,   cachedRead: 0.04,  cachedWrite: 0.50 },
@@ -111,7 +110,6 @@ const ZEN_PRICING: Record<string, ZenPricing> = {
   'deepseek-v4-pro':         { input: 1.74,  output: 3.48,   cachedRead: 0.0145 },
   'mimo-v2.5-pro':           { input: 1.74,  output: 3.48,   cachedRead: 0.0145 },
 
-  // Tier 3 — $3.50 ≤ output < $10.00
   'kimi-k2.6':               { input: 0.95,  output: 4.00,   cachedRead: 0.16 },
   'glm-5.1':                 { input: 1.40,  output: 4.40,   cachedRead: 0.26 },
   'gpt-5.4-mini':            { input: 0.75,  output: 4.50,   cachedRead: 0.075 },
@@ -122,7 +120,6 @@ const ZEN_PRICING: Record<string, ZenPricing> = {
   'gpt-5.1-codex':           { input: 1.07,  output: 8.50,   cachedRead: 0.107 },
   'gemini-3.5-flash':        { input: 1.50,  output: 9.00,   cachedRead: 0.15 },
 
-  // Tier 4 — $10.00 ≤ output < $25.00
   'gpt-5.1-codex-max':       { input: 1.25,  output: 10.00,  cachedRead: 0.125 },
   'gemini-3.1-pro':          { input: 2.00,  output: 12.00,  cachedRead: 0.20 },
   'gpt-5.2':                 { input: 1.75,  output: 14.00,  cachedRead: 0.175 },
@@ -135,7 +132,6 @@ const ZEN_PRICING: Record<string, ZenPricing> = {
   'gpt-5.4':                 { input: 2.50,  output: 15.00,  cachedRead: 0.25 },
   'qwen3.7-max':             { input: 2.50,  output: 7.50,   cachedRead: 0.50,  cachedWrite: 3.125 },
 
-  // Tier 5 — output ≥ $25.00
   'claude-opus-4-5':         { input: 5.00,  output: 25.00,  cachedRead: 0.50,  cachedWrite: 6.25 },
   'claude-opus-4-6':         { input: 5.00,  output: 25.00,  cachedRead: 0.50,  cachedWrite: 6.25 },
   'claude-opus-4-7':         { input: 5.00,  output: 25.00,  cachedRead: 0.50,  cachedWrite: 6.25 },
@@ -145,27 +141,28 @@ const ZEN_PRICING: Record<string, ZenPricing> = {
   'gpt-5.4-pro':             { input: 30.00, output: 180.00, cachedRead: 30.00 },
   'gpt-5.5-pro':             { input: 30.00, output: 180.00, cachedRead: 30.00 },
 
-  // Deprecated models (kept for backward compatibility with history entries)
   'claude-3-5-haiku':        { input: 0.80,  output: 4.00,   cachedRead: 0.08,  cachedWrite: 1.00 },
 };
 
-const GO_PRICING: Record<string, GoPricing> = {
-  'glm-5.1':          { per5Hour: '880',    perWeek: '2,150',  perMonth: '4,300' },
-  'glm-5':            { per5Hour: '1,150',  perWeek: '2,880',  perMonth: '5,750' },
-  'kimi-k2.6':        { per5Hour: '1,150',  perWeek: '2,880',  perMonth: '5,750' },
-  'kimi-k2.5':        { per5Hour: '1,850',  perWeek: '4,630',  perMonth: '9,250' },
-  'mimo-v2.5':        { per5Hour: '30,100', perWeek: '75,200', perMonth: '150,400' },
-  'mimo-v2.5-pro':    { per5Hour: '3,250',  perWeek: '8,150',  perMonth: '16,300' },
-  'minimax-m3':       { per5Hour: '1,400',  perWeek: '3,500',  perMonth: '7,000' },
-  'minimax-m2.7':     { per5Hour: '3,400',  perWeek: '8,500',  perMonth: '17,000' },
-  'minimax-m2.5':     { per5Hour: '6,300',  perWeek: '15,900', perMonth: '31,800' },
-  'qwen3.7-max':      { per5Hour: '950',    perWeek: '2,390',  perMonth: '4,770' },
-  'qwen3.7-plus':     { per5Hour: '4,300',  perWeek: '10,800', perMonth: '21,600' },
-  'qwen3.6-plus':     { per5Hour: '3,300',  perWeek: '8,200',  perMonth: '16,300' },
-  'qwen3.5-plus':     { per5Hour: '4,300',  perWeek: '10,800', perMonth: '21,600' },
-  'deepseek-v4-pro':  { per5Hour: '3,450',  perWeek: '8,550',  perMonth: '17,150' },
-  'deepseek-v4-flash':{ per5Hour: '31,650', perWeek: '79,050', perMonth: '158,150' },
-};
+// Remote pricing data populated from https://models.dev/api.json on startup.
+let remotePricing: Record<string, RemotePricing> | null = null;
+
+export async function initPricingData(): Promise<void> {
+  try {
+    const data = await window.electronAPI.getPricingData();
+    if (data) {
+      remotePricing = data;
+    }
+  } catch {
+    // Fall back to hardcoded data
+  }
+}
+
+function findRemotePricing(modelId: string): RemotePricing | undefined {
+  if (!remotePricing) return;
+  const bare = getBareId(modelId);
+  return remotePricing[bare];
+}
 
 // Brand-new models the CLI may return before we ship a new release.
 // Anything in this map gets a tier derived from its output price, so the
@@ -200,13 +197,7 @@ function findZenPrice(modelId: string): ZenPricing | undefined {
   return ZEN_PRICING[bare];
 }
 
-function findGoPrice(modelId: string): GoPricing | undefined {
-  const bare = getBareId(modelId);
-  return GO_PRICING[bare];
-}
-
 function tierFromOutputPrice(output: number): Exclude<CostTier, 'free'> {
-  // Price brackets chosen so every tier in the Go/Zen catalog is populated.
   if (output < 1.5)   return 1;
   if (output < 3.5)   return 2;
   if (output < 10.0)  return 3;
@@ -222,26 +213,21 @@ const TIER_LABELS: Record<Exclude<CostTier, 'free'>, string> = {
   5: 'Highest cost',
 };
 
-function buildZenTooltip(id: string, zen: ZenPricing): string {
-  const fmt = (n: number) => n === 0 ? 'Free' : '$' + n.toFixed(n < 1 ? 3 : 2);
-  const parts: string[] = [];
-  parts.push(`Input: ${fmt(zen.input)}/M • Output: ${fmt(zen.output)}/M • Cached read: ${fmt(zen.cachedRead)}/M`);
-  if (zen.cachedWrite !== undefined) parts.push(`Cached write: ${fmt(zen.cachedWrite)}/M`);
+function formatPricing(n: number): string {
+  return n === 0 ? 'Free' : '$' + n.toFixed(n < 1 ? 3 : 2);
+}
+
+function buildPricingTooltip(tier: Exclude<CostTier, 'free'>, pricing: { input: number; output: number; cache_read?: number; cache_write?: number }): string {
+  const parts: string[] = [TIER_LABELS[tier]];
+  parts.push(`Input: ${formatPricing(pricing.input)}/M • Output: ${formatPricing(pricing.output)}/M`);
+  if (pricing.cache_read !== undefined) {
+    parts.push(`Cached read: ${formatPricing(pricing.cache_read)}/M`);
+  }
+  if (pricing.cache_write !== undefined) {
+    parts.push(`Cached write: ${formatPricing(pricing.cache_write)}/M`);
+  }
+  parts.push('Pricing: models.dev');
   return parts.join('\n');
-}
-
-function buildGoTooltip(id: string, label: string, go: GoPricing): string {
-  return [
-    label,
-    `Go: ${go.per5Hour} req/5h • ${go.perWeek} req/wk • ${go.perMonth} req/mo`,
-  ].join('\n');
-}
-
-function buildPricingTooltip(id: string, tier: Exclude<CostTier, 'free'>, zen: ZenPricing | undefined, go: GoPricing | undefined): string {
-  const lines: string[] = [TIER_LABELS[tier]];
-  if (zen) lines.push(buildZenTooltip(id, zen));
-  if (go) lines.push(buildGoTooltip(id, TIER_LABELS[tier], go));
-  return lines.join('\n');
 }
 
 export function getModelCostInfo(modelId: string): ModelCostInfo | undefined {
@@ -257,12 +243,18 @@ export function getModelCostInfo(modelId: string): ModelCostInfo | undefined {
     return { tier: 'free', tooltip: 'Free — no usage cost' };
   }
 
-  // Price-based tier for any Zen/Go model that we have pricing data for.
+  // Remote pricing data takes priority
+  const remote = findRemotePricing(id);
+  if (remote) {
+    const tier = tierFromOutputPrice(remote.output);
+    return { tier, tooltip: buildPricingTooltip(tier, remote) };
+  }
+
+  // Fallback to hardcoded Zen pricing
   const zen = findZenPrice(id);
-  const go  = findGoPrice(id);
   if (zen) {
     const tier = tierFromOutputPrice(zen.output);
-    return { tier, tooltip: buildPricingTooltip(id, tier, zen, go) };
+    return { tier, tooltip: buildPricingTooltip(tier, { input: zen.input, output: zen.output, cache_read: zen.cachedRead, cache_write: zen.cachedWrite }) };
   }
 
   // No pricing data — pick a tier from the model name so the indicator is
@@ -341,6 +333,7 @@ export interface ElectronAPI {
   checkForUpdates: () => Promise<boolean>;
   openVsCode: (folder: string) => Promise<boolean>;
   getOpenCodeStats: () => Promise<OpenCodeStats>;
+  getPricingData: () => Promise<Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> | null>;
 }
 
 // ── Launch History ──

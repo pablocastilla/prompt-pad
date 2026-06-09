@@ -194,10 +194,10 @@ test.describe('Model picker behavior', () => {
       await selectOpenCodeProvider(page);
 
       // Checkbox should be visible and checked by default
-      await expect(page.locator('.model-picker-go-toggle')).toBeVisible();
-      await expect(page.locator('.model-picker-go-toggle input[type="checkbox"]')).toBeChecked();
+      await expect(page.locator('.model-picker-go-toggle').first()).toBeVisible();
+      await expect(page.locator('.model-picker-go-toggle').first().locator('input[type="checkbox"]')).toBeChecked();
 
-      await expect(page.locator('.model-picker-go-toggle input[type="checkbox"]')).toBeChecked();
+      await expect(page.locator('.model-picker-go-toggle').first().locator('input[type="checkbox"]')).toBeChecked();
 
       await app.close();
     } finally {
@@ -348,8 +348,8 @@ test.describe('Model picker behavior', () => {
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
       await selectOpenCodeProvider(page);
 
-      await expect(page.locator('.model-picker-go-toggle')).toBeVisible();
-      await expect(page.locator('.model-picker-go-toggle input[type="checkbox"]')).not.toBeChecked();
+      await expect(page.locator('.model-picker-go-toggle').first()).toBeVisible();
+      await expect(page.locator('.model-picker-go-toggle').first().locator('input[type="checkbox"]')).not.toBeChecked();
 
       await app.close();
     } finally {
