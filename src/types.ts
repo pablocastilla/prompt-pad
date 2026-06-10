@@ -292,6 +292,17 @@ export interface OpenCodeStats {
   dbPath: string | null;
 }
 
+// ── GitHub PR Statistics ──
+export interface DayPRs {
+  date: string;
+  count: number;
+}
+
+export interface PRStats {
+  days: DayPRs[];
+  total: number;
+}
+
 // ── Electron API type ──
 export interface ElectronAPI {
   loadSettings: () => Promise<Settings>;
@@ -333,6 +344,7 @@ export interface ElectronAPI {
   checkForUpdates: () => Promise<boolean>;
   openVsCode: (folder: string) => Promise<boolean>;
   getOpenCodeStats: () => Promise<OpenCodeStats>;
+  getPRStats: () => Promise<PRStats>;
   getPricingData: () => Promise<Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> | null>;
 }
 

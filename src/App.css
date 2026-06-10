@@ -2486,6 +2486,31 @@ html, body, #root {
   opacity: 0.25;
 }
 
+.stats-bar-prs {
+  max-width: 28px;
+  background: #22c55e;
+  opacity: 0.5;
+}
+
+.stats-bar-pr-label {
+  font-size: 8px;
+  color: #22c55e;
+  text-align: center;
+  white-space: nowrap;
+  margin-top: 2px;
+  font-weight: 600;
+  min-height: 12px;
+  line-height: 1;
+}
+
+.stats-cli-hint {
+  font-size: 10px;
+  color: var(--text3);
+  text-align: center;
+  opacity: 0.5;
+  margin-top: 2px;
+}
+
 .stats-bar-segment {
   width: 100%;
   transition: opacity .15s;

@@ -250,8 +250,9 @@ The Gaudy theme is best experienced live. It features:
 
 ### Statistics
 - **OpenCode Spending Dashboard**: opens as a tab with a close button (×) for easy switching between stats and editor.
-- **Dual Bar Chart**: each day shows two side-by-side bars — cost (left, stacked by model) and tokens (right, split by input/output). Each scale is independent so both are always visible.
+- **Triple Bar Chart**: each day shows three bars — cost (left, stacked by model), tokens (middle, split by input/output), and GitHub PRs merged (right). Each scale is independent so all are always visible.
 - **Model Breakdown**: hover over any day to see a detailed tooltip showing exactly which models you used, how many times you fired them, and the cost per model.
+- **GitHub PRs**: when the `gh` CLI is installed and authenticated, a third bar shows how many PRs you merged each day. A summary card shows total PRs merged in the last 30 days.
 - **Native Integration**: securely connects directly to your local `opencode.db` using `better-sqlite3` to ensure your data stays on your machine.
 
 ### Auto-Updates

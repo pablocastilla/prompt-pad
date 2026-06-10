@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { t } from '../i18n';
-import type { OpenCodeDayCost, OpenCodeStats } from '../types';
+import type { OpenCodeDayCost, OpenCodeStats, PRStats, DayPRs } from '../types';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -26,7 +26,6 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-// Extract base model name for prettier display if possible
 function formatModelName(modelId: string): string {
   return modelId.replace(/^opencode(-go)?\//, '').replace(/^antigravity\//, '');
 }
@@ -55,19 +54,34 @@ function getModelColor(modelId: string) {
   return colorPalette[Math.abs(hash) % colorPalette.length];
 }
 
+interface DayData {
+  date: string;
+  cost: number;
+  sessions: number;
+  tokensIn: number;
+  tokensOut: number;
+  models: OpenCodeDayCost['models'];
+  prs: number;
+}
+
 export function StatsPanel() {
   const [data, setData] = useState<OpenCodeStats | null>(null);
+  const [prData, setPrData] = useState<PRStats>({ days: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hoveredDay, setHoveredDay] = useState<OpenCodeDayCost | null>(null);
+  const [hoveredDay, setHoveredDay] = useState<DayData | null>(null);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    window.electronAPI.getOpenCodeStats()
-      .then((result: OpenCodeStats) => {
-        setData(result);
+    Promise.all([
+      window.electronAPI.getOpenCodeStats(),
+      window.electronAPI.getPRStats(),
+    ])
+      .then(([statsResult, prResult]) => {
+        setData(statsResult);
+        setPrData(prResult);
         setLoading(false);
       })
       .catch((err: Error) => {
@@ -103,19 +117,30 @@ export function StatsPanel() {
 
   const { days, totalCost, totalSessions } = data;
 
-  // Build full 30-day array (today minus 29 days)
-  const fullMonth: OpenCodeDayCost[] = [];
+  // Build full 30-day array merging OpenCode + PR data
+  const fullMonth: DayData[] = [];
   for (let i = 29; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
-    const found = days.find(x => x.date === key);
-    fullMonth.push(found ?? { date: key, cost: 0, sessions: 0, tokensIn: 0, tokensOut: 0, models: [] });
+    const oc = days.find(x => x.date === key);
+    const pr = prData.days.find(x => x.date === key);
+    fullMonth.push({
+      date: key,
+      cost: oc?.cost ?? 0,
+      sessions: oc?.sessions ?? 0,
+      tokensIn: oc?.tokensIn ?? 0,
+      tokensOut: oc?.tokensOut ?? 0,
+      models: oc?.models ?? [],
+      prs: pr?.count ?? 0,
+    });
   }
 
   const maxCost = Math.max(...fullMonth.map(d => d.cost), 0.001);
   const maxTokens = Math.max(...fullMonth.map(d => d.tokensIn + d.tokensOut), 1);
+  const maxPrs = Math.max(...fullMonth.map(d => d.prs), 1);
   const todayStr = new Date().toISOString().slice(0, 10);
+  const hasPrData = prData.total > 0;
 
   return (
     <div className="stats-panel">
@@ -129,6 +154,12 @@ export function StatsPanel() {
           <div className="stats-card-value">{totalSessions}</div>
           <div className="stats-card-label">{t('statsSessions')}</div>
         </div>
+        {hasPrData && (
+          <div className="stats-card">
+            <div className="stats-card-value">{prData.total}</div>
+            <div className="stats-card-label">{t('statsPRsMerged')}</div>
+          </div>
+        )}
       </div>
 
       {/* Chart title */}
@@ -141,10 +172,11 @@ export function StatsPanel() {
             const pct = maxCost > 0 ? (day.cost / maxCost) * 100 : 0;
             const isToday = day.date === todayStr;
             const isHovered = hoveredDay?.date === day.date;
-            
-            // If day cost is 0, we might still want to show a tiny grey bar if there are sessions
+
             const showGreyBar = day.cost === 0 && day.sessions > 0;
             const heightPct = showGreyBar ? 2 : Math.max(pct, day.cost > 0 ? 2 : 0);
+
+            const prPct = (day.prs / maxPrs) * 100;
 
             return (
               <div
@@ -184,7 +216,7 @@ export function StatsPanel() {
                       })}
                     </div>
                   </div>
-                  {/* Tokens bar (right) */}
+                  {/* Tokens bar (middle) */}
                   <div className="stats-bar-group">
                     {(day.tokensIn + day.tokensOut) > 0 && (
                       <div className="stats-bar-token-label">{formatTokens(day.tokensIn + day.tokensOut)}</div>
@@ -209,6 +241,18 @@ export function StatsPanel() {
                       )}
                     </div>
                   </div>
+                  {/* PRs bar (right) */}
+                  {hasPrData && (
+                    <div className="stats-bar-group">
+                      {day.prs > 0 && (
+                        <div className="stats-bar-pr-label">{day.prs}</div>
+                      )}
+                      <div
+                        className="stats-bar stats-bar-prs"
+                        style={{ height: `${Math.max(prPct, day.prs > 0 ? 2 : 0)}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
                 {/* Day label */}
                 <div className={`stats-bar-label${isToday ? ' stats-bar-label-today' : ''}`}>
@@ -222,8 +266,11 @@ export function StatsPanel() {
 
       {/* Source info */}
       <div className="stats-source">
-        OpenCode · opencode.db
+        OpenCode · opencode.db{hasPrData ? ' · GitHub PRs' : ''}
       </div>
+
+      {/* gh CLI install hint */}
+      <div className="stats-cli-hint">{t('statsGHInstallHint')}</div>
 
       {/* Global fixed tooltip to prevent cutoff */}
       {hoveredDay && (
@@ -260,8 +307,14 @@ export function StatsPanel() {
                 <span>{t('statsTokensOut')}:</span>
                 <span>{formatTokens(hoveredDay.tokensOut)}</span>
               </div>
-              
-              {/* Models Breakdown */}
+
+              {hoveredDay.prs > 0 && (
+                <div className="stats-tooltip-row" style={{ marginBottom: '8px' }}>
+                  <span>{t('statsPRsMerged')}:</span>
+                  <span>{hoveredDay.prs}</span>
+                </div>
+              )}
+
               {hoveredDay.models.length > 0 && (
                 <div style={{ marginTop: '8px', borderTop: '1px dashed var(--border)', paddingTop: '8px' }}>
                   <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text3)', marginBottom: '4px', fontWeight: 600 }}>Breakdown</div>

@@ -172,4 +172,57 @@ test.describe('Statistics tab', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  test('stats panel shows gh CLI hint', async () => {
+    const testDir = getTestDir();
+    try {
+      saveSettings(testDir);
+      cleanSession(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      // Open stats
+      await page.locator('.activity-btn', { hasText: '📊' }).click();
+      await page.waitForTimeout(300);
+
+      // The gh CLI install hint should be present
+      const hint = page.locator('.stats-cli-hint');
+      await expect(hint).toBeVisible();
+      await expect(hint).not.toBeEmpty();
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('pr bars are not rendered when gh CLI is unavailable', async () => {
+    const testDir = getTestDir();
+    try {
+      saveSettings(testDir);
+      cleanSession(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      // Open stats
+      await page.locator('.activity-btn', { hasText: '📊' }).click();
+      await page.waitForTimeout(300);
+
+      // PR bars should not be present since gh CLI is unavailable in test env
+      await expect(page.locator('.stats-bar-prs')).toHaveCount(0);
+
+      // Source text should NOT mention PRs since no PR data
+      const source = page.locator('.stats-source');
+      await expect(source).toBeVisible();
+      await expect(source).not.toContainText('PR');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });

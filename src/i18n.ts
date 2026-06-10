@@ -96,6 +96,8 @@ const translations = {
     statsYesterday: 'Yesterday',
     statsTokensIn: 'Tokens in',
     statsTokensOut: 'Tokens out',
+    statsPRsMerged: 'PRs merged',
+    statsGHInstallHint: 'Install gh CLI from https://cli.github.com/ to see PR stats',
   },
   es: {
     launch: 'Lanzar', selectLaunch: 'Seleccionar lanzamiento…', noLaunches: 'Sin configuraciones aún.',
@@ -194,6 +196,8 @@ const translations = {
     statsYesterday: 'Ayer',
     statsTokensIn: 'Tokens entrada',
     statsTokensOut: 'Tokens salida',
+    statsPRsMerged: 'PRs fusionados',
+    statsGHInstallHint: 'Instala gh CLI desde https://cli.github.com/ para ver estadísticas de PRs',
   },
 } as const;
 

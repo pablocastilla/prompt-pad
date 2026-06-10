@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Statistics
   getOpenCodeStats: () => ipcRenderer.invoke('stats:opencode'),
+  getPRStats: () => ipcRenderer.invoke('prs:stats'),
 
   // Pricing data from models.dev
   getPricingData: () => ipcRenderer.invoke('pricing:get'),

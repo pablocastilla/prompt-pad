@@ -1286,3 +1286,30 @@ ipcMain.handle('stats:opencode', () => {
   }
 });
 
+// ── GitHub PR Statistics ──────────────────────────────────────────────────────
+ipcMain.handle('prs:stats', async () => {
+  try {
+    const output = await runCommand('gh', [
+      'pr', 'list',
+      '--state', 'merged',
+      '--author', '@me',
+      '--json', 'mergedAt,number',
+      '--limit', '1000',
+    ], 10000);
+    const prs = JSON.parse(output) as Array<{ mergedAt: string; number: number }>;
+    const dayCount = new Map<string, number>();
+    for (const pr of prs) {
+      if (!pr.mergedAt) continue;
+      const date = new Date(pr.mergedAt).toISOString().slice(0, 10);
+      dayCount.set(date, (dayCount.get(date) || 0) + 1);
+    }
+    const days = Array.from(dayCount.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const total = days.reduce((s, d) => s + d.count, 0);
+    return { days, total };
+  } catch {
+    return { days: [], total: 0 };
+  }
+});
+
