@@ -160,6 +160,9 @@ export function StatsPanel() {
                 <div className="stats-bar-wrapper">
                   {/* Cost bar (left) */}
                   <div className="stats-bar-group">
+                    {day.cost > 0 && (
+                      <div className="stats-bar-cost-label">{formatCost(day.cost)}</div>
+                    )}
                     <div
                       className={`stats-bar stats-bar-cost${isHovered ? ' stats-bar-hovered' : ''}`}
                       style={{ height: `${heightPct}%` }}
@@ -180,12 +183,12 @@ export function StatsPanel() {
                         );
                       })}
                     </div>
-                    {day.cost > 0 && (
-                      <div className="stats-bar-cost-label">{formatCost(day.cost)}</div>
-                    )}
                   </div>
                   {/* Tokens bar (right) */}
                   <div className="stats-bar-group">
+                    {(day.tokensIn + day.tokensOut) > 0 && (
+                      <div className="stats-bar-token-label">{formatTokens(day.tokensIn + day.tokensOut)}</div>
+                    )}
                     <div
                       className="stats-bar stats-bar-tokens"
                       style={{ height: `${Math.max((day.tokensIn + day.tokensOut) / maxTokens * 100, 1)}%` }}
@@ -205,9 +208,6 @@ export function StatsPanel() {
                         />
                       )}
                     </div>
-                    {(day.tokensIn + day.tokensOut) > 0 && (
-                      <div className="stats-bar-token-label">{formatTokens(day.tokensIn + day.tokensOut)}</div>
-                    )}
                   </div>
                 </div>
                 {/* Day label */}

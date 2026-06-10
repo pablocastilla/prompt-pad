@@ -114,13 +114,13 @@ test.describe('Statistics tab', () => {
       await page.locator('.activity-btn', { hasText: '📊' }).click();
       await page.waitForTimeout(300);
 
-      // Expect the token bars to exist inside bar columns
+      // Expect the token bars to be visible inside bar columns
       const tokenBars = page.locator('.stats-bar-tokens');
-      await expect(tokenBars.first()).toBeAttached();
+      await expect(tokenBars.first()).toBeVisible();
 
-      // Expect the cost bars to exist inside bar columns
+      // Expect the cost bars to be visible inside bar columns
       const costBars = page.locator('.stats-bar-cost');
-      await expect(costBars.first()).toBeAttached();
+      await expect(costBars.first()).toBeVisible();
 
       // Each bar column should have a wrapper containing both the cost and token bar groups
       const barCols = page.locator('.stats-bar-col');
@@ -131,6 +131,17 @@ test.describe('Statistics tab', () => {
       const groups = page.locator('.stats-bar-group');
       const groupCount = await groups.count();
       expect(groupCount).toBeGreaterThanOrEqual(56); // at least 28 days × 2 groups
+
+      // Verify bars have non-zero rendered height (regression check for percentage height resolution)
+      const firstCostBar = costBars.first();
+      const costBarBox = await firstCostBar.boundingBox();
+      expect(costBarBox).not.toBeNull();
+      expect(costBarBox!.height).toBeGreaterThan(0);
+
+      const firstTokenBar = tokenBars.first();
+      const tokenBarBox = await firstTokenBar.boundingBox();
+      expect(tokenBarBox).not.toBeNull();
+      expect(tokenBarBox!.height).toBeGreaterThan(0);
 
       await app.close();
     } finally {
