@@ -2477,6 +2477,22 @@ html, body, #root {
   filter: brightness(1.2);
 }
 
+/* Token background bar (subtle, behind cost bars) */
+.stats-bar-token-bg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  max-width: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 4px 4px 0 0;
+  background: var(--accent);
+  opacity: 0.1;
+  min-height: 1px;
+  pointer-events: none;
+}
+
 .stats-bar-hovered {
   opacity: 1;
   box-shadow: 0 0 0 2px var(--accent-dim), 0 -4px 12px color-mix(in srgb, var(--accent) 30%, transparent);

@@ -100,6 +100,35 @@ test.describe('Statistics tab', () => {
     }
   });
 
+  test('stats panel renders token background bars behind cost bars', async () => {
+    const testDir = getTestDir();
+    try {
+      saveSettings(testDir);
+      cleanSession(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      // Open stats
+      await page.locator('.activity-btn', { hasText: '📊' }).click();
+      await page.waitForTimeout(300);
+
+      // Expect the token background bars to exist inside bar columns
+      const tokenBars = page.locator('.stats-bar-token-bg');
+      await expect(tokenBars.first()).toBeAttached();
+
+      // Each bar column should have a wrapper containing both the token bg and the cost bar
+      const barCols = page.locator('.stats-bar-col');
+      const count = await barCols.count();
+      expect(count).toBeGreaterThanOrEqual(28); // at least 28 days visible
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
   test('stats tab is active when stats button is clicked', async () => {
     const testDir = getTestDir();
     try {

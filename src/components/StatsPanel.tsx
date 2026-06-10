@@ -114,6 +114,7 @@ export function StatsPanel() {
   }
 
   const maxCost = Math.max(...fullMonth.map(d => d.cost), 0.001);
+  const maxTokens = Math.max(...fullMonth.map(d => d.tokensIn + d.tokensOut), 1);
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
@@ -156,8 +157,14 @@ export function StatsPanel() {
                 onMouseMove={(e) => setHoverPosition({ x: e.clientX, y: e.clientY })}
                 onMouseLeave={() => setHoveredDay(null)}
               >
-                {/* Stacked Bar */}
+                {/* Token background bar (subtle, behind cost) */}
                 <div className="stats-bar-wrapper">
+                  {!showGreyBar && (
+                    <div
+                      className="stats-bar-token-bg"
+                      style={{ height: `${Math.max((day.tokensIn + day.tokensOut) / maxTokens * 100, 1)}%` }}
+                    />
+                  )}
                   <div
                     className={`stats-bar${isHovered ? ' stats-bar-hovered' : ''}`}
                     style={{ height: `${heightPct}%` }}
