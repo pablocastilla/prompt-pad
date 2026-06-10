@@ -2452,19 +2452,37 @@ html, body, #root {
   align-items: flex-end;
   justify-content: center;
   padding: 0 2px;
+  gap: 2px;
   position: relative;
+}
+
+.stats-bar-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 28px;
 }
 
 .stats-bar {
   width: 100%;
-  max-width: 48px;
   min-height: 2px;
-  border-radius: 4px 4px 0 0;
-  background: transparent;
+  border-radius: 3px 3px 0 0;
   display: flex;
   flex-direction: column-reverse;
   overflow: hidden;
   transition: opacity .15s, transform .15s, box-shadow .15s;
+}
+
+.stats-bar-cost {
+  max-width: 28px;
+  background: transparent;
+}
+
+.stats-bar-tokens {
+  max-width: 28px;
+  background: var(--accent);
+  opacity: 0.25;
 }
 
 .stats-bar-segment {
@@ -2477,22 +2495,6 @@ html, body, #root {
   filter: brightness(1.2);
 }
 
-/* Token background bar (subtle, behind cost bars) */
-.stats-bar-token-bg {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  max-width: 48px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 4px 4px 0 0;
-  background: var(--accent);
-  opacity: 0.1;
-  min-height: 1px;
-  pointer-events: none;
-}
-
 .stats-bar-hovered {
   opacity: 1;
   box-shadow: 0 0 0 2px var(--accent-dim), 0 -4px 12px color-mix(in srgb, var(--accent) 30%, transparent);
@@ -2500,14 +2502,26 @@ html, body, #root {
 }
 
 .stats-bar-cost-label {
-  font-size: 9px;
+  font-size: 8px;
   color: var(--text3);
   text-align: center;
   white-space: nowrap;
-  margin-top: 3px;
+  margin-top: 2px;
   font-weight: 600;
   letter-spacing: -.01em;
-  min-height: 13px;
+  min-height: 12px;
+  line-height: 1;
+}
+
+.stats-bar-token-label {
+  font-size: 8px;
+  color: var(--text2);
+  text-align: center;
+  white-space: nowrap;
+  margin-top: 2px;
+  font-weight: 500;
+  min-height: 12px;
+  line-height: 1;
 }
 
 .stats-bar-label {
@@ -2649,15 +2663,14 @@ html, body, #root {
   text-shadow: 0 0 8px rgba(255, 226, 138, .3);
 }
 
-[data-theme="gaudy"] .stats-bar {
+[data-theme="gaudy"] .stats-bar-cost {
   background: linear-gradient(180deg, #ff78c8, #ffe28a);
   opacity: .7;
 }
 
-[data-theme="gaudy"] .stats-bar-today {
-  background: linear-gradient(180deg, #ffe28a, #ff78c8);
-  opacity: 1;
-  box-shadow: 0 0 14px rgba(255, 226, 138, .3);
+[data-theme="gaudy"] .stats-bar-tokens {
+  opacity: .4;
+  background: linear-gradient(180deg, #a78bfa, #818cf8);
 }
 
 [data-theme="gaudy"] .stats-bar-hovered {
@@ -2695,13 +2708,13 @@ html, body, #root {
   color: #ff4fd8;
 }
 
-[data-theme="cyberpunk"] .stats-bar {
+[data-theme="cyberpunk"] .stats-bar-cost {
   background: linear-gradient(180deg, #47e9ff, #ff4fd8);
 }
 
-[data-theme="cyberpunk"] .stats-bar-today {
-  background: linear-gradient(180deg, #ff4fd8, #47e9ff);
-  box-shadow: 0 0 12px rgba(71, 233, 255, .25);
+[data-theme="cyberpunk"] .stats-bar-tokens {
+  opacity: .35;
+  background: linear-gradient(180deg, #22d3ee, #2dd4bf);
 }
 
 [data-theme="cyberpunk"] .stats-tooltip {

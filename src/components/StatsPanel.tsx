@@ -157,39 +157,59 @@ export function StatsPanel() {
                 onMouseMove={(e) => setHoverPosition({ x: e.clientX, y: e.clientY })}
                 onMouseLeave={() => setHoveredDay(null)}
               >
-                {/* Token background bar (subtle, behind cost) */}
                 <div className="stats-bar-wrapper">
-                  {!showGreyBar && (
+                  {/* Cost bar (left) */}
+                  <div className="stats-bar-group">
                     <div
-                      className="stats-bar-token-bg"
-                      style={{ height: `${Math.max((day.tokensIn + day.tokensOut) / maxTokens * 100, 1)}%` }}
-                    />
-                  )}
-                  <div
-                    className={`stats-bar${isHovered ? ' stats-bar-hovered' : ''}`}
-                    style={{ height: `${heightPct}%` }}
-                  >
-                    {showGreyBar && (
-                      <div className="stats-bar-segment" style={{ height: '100%', backgroundColor: 'var(--text3)' }} />
+                      className={`stats-bar stats-bar-cost${isHovered ? ' stats-bar-hovered' : ''}`}
+                      style={{ height: `${heightPct}%` }}
+                    >
+                      {showGreyBar && (
+                        <div className="stats-bar-segment" style={{ height: '100%', backgroundColor: 'var(--text3)' }} />
+                      )}
+                      {day.cost > 0 && day.models.map((m) => {
+                        const mPct = (m.cost / day.cost) * 100;
+                        if (mPct <= 0) return null;
+                        return (
+                          <div
+                            key={m.modelId}
+                            className="stats-bar-segment"
+                            style={{ height: `${mPct}%`, backgroundColor: getModelColor(m.modelId) }}
+                            title={`${formatModelName(m.modelId)}: ${formatCost(m.cost)}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    {day.cost > 0 && (
+                      <div className="stats-bar-cost-label">{formatCost(day.cost)}</div>
                     )}
-                    {day.cost > 0 && day.models.map((m) => {
-                      const mPct = (m.cost / day.cost) * 100;
-                      if (mPct <= 0) return null;
-                      return (
+                  </div>
+                  {/* Tokens bar (right) */}
+                  <div className="stats-bar-group">
+                    <div
+                      className="stats-bar stats-bar-tokens"
+                      style={{ height: `${Math.max((day.tokensIn + day.tokensOut) / maxTokens * 100, 1)}%` }}
+                    >
+                      {day.tokensIn > 0 && (
                         <div
-                          key={m.modelId}
                           className="stats-bar-segment"
-                          style={{ height: `${mPct}%`, backgroundColor: getModelColor(m.modelId) }}
-                          title={`${formatModelName(m.modelId)}: ${formatCost(m.cost)}`}
+                          style={{ height: `${(day.tokensIn / (day.tokensIn + day.tokensOut)) * 100}%`, backgroundColor: getModelColor('tokens-in') }}
+                          title={`${t('statsTokensIn')}: ${formatTokens(day.tokensIn)}`}
                         />
-                      );
-                    })}
+                      )}
+                      {day.tokensOut > 0 && (
+                        <div
+                          className="stats-bar-segment"
+                          style={{ height: `${(day.tokensOut / (day.tokensIn + day.tokensOut)) * 100}%`, backgroundColor: getModelColor('tokens-out') }}
+                          title={`${t('statsTokensOut')}: ${formatTokens(day.tokensOut)}`}
+                        />
+                      )}
+                    </div>
+                    {(day.tokensIn + day.tokensOut) > 0 && (
+                      <div className="stats-bar-token-label">{formatTokens(day.tokensIn + day.tokensOut)}</div>
+                    )}
                   </div>
                 </div>
-                {/* Cost label */}
-                {day.cost > 0 && (
-                  <div className="stats-bar-cost-label">{formatCost(day.cost)}</div>
-                )}
                 {/* Day label */}
                 <div className={`stats-bar-label${isToday ? ' stats-bar-label-today' : ''}`}>
                   {isToday ? t('statsToday') : new Date(day.date + 'T00:00:00').getDate()}

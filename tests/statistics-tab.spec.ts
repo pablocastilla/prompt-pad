@@ -100,7 +100,7 @@ test.describe('Statistics tab', () => {
     }
   });
 
-  test('stats panel renders token background bars behind cost bars', async () => {
+  test('stats panel renders side-by-side cost and token bars', async () => {
     const testDir = getTestDir();
     try {
       saveSettings(testDir);
@@ -114,14 +114,23 @@ test.describe('Statistics tab', () => {
       await page.locator('.activity-btn', { hasText: '📊' }).click();
       await page.waitForTimeout(300);
 
-      // Expect the token background bars to exist inside bar columns
-      const tokenBars = page.locator('.stats-bar-token-bg');
+      // Expect the token bars to exist inside bar columns
+      const tokenBars = page.locator('.stats-bar-tokens');
       await expect(tokenBars.first()).toBeAttached();
 
-      // Each bar column should have a wrapper containing both the token bg and the cost bar
+      // Expect the cost bars to exist inside bar columns
+      const costBars = page.locator('.stats-bar-cost');
+      await expect(costBars.first()).toBeAttached();
+
+      // Each bar column should have a wrapper containing both the cost and token bar groups
       const barCols = page.locator('.stats-bar-col');
       const count = await barCols.count();
       expect(count).toBeGreaterThanOrEqual(28); // at least 28 days visible
+
+      // Each bar column should contain two .stats-bar-group elements (cost + tokens)
+      const groups = page.locator('.stats-bar-group');
+      const groupCount = await groups.count();
+      expect(groupCount).toBeGreaterThanOrEqual(56); // at least 28 days × 2 groups
 
       await app.close();
     } finally {
