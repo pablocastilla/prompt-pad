@@ -564,8 +564,8 @@ test.describe('Provider picker navigation', () => {
       await page.evaluate(() => {
         const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
         (api as { getAntigravityModels: () => Promise<unknown> }).getAntigravityModels = async () => [
-          { id: 'antigravity/default', label: 'Default' },
-          { id: 'antigravity/pro', label: 'Pro' },
+          { id: 'Gemini 3.5 Flash (Medium)', label: 'Gemini 3.5 Flash (Medium)' },
+          { id: 'Claude Sonnet 4.6 (Thinking)', label: 'Claude Sonnet 4.6 (Thinking)' },
         ];
       });
 

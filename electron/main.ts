@@ -10,7 +10,7 @@ const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
 const DEFAULT_MODEL = 'claude-sonnet-4.6';
 const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.7';
-const DEFAULT_ANTIGRAVITY_MODEL = 'antigravity/default';
+const DEFAULT_ANTIGRAVITY_MODEL = 'Gemini 3.5 Flash (Medium)';
 
 // Maximum reasoning effort supported by each model
 const MODEL_MAX_EFFORT: Record<string, string> = {
@@ -133,16 +133,8 @@ function parseOpenCodeModels(raw: string): Array<{ id: string; label: string }> 
 }
 
 function parseAntigravityModels(raw: string): Array<{ id: string; label: string }> {
-  const unique = new Map<string, { id: string; label: string }>();
-  for (const line of raw.split(/\r?\n/)) {
-    const clean = line.trim();
-    if (!clean.startsWith('antigravity/')) continue;
-    unique.set(clean, {
-      id: clean,
-      label: clean.replace(/^antigravity\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    });
-  }
-  return [...unique.values()];
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  return lines.map(name => ({ id: name, label: name }));
 }
 
 function parseCopilotModels(raw: string): Array<{ id: string; label: string }> {
@@ -377,13 +369,29 @@ ipcMain.handle('models:get-opencode', async () => {
 
 ipcMain.handle('models:get-antigravity', async () => {
   if (antigravityModelsCache && antigravityModelsCache.length > 0) return antigravityModelsCache;
-  const output = await runCommand('agy.exe', ['models'], 8000);
-  const parsed = parseAntigravityModels(output);
-  if (parsed.length === 0) {
-    throw new Error('No models returned from antigravity CLI');
+  try {
+    const output = await runCommand('agy.exe', ['models'], 8000);
+    const parsed = parseAntigravityModels(output);
+    if (parsed.length > 0) {
+      antigravityModelsCache = parsed;
+      return parsed;
+    }
+  } catch {
+    // CLI failed, fall through to fallback
   }
-  antigravityModelsCache = parsed;
-  return parsed;
+  // Fallback list from agy CLI docs (v1.0.7)
+  const fallback: Array<{ id: string; label: string }> = [
+    { id: 'Gemini 3.5 Flash (Medium)', label: 'Gemini 3.5 Flash (Medium)' },
+    { id: 'Gemini 3.5 Flash (High)',   label: 'Gemini 3.5 Flash (High)' },
+    { id: 'Gemini 3.5 Flash (Low)',    label: 'Gemini 3.5 Flash (Low)' },
+    { id: 'Gemini 3.1 Pro (Low)',      label: 'Gemini 3.1 Pro (Low)' },
+    { id: 'Gemini 3.1 Pro (High)',     label: 'Gemini 3.1 Pro (High)' },
+    { id: 'Claude Sonnet 4.6 (Thinking)', label: 'Claude Sonnet 4.6 (Thinking)' },
+    { id: 'Claude Opus 4.6 (Thinking)',   label: 'Claude Opus 4.6 (Thinking)' },
+    { id: 'GPT-OSS 120B (Medium)',     label: 'GPT-OSS 120B (Medium)' },
+  ];
+  antigravityModelsCache = fallback;
+  return fallback;
 });
 
 ipcMain.handle('models:clear-cache', () => {
@@ -627,9 +635,10 @@ async function executeLaunchAntigravity(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
 }) {
-  const { folder, yolo, prompt, attachedFilePaths = [] } = config;
+  const { folder, yolo, prompt, mode, attachedFilePaths = [] } = config;
   const model = normalizeAntigravityModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
+  const isInteractive = mode === 'interactive';
   const id = Date.now().toString();
 
   const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
@@ -653,16 +662,23 @@ async function executeLaunchAntigravity(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  const message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  if (attachedFileNames.length > 0) {
+    message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
+  }
+
   const safeDir = escapeSingleQuotePS(workDir);
   const safeModel = escapeSingleQuotePS(model);
+  const safeMsg = escapeSingleQuotePS(message);
   const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
+  const yoloArg = yolo ? "'--dangerously-skip-permissions'" : '';
 
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-ag-' + id + '.ps1');
+    const interactiveArg = isInteractive ? "'-i'" : "'-p'";
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
-      "$agArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "')",
+      "$agArgs = @('--model', '" + safeModel + "'" + (yoloArg ? ", " + yoloArg : '') + ", " + interactiveArg + ", '" + safeMsg + "')",
       "& agy.exe @agArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
@@ -680,10 +696,12 @@ async function executeLaunchAntigravity(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-ag-' + id + '.sh');
+    const yoloArgNix = yolo ? ' --dangerously-skip-permissions' : '';
+    const modeFlag = isInteractive ? '-i' : '-p';
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'agy.exe run --model ' + JSON.stringify(model) + ' --dir ' + JSON.stringify(workDir) + ' ' + JSON.stringify(message),
+      'agy.exe --model ' + JSON.stringify(model) + yoloArgNix + ' ' + modeFlag + ' ' + JSON.stringify(message),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');
