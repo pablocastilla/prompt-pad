@@ -226,8 +226,12 @@ export function ModelPicker() {
     listEl.scrollTop = 0;
   }, [pendingLaunch, allModels.length, tool]);
 
+  const setShowGitPanel = useStore(s => s.setShowGitPanel);
+  const setGitFolder = useStore(s => s.setGitFolder);
+
   const launchWithModel = async (toolForLaunch: LaunchTool, model: string) => {
     if (!pendingLaunch) return;
+    const folder = pendingLaunch.launch.folder;
     setPendingLaunch(null);
     const entry: LaunchHistoryEntry = {
       id: uid(),
@@ -237,7 +241,7 @@ export function ModelPicker() {
       model,
       prompt: pendingLaunch.prompt,
       timestamp: Date.now(),
-      folder: pendingLaunch.launch.folder,
+      folder,
     };
     addLaunchHistoryEntry(entry);
     const updated = [entry, ...launchHistory].slice(0, 100);
@@ -245,12 +249,16 @@ export function ModelPicker() {
     await window.electronAPI.executeLaunch({
       tool: toolForLaunch,
       model,
-      folder: pendingLaunch.launch.folder,
+      folder,
       yolo: true,
       prompt: pendingLaunch.prompt,
       mode: 'interactive',
       attachedFilePaths: pendingLaunch.attachedFilePaths,
     });
+    if (folder) {
+      setGitFolder(folder);
+      setShowGitPanel(true);
+    }
     if (settings.theme === 'gaudy') {
       triggerLaunchSplash();
       addToast(t('gaudyLaunch'));

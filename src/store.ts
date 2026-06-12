@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry } from './types';
+import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry, GitFile } from './types';
 
 type ActivePanel = 'launches' | 'phrases' | 'settings' | 'history' | 'statistics' | null;
 
@@ -60,6 +60,16 @@ interface AppState {
   setPendingLaunch: (data: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[] } | null) => void;
   launchSplash: number;
   triggerLaunchSplash: () => void;
+  showGitPanel: boolean;
+  gitFolder: string | null;
+  gitFiles: GitFile[];
+  selectedGitFile: string | null;
+  gitFileDiff: string;
+  setShowGitPanel: (show: boolean) => void;
+  setGitFolder: (folder: string | null) => void;
+  setGitFiles: (files: GitFile[]) => void;
+  setSelectedGitFile: (file: string | null) => void;
+  setGitFileDiff: (diff: string) => void;
 }
 
 const initialTab = createTab();
@@ -195,4 +205,14 @@ export const useStore = create<AppState>((set, get) => ({
   setPendingLaunch: (data) => set({ pendingLaunch: data }),
   launchSplash: 0,
   triggerLaunchSplash: () => set(s => ({ launchSplash: s.launchSplash + 1 })),
+  showGitPanel: false,
+  gitFolder: null,
+  gitFiles: [],
+  selectedGitFile: null,
+  gitFileDiff: '',
+  setShowGitPanel: (show) => set({ showGitPanel: show }),
+  setGitFolder: (folder) => set({ gitFolder: folder }),
+  setGitFiles: (files) => set({ gitFiles: files }),
+  setSelectedGitFile: (file) => set({ selectedGitFile: file }),
+  setGitFileDiff: (diff) => set({ gitFileDiff: diff }),
 }));

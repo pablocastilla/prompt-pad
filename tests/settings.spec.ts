@@ -21,7 +21,7 @@ function cleanSettings(testDir: string) {
 }
 
 async function openSettings(page: import('@playwright/test').Page) {
-  await page.locator('.activity-btn').nth(3).click();
+  await page.locator('.activity-btn').nth(4).click();
   await expect(page.locator('.settings-panel')).toBeVisible();
 }
 

@@ -303,6 +303,12 @@ export interface PRStats {
   total: number;
 }
 
+// ── Git integration ──
+export interface GitFile {
+  path: string;
+  status: string;
+}
+
 // ── Electron API type ──
 export interface ElectronAPI {
   loadSettings: () => Promise<Settings>;
@@ -346,6 +352,8 @@ export interface ElectronAPI {
   getOpenCodeStats: () => Promise<OpenCodeStats>;
   getPRStats: () => Promise<PRStats>;
   getPricingData: () => Promise<Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> | null>;
+  getGitStatus: (folder: string) => Promise<GitFile[]>;
+  getGitDiff: (folder: string, filePath: string) => Promise<string>;
 }
 
 // ── Launch History ──

@@ -1304,6 +1304,35 @@ ipcMain.handle('stats:opencode', () => {
   }
 });
 
+// ── Git integration ───────────────────────────────────────────────────────────
+ipcMain.handle('git:status', async (_e, folder: string) => {
+  if (!folder) return [];
+  try {
+    const output = await runCommand('git', ['-C', folder, 'status', '--porcelain'], 8000);
+    const files: Array<{ path: string; status: string }> = [];
+    for (const line of output.split(/\r?\n/)) {
+      const cleaned = line.replace(/\r$/, '');
+      if (!cleaned.trim()) continue;
+      const status = cleaned.slice(0, 2).trim();
+      const filePath = cleaned.slice(3).trim();
+      files.push({ path: filePath, status });
+    }
+    return files;
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('git:diff', async (_e, folder: string, filePath: string) => {
+  if (!folder || !filePath) return '';
+  try {
+    const out = await runCommand('git', ['-C', folder, 'diff', '--', filePath], 8000);
+    return out.replace(/\r\n/g, '\n');
+  } catch {
+    return '';
+  }
+});
+
 // ── GitHub PR Statistics ──────────────────────────────────────────────────────
 ipcMain.handle('prs:stats', async () => {
   try {

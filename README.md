@@ -214,6 +214,14 @@ The Gaudy theme is best experienced live. It features:
 - **Open folder in VS Code**: each launch shortcut can also open the launch folder in VS Code using a configurable modifier in Settings (`Ctrl+Shift`, `Ctrl+Alt`, or `Ctrl+Alt+Shift`).
 - **Pin favourite models**: pin OpenCode models in the picker for quick access with number keys.
 
+### Git Changes Panel
+- **Auto-opening panel**: after launching a prompt, a right-side panel opens showing all files modified in the launch folder's git repository.
+- **Live file list**: displays all changed, added, deleted, and untracked files with colour-coded status indicators (`M` for modified, `A` for added, `D` for deleted, `?` for untracked).
+- **Auto-refresh**: the file list refreshes every 7 seconds so you can track changes as the AI works.
+- **Inline diff viewer**: click any file to see the full unified diff with syntax-coloured additions and removals — no need to switch to a terminal.
+- **Per-project tracking**: each launch config points to its own folder, so the panel automatically tracks the right repository when you switch between projects.
+- **Graceful degradation**: shows "No changes detected" for clean repos or non-git folders.
+
 ### Launch History
 - **Every launch remembered**: prompt text, provider, model, and folder — all saved automatically.
 - **Grouped by launcher**: entries organized under their launch config name with collapsible groups.

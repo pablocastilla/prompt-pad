@@ -9,6 +9,7 @@ import { GaudyToast } from './components/GaudyToast';
 import { ModelPicker } from './components/ModelPicker';
 import { LaunchSplash } from './components/LaunchSplash';
 import { StatsPanel } from './components/StatsPanel';
+import { GitDiffPanel } from './components/GitDiffPanel';
 import { initPricingData } from './types';
 import type { LaunchConfig, Phrase, Settings, Tab } from './types';
 import './App.css';
@@ -271,6 +272,7 @@ export default function App() {
         <ActivityBar />
         {activePanel && <SidePanel />}
         {activeTab?.content === '__STATS__' ? <StatsPanel /> : <Editor key={activeTabId} />}
+        <GitDiffPanel />
       </div>
       {toasts.length > 0 && <GaudyToast />}
 
