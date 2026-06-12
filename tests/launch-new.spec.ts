@@ -294,7 +294,7 @@ test.describe('Launch configuration form', () => {
 });
 
 test.describe('Provider picker navigation', () => {
-  test('provider picker shows exactly 5 providers in opencode/copilot/claude-code/codex/gemini order', async () => {
+  test('provider picker shows exactly 5 providers in opencode/copilot/claude-code/codex/antigravity order', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -324,7 +324,7 @@ test.describe('Provider picker navigation', () => {
       await expect(providers).toHaveCount(5);
 
       const providerNames = await providers.evaluateAll((els) => els.map((el) => el.getAttribute('data-provider')));
-      expect(providerNames).toEqual(['opencode', 'copilot', 'claude-code', 'codex', 'gemini']);
+      expect(providerNames).toEqual(['opencode', 'copilot', 'claude-code', 'codex', 'antigravity']);
 
       // Each item shows its numeric shortcut (1..5)
       for (let i = 0; i < 5; i++) {
@@ -547,7 +547,7 @@ test.describe('Provider picker navigation', () => {
     }
   });
 
-  test('numeric key 5 launches gemini directly without model picker', async () => {
+  test('numeric key 5 opens model picker for antigravity (it has a model API)', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -561,6 +561,14 @@ test.describe('Provider picker navigation', () => {
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
 
+      await page.evaluate(() => {
+        const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
+        (api as { getAntigravityModels: () => Promise<unknown> }).getAntigravityModels = async () => [
+          { id: 'antigravity/default', label: 'Default' },
+          { id: 'antigravity/pro', label: 'Pro' },
+        ];
+      });
+
       await page.locator('.editor-textarea').fill('test prompt');
       await page.waitForTimeout(100);
 
@@ -570,11 +578,13 @@ test.describe('Provider picker navigation', () => {
       await page.keyboard.press('5');
       await page.waitForTimeout(500);
 
-      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      // Antigravity has a model picker, so the overlay stays visible with the model list
+      await expect(page.locator('.model-picker-list')).toBeVisible();
+      await expect(page.locator('.provider-picker-list')).not.toBeVisible();
 
+      // No launch call should have happened yet (still in model picker)
       const calls = readLaunchCalls(testDir);
-      expect(calls).toHaveLength(1);
-      expect(calls[0].tool).toBe('gemini');
+      expect(calls).toHaveLength(0);
 
       await app.close();
     } finally {

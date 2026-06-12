@@ -7,7 +7,7 @@ export interface Phrase {
 }
 
 // ── Launch Configuration ──
-// 'copilot' and 'antigravity' are kept for backward compatibility with old launch history entries.
+// 'gemini' is kept for backward compatibility with old launch history entries.
 export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex' | 'gemini';
 
 export interface LaunchConfig {
