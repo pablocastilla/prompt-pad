@@ -49,9 +49,19 @@ export function ToolIcon({ tool, size = 14, className }: ToolIconProps) {
   }
   if (tool === 'antigravity') {
     return (
-      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" className={className}>
-        <circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M2.5 12h19" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <svg viewBox="8 12 92 92" width={size} height={size} aria-hidden="true" className={className}>
+        <defs>
+          <linearGradient id="antigravity-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#3186FF" />
+            <stop offset="35%" stopColor="#00B95C" />
+            <stop offset="70%" stopColor="#FFE432" />
+            <stop offset="100%" stopColor="#FC413D" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M89.6992 93.695C94.3659 97.195 101.366 94.8617 94.9492 88.445C75.6992 69.7783 79.7825 18.445 55.8659 18.445C31.9492 18.445 36.0325 69.7783 16.7825 88.445C9.78251 95.445 17.3658 97.195 22.0325 93.695C40.1159 81.445 38.9492 59.8617 55.8659 59.8617C72.7825 59.8617 71.6159 81.445 89.6992 93.695Z"
+          fill="url(#antigravity-gradient)"
+        />
       </svg>
     );
   }
