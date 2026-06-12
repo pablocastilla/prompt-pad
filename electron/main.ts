@@ -1323,10 +1323,27 @@ ipcMain.handle('git:status', async (_e, folder: string) => {
   }
 });
 
-ipcMain.handle('git:diff', async (_e, folder: string, filePath: string) => {
+ipcMain.handle('git:diff', async (_e, folder: string, filePath: string, status?: string) => {
   if (!folder || !filePath) return '';
+  const raw = status?.trim() || '';
+
+  // Untracked files: show the file content as all additions
+  if (raw === '?' || raw === '??') {
+    try {
+      const fullPath = path.resolve(folder, filePath);
+      const content = fs.readFileSync(fullPath, 'utf-8');
+      const lines = content.split(/\r?\n/);
+      const header = `--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n`;
+      const body = lines.map(l => `+${l}`).join('\n');
+      return header + body;
+    } catch {
+      return '';
+    }
+  }
+
+  // Tracked files: show combined staged + unstaged diff against HEAD
   try {
-    const out = await runCommand('git', ['-C', folder, 'diff', '--', filePath], 8000);
+    const out = await runCommand('git', ['-C', folder, 'diff', 'HEAD', '--', filePath], 8000);
     return out.replace(/\r\n/g, '\n');
   } catch {
     return '';

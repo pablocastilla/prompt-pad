@@ -62,6 +62,51 @@ export function GitDiffPanel() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const diffRef = useRef<HTMLDivElement | null>(null);
 
+  const [panelWidth, setPanelWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('gitPanelWidth');
+      return saved ? Math.max(180, Math.min(800, Number(saved))) : 320;
+    }
+    return 320;
+  });
+  const panelWidthRef = useRef(panelWidth);
+  const resizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = panelWidth;
+    panelWidthRef.current = panelWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = e.clientX - startXRef.current;
+      const newWidth = Math.max(180, Math.min(800, startWidthRef.current + delta));
+      panelWidthRef.current = newWidth;
+      setPanelWidth(newWidth);
+    };
+    const handleMouseUp = () => {
+      if (!resizingRef.current) return;
+      resizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem('gitPanelWidth', String(panelWidthRef.current));
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   const refreshStatus = async () => {
     if (!gitFolder) return;
     setLoading(true);
@@ -75,10 +120,10 @@ export function GitDiffPanel() {
     }
   };
 
-  const refreshDiff = async (filePath: string) => {
+  const refreshDiff = async (filePath: string, status?: string) => {
     if (!gitFolder) return;
     try {
-      const diff = await window.electronAPI.getGitDiff(gitFolder, filePath);
+      const diff = await window.electronAPI.getGitDiff(gitFolder, filePath, status);
       setGitFileDiff(diff);
     } catch {
       setGitFileDiff('');
@@ -108,11 +153,12 @@ export function GitDiffPanel() {
 
   useEffect(() => {
     if (selectedGitFile) {
-      refreshDiff(selectedGitFile);
+      const file = gitFiles.find(f => f.path === selectedGitFile);
+      refreshDiff(selectedGitFile, file?.status);
     } else {
       setGitFileDiff('');
     }
-  }, [selectedGitFile]);
+  }, [selectedGitFile, gitFiles]);
 
   useEffect(() => {
     if (diffRef.current) {
@@ -140,7 +186,8 @@ export function GitDiffPanel() {
   const diffLines = gitFileDiff ? gitFileDiff.split('\n') : [];
 
   return (
-    <div className="git-panel">
+    <div className="git-panel" style={{ width: panelWidth }}>
+      <div className="git-panel-resize-handle" onMouseDown={handleResizeStart} />
       <div className="git-panel-header">
         <span className="git-panel-title">Git Changes</span>
         <div className="git-panel-header-actions">

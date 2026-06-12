@@ -78,7 +78,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Git integration
   getGitStatus: (folder: string) => ipcRenderer.invoke('git:status', folder),
-  getGitDiff: (folder: string, filePath: string) => ipcRenderer.invoke('git:diff', folder, filePath),
+  getGitDiff: (folder: string, filePath: string, status?: string) => ipcRenderer.invoke('git:diff', folder, filePath, status),
 
   // Pricing data from models.dev
   getPricingData: () => ipcRenderer.invoke('pricing:get'),

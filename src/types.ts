@@ -353,7 +353,7 @@ export interface ElectronAPI {
   getPRStats: () => Promise<PRStats>;
   getPricingData: () => Promise<Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> | null>;
   getGitStatus: (folder: string) => Promise<GitFile[]>;
-  getGitDiff: (folder: string, filePath: string) => Promise<string>;
+  getGitDiff: (folder: string, filePath: string, status?: string) => Promise<string>;
 }
 
 // ── Launch History ──

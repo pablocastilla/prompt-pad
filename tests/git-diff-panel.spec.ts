@@ -489,4 +489,195 @@ test.describe('Git diff panel', () => {
     }
   });
 
+  test('diff shows staged changes', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'staged-repo');
+      fs.mkdirSync(repoDir, { recursive: true });
+      execSync('git init', { cwd: repoDir });
+      execSync('git config user.email test@test.com', { cwd: repoDir });
+      execSync('git config user.name Test', { cwd: repoDir });
+      fs.writeFileSync(path.join(repoDir, 'main.ts'), '// original\n');
+      execSync('git add main.ts', { cwd: repoDir });
+      execSync('git commit -m "initial"', { cwd: repoDir });
+      // Stage a change
+      fs.writeFileSync(path.join(repoDir, 'main.ts'), '// original\n// staged change\n');
+      execSync('git add main.ts', { cwd: repoDir });
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Staged Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+
+      await page.locator('.git-panel-file').first().click();
+      await page.waitForTimeout(500);
+
+      await expect(page.locator('.git-panel-diff-filename')).toBeVisible();
+      await expect(page.locator('.git-diff-content')).toBeVisible();
+      const diffText = await page.locator('.git-diff-content').textContent();
+      expect(diffText).toContain('staged change');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('diff shows untracked file content', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'untracked-repo');
+      fs.mkdirSync(repoDir, { recursive: true });
+      execSync('git init', { cwd: repoDir });
+      execSync('git config user.email test@test.com', { cwd: repoDir });
+      execSync('git config user.name Test', { cwd: repoDir });
+      fs.writeFileSync(path.join(repoDir, 'existing.ts'), '// existing\n');
+      execSync('git add existing.ts', { cwd: repoDir });
+      execSync('git commit -m "initial"', { cwd: repoDir });
+      // Create an untracked file
+      fs.writeFileSync(path.join(repoDir, 'new-file.ts'), 'const y = 2;\n');
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Untracked Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+
+      // Click on the untracked file
+      const untrackedFile = page.locator('.git-file-status.git-status-untracked').first();
+      await untrackedFile.locator('..').click();
+      await page.waitForTimeout(500);
+
+      await expect(page.locator('.git-panel-diff-filename')).toBeVisible();
+      await expect(page.locator('.git-diff-content')).toBeVisible();
+      const diffText = await page.locator('.git-diff-content').textContent();
+      expect(diffText).toContain('const y = 2;');
+      expect(diffText).toContain('+const y = 2;');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('git panel has resize handle', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'resize-repo');
+      initGitRepo(repoDir);
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Resize Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.git-panel-resize-handle')).toBeVisible();
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('git panel resize changes width', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'resize-repo-2');
+      initGitRepo(repoDir);
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Resize Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+
+      const handle = page.locator('.git-panel-resize-handle');
+      const box = await handle.boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) return;
+
+      const startX = box.x + box.width / 2;
+      const startY = box.y + box.height / 2;
+
+      // Drag left by 100px to make panel narrower
+      const page2 = page;
+      await page2.mouse.move(startX, startY);
+      await page2.mouse.down();
+      await page2.mouse.move(startX - 100, startY, { steps: 5 });
+      await page2.mouse.up();
+      await page.waitForTimeout(300);
+
+      const newBox = await page.locator('.git-panel').boundingBox();
+      expect(newBox).not.toBeNull();
+      if (!newBox) return;
+      // Width should be less than default 320 (approximately 220)
+      expect(newBox.width).toBeLessThan(300);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
 });
