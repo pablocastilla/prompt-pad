@@ -88,7 +88,7 @@ export function GitDiffPanel() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!resizingRef.current) return;
       const delta = e.clientX - startXRef.current;
-      const newWidth = Math.max(180, Math.min(800, startWidthRef.current + delta));
+      const newWidth = Math.max(180, Math.min(800, startWidthRef.current - delta));
       panelWidthRef.current = newWidth;
       setPanelWidth(newWidth);
     };

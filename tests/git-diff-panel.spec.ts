@@ -624,7 +624,6 @@ test.describe('Git diff panel', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
-
   test('git panel resize changes width', async () => {
     const testDir = getTestDir();
     try {
@@ -647,6 +646,7 @@ test.describe('Git diff panel', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+
       await page.keyboard.press('3');
       await page.waitForTimeout(1000);
 
@@ -660,19 +660,184 @@ test.describe('Git diff panel', () => {
       const startX = box.x + box.width / 2;
       const startY = box.y + box.height / 2;
 
-      // Drag left by 100px to make panel narrower
       const page2 = page;
+
+      // Drag right by 100px to make panel narrower
       await page2.mouse.move(startX, startY);
       await page2.mouse.down();
-      await page2.mouse.move(startX - 100, startY, { steps: 5 });
+      await page2.mouse.move(startX + 100, startY, { steps: 5 });
       await page2.mouse.up();
       await page.waitForTimeout(300);
 
       const newBox = await page.locator('.git-panel').boundingBox();
       expect(newBox).not.toBeNull();
       if (!newBox) return;
-      // Width should be less than default 320 (approximately 220)
+      // Width should be less than default 320 (approximately 220 after dragging right)
       expect(newBox.width).toBeLessThan(300);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('git panel resize in opposite direction', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'resize-repo-3');
+      initGitRepo(repoDir);
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Resize Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+
+      const handle = page.locator('.git-panel-resize-handle');
+      const box = await handle.boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) return;
+
+      const startX = box.x + box.width / 2;
+      const startY = box.y + box.height / 2;
+
+      // Drag left by 100px to make panel wider
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX - 100, startY, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+
+      const newBox = await page.locator('.git-panel').boundingBox();
+      expect(newBox).not.toBeNull();
+      if (!newBox) return;
+      // Width should be greater than default 320
+      expect(newBox.width).toBeGreaterThan(330);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('git panel resize persists width in localStorage', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'resize-repo-4');
+      initGitRepo(repoDir);
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Resize Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+
+      const handle = page.locator('.git-panel-resize-handle');
+      const box = await handle.boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) return;
+
+      const startX = box.x + box.width / 2;
+      const startY = box.y + box.height / 2;
+
+      // Drag right to shrink
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + 80, startY, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+
+      const newBox = await page.locator('.git-panel').boundingBox();
+      expect(newBox).not.toBeNull();
+      if (!newBox) return;
+
+      // Get the saved width from localStorage
+      const savedWidth = await page.evaluate(() => localStorage.getItem('gitPanelWidth'));
+      expect(savedWidth).not.toBeNull();
+      expect(Number(savedWidth)).toBeCloseTo(newBox.width, -1);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('git panel resize respects min width', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'resize-repo-5');
+      initGitRepo(repoDir);
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Resize Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+
+      const handle = page.locator('.git-panel-resize-handle');
+      const box = await handle.boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) return;
+
+      const startX = box.x + box.width / 2;
+      const startY = box.y + box.height / 2;
+
+      // Drag right by a huge amount (min width is 180, default is 320, so dragging 500px should hit min)
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + 500, startY, { steps: 10 });
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+
+      const newBox = await page.locator('.git-panel').boundingBox();
+      expect(newBox).not.toBeNull();
+      if (!newBox) return;
+      // Should not go below 180px
+      expect(newBox.width).toBeGreaterThanOrEqual(180);
 
       await app.close();
     } finally {
