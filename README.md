@@ -220,7 +220,7 @@ The Gaudy theme is best experienced live. It features:
 - **Auto-refresh**: the file list refreshes every 7 seconds so you can track changes as the AI works.
 - **Inline diff viewer**: click any file to see the full unified diff with syntax-coloured additions and removals. Supports staged, unstaged, and untracked files — staged changes and untracked file content are displayed alongside standard unstaged diffs.
 - **Resizable panel**: drag the left edge of the panel to expand or reduce its width. The size persists across sessions.
-- **Per-project tracking**: each launch config points to its own folder, so the panel automatically tracks the right repository when you switch between projects.
+- **Per-tab tracking**: each tab remembers the folder it was launched against. Switching tabs shows that tab's git changes, and tabs with no launch show no panel. This lets you fire prompts at different projects from different tabs and track each one independently.
 - **Graceful degradation**: shows "No changes detected" for clean repos or non-git folders.
 
 ### Launch History

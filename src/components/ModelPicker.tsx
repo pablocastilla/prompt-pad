@@ -226,12 +226,13 @@ export function ModelPicker() {
     listEl.scrollTop = 0;
   }, [pendingLaunch, allModels.length, tool]);
 
-  const setShowGitPanel = useStore(s => s.setShowGitPanel);
-  const setGitFolder = useStore(s => s.setGitFolder);
+  const activeTabId = useStore(s => s.activeTabId);
+  const setTabLaunchFolder = useStore(s => s.setTabLaunchFolder);
 
   const launchWithModel = async (toolForLaunch: LaunchTool, model: string) => {
     if (!pendingLaunch) return;
     const folder = pendingLaunch.launch.folder;
+    const tabId = activeTabId;
     setPendingLaunch(null);
     const entry: LaunchHistoryEntry = {
       id: uid(),
@@ -255,9 +256,8 @@ export function ModelPicker() {
       mode: 'interactive',
       attachedFilePaths: pendingLaunch.attachedFilePaths,
     });
-    if (folder) {
-      setGitFolder(folder);
-      setShowGitPanel(true);
+    if (folder && tabId) {
+      setTabLaunchFolder(tabId, folder);
     }
     if (settings.theme === 'gaudy') {
       triggerLaunchSplash();

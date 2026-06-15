@@ -791,7 +791,6 @@ test.describe('Git diff panel', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
-
   test('git panel resize respects min width', async () => {
     const testDir = getTestDir();
     try {
@@ -814,6 +813,7 @@ test.describe('Git diff panel', () => {
 
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+
       await page.keyboard.press('3');
       await page.waitForTimeout(1000);
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -838,6 +838,163 @@ test.describe('Git diff panel', () => {
       if (!newBox) return;
       // Should not go below 180px
       expect(newBox.width).toBeGreaterThanOrEqual(180);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('git panel hides when switching to a tab with no launch', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'tab-switch-repo');
+      initGitRepo(repoDir);
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'My Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      // Launch
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+
+      // Add a new blank tab
+      await page.locator('.tab-add').click();
+      await page.waitForTimeout(300);
+
+      // Git panel should not be visible on the new tab
+      await expect(page.locator('.git-panel')).toHaveCount(0);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('git panel shows again when switching back to launched tab', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir = path.join(testDir, 'tab-switch-back-repo');
+      initGitRepo(repoDir);
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'My Repo', folder: repoDir },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      // Launch from tab 1
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+
+      // Add a new blank tab
+      await page.locator('.tab-add').click();
+      await page.waitForTimeout(300);
+      await expect(page.locator('.git-panel')).toHaveCount(0);
+
+      // Switch back to the first tab
+      await page.locator('.tab').first().click();
+      await page.waitForTimeout(300);
+
+      // Git panel should be visible again
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.git-panel-title')).toHaveText('Git Changes');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('git panel shows correct folder files per tab', async () => {
+    const testDir = getTestDir();
+    try {
+      const repoDir1 = path.join(testDir, 'per-tab-repo1');
+      initGitRepo(repoDir1);
+      const repoDir2 = path.join(testDir, 'per-tab-repo2');
+      fs.mkdirSync(repoDir2, { recursive: true });
+      execSync('git init', { cwd: repoDir2 });
+      execSync('git config user.email test@test.com', { cwd: repoDir2 });
+      execSync('git config user.name Test', { cwd: repoDir2 });
+      fs.writeFileSync(path.join(repoDir2, 'main.ts'), '// main\n');
+      execSync('git add main.ts', { cwd: repoDir2 });
+      execSync('git commit -m "init"', { cwd: repoDir2 });
+      fs.writeFileSync(path.join(repoDir2, 'main.ts'), '// main\n// modified\n');
+
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Repo 1', folder: repoDir1, shortcut: '1' },
+        { id: 'l2', name: 'Repo 2', folder: repoDir2, shortcut: '2' },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      // Fill tab 1 and launch with repo1
+      await page.locator('.editor-textarea').fill('launch repo1');
+      await page.waitForTimeout(100);
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+      let paths1 = await page.locator('.git-file-path').allTextContents();
+      expect(paths1).toContain('readme.md');
+
+      // Add tab 2 and launch with repo2
+      await page.locator('.tab-add').click();
+      await page.waitForTimeout(300);
+      await page.locator('.editor-textarea').fill('launch repo2');
+      await page.waitForTimeout(100);
+      await page.keyboard.press('Control+Shift+2');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.keyboard.press('3');
+      await page.waitForTimeout(1000);
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+      let paths2 = await page.locator('.git-file-path').allTextContents();
+      expect(paths2).toContain('main.ts');
+
+      // Switch back to tab 1 - should show repo1 files
+      await page.locator('.tab').first().click();
+      await page.waitForTimeout(500);
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+      paths1 = await page.locator('.git-file-path').allTextContents();
+      expect(paths1).toContain('readme.md');
+
+      // Switch to tab 2 - should show repo2 files
+      await page.locator('.tab').nth(1).click();
+      await page.waitForTimeout(500);
+      await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
+      paths2 = await page.locator('.git-file-path').allTextContents();
+      expect(paths2).toContain('main.ts');
 
       await app.close();
     } finally {

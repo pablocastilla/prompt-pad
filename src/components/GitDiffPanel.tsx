@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import type { GitFile } from '../types';
 
@@ -48,15 +48,18 @@ function renderDiffLine(line: string, idx: number): React.ReactNode {
 }
 
 export function GitDiffPanel() {
-  const showGitPanel = useStore(s => s.showGitPanel);
-  const setShowGitPanel = useStore(s => s.setShowGitPanel);
-  const gitFolder = useStore(s => s.gitFolder);
-  const gitFiles = useStore(s => s.gitFiles);
-  const setGitFiles = useStore(s => s.setGitFiles);
-  const selectedGitFile = useStore(s => s.selectedGitFile);
-  const setSelectedGitFile = useStore(s => s.setSelectedGitFile);
-  const gitFileDiff = useStore(s => s.gitFileDiff);
-  const setGitFileDiff = useStore(s => s.setGitFileDiff);
+  const tabs = useStore(s => s.tabs);
+  const activeTabId = useStore(s => s.activeTabId);
+  const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
+  const showGitPanel = activeTab?.showGitPanel === true;
+  const gitFolder = activeTab?.launchFolder ?? null;
+  const gitFiles: import('../types').GitFile[] = useMemo(() => activeTab?.gitFiles ?? [], [activeTab?.gitFiles]);
+  const selectedGitFile = activeTab?.selectedGitFile ?? null;
+  const gitFileDiff = activeTab?.gitFileDiff ?? '';
+  const setTabShowGitPanel = useStore(s => s.setTabShowGitPanel);
+  const setTabGitFiles = useStore(s => s.setTabGitFiles);
+  const setTabSelectedGitFile = useStore(s => s.setTabSelectedGitFile);
+  const setTabGitFileDiff = useStore(s => s.setTabGitFileDiff);
 
   const [loading, setLoading] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -108,11 +111,11 @@ export function GitDiffPanel() {
   }, []);
 
   const refreshStatus = async () => {
-    if (!gitFolder) return;
+    if (!gitFolder || !activeTabId) return;
     setLoading(true);
     try {
       const files = await window.electronAPI.getGitStatus(gitFolder);
-      setGitFiles(files);
+      setTabGitFiles(activeTabId, files);
     } catch {
       // ignore
     } finally {
@@ -121,12 +124,12 @@ export function GitDiffPanel() {
   };
 
   const refreshDiff = async (filePath: string, status?: string) => {
-    if (!gitFolder) return;
+    if (!gitFolder || !activeTabId) return;
     try {
       const diff = await window.electronAPI.getGitDiff(gitFolder, filePath, status);
-      setGitFileDiff(diff);
+      setTabGitFileDiff(activeTabId, diff);
     } catch {
-      setGitFileDiff('');
+      setTabGitFileDiff(activeTabId, '');
     }
   };
 
@@ -152,13 +155,13 @@ export function GitDiffPanel() {
   }, [showGitPanel, gitFolder]);
 
   useEffect(() => {
-    if (selectedGitFile) {
+    if (selectedGitFile && activeTabId) {
       const file = gitFiles.find(f => f.path === selectedGitFile);
       refreshDiff(selectedGitFile, file?.status);
-    } else {
-      setGitFileDiff('');
+    } else if (activeTabId) {
+      setTabGitFileDiff(activeTabId, '');
     }
-  }, [selectedGitFile, gitFiles]);
+  }, [selectedGitFile, gitFiles, activeTabId]);
 
   useEffect(() => {
     if (diffRef.current) {
@@ -167,18 +170,20 @@ export function GitDiffPanel() {
   }, [gitFileDiff]);
 
   const handleFileClick = (file: GitFile) => {
+    if (!activeTabId) return;
     if (selectedGitFile === file.path) {
-      setSelectedGitFile(null);
+      setTabSelectedGitFile(activeTabId, null);
     } else {
-      setSelectedGitFile(file.path);
+      setTabSelectedGitFile(activeTabId, file.path);
     }
   };
 
   const handleClose = () => {
-    setShowGitPanel(false);
-    setGitFiles([]);
-    setSelectedGitFile(null);
-    setGitFileDiff('');
+    if (!activeTabId) return;
+    setTabShowGitPanel(activeTabId, false);
+    setTabGitFiles(activeTabId, []);
+    setTabSelectedGitFile(activeTabId, null);
+    setTabGitFileDiff(activeTabId, '');
   };
 
   if (!showGitPanel || !gitFolder) return null;
@@ -200,7 +205,7 @@ export function GitDiffPanel() {
         {selectedGitFile ? (
           <>
             <div className="git-panel-diff-header">
-              <button className="btn-icon" onClick={() => setSelectedGitFile(null)} title="Back to list"><IconBack /></button>
+              <button className="btn-icon" onClick={() => activeTabId && setTabSelectedGitFile(activeTabId, null)} title="Back to list"><IconBack /></button>
               <span className="git-panel-diff-filename">{selectedGitFile}</span>
             </div>
             <div className="git-panel-diff" ref={diffRef}>

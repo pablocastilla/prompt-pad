@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry, GitFile } from './types';
+import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry } from './types';
 
 type ActivePanel = 'launches' | 'phrases' | 'settings' | 'history' | 'statistics' | null;
 
@@ -7,7 +7,7 @@ function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 function createTab(title?: string): Tab {
-  return { id: uid(), title: title || 'Untitled', path: null, content: '', dirty: false, lastSavedAt: null, attachedFiles: [], phraseRanges: [] };
+  return { id: uid(), title: title || 'Untitled', path: null, content: '', dirty: false, lastSavedAt: null, attachedFiles: [], phraseRanges: [], launchFolder: null, showGitPanel: false, gitFiles: [], selectedGitFile: null, gitFileDiff: '' };
 }
 
 interface AppState {
@@ -60,16 +60,11 @@ interface AppState {
   setPendingLaunch: (data: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[] } | null) => void;
   launchSplash: number;
   triggerLaunchSplash: () => void;
-  showGitPanel: boolean;
-  gitFolder: string | null;
-  gitFiles: GitFile[];
-  selectedGitFile: string | null;
-  gitFileDiff: string;
-  setShowGitPanel: (show: boolean) => void;
-  setGitFolder: (folder: string | null) => void;
-  setGitFiles: (files: GitFile[]) => void;
-  setSelectedGitFile: (file: string | null) => void;
-  setGitFileDiff: (diff: string) => void;
+  setTabLaunchFolder: (tabId: string, folder: string | null) => void;
+  setTabShowGitPanel: (tabId: string, show: boolean) => void;
+  setTabGitFiles: (tabId: string, files: import('./types').GitFile[]) => void;
+  setTabSelectedGitFile: (tabId: string, file: string | null) => void;
+  setTabGitFileDiff: (tabId: string, diff: string) => void;
   helpOpen: boolean;
   setHelpOpen: (open: boolean) => void;
 }
@@ -207,16 +202,21 @@ export const useStore = create<AppState>((set, get) => ({
   setPendingLaunch: (data) => set({ pendingLaunch: data }),
   launchSplash: 0,
   triggerLaunchSplash: () => set(s => ({ launchSplash: s.launchSplash + 1 })),
-  showGitPanel: false,
-  gitFolder: null,
-  gitFiles: [],
-  selectedGitFile: null,
-  gitFileDiff: '',
-  setShowGitPanel: (show) => set({ showGitPanel: show }),
-  setGitFolder: (folder) => set({ gitFolder: folder }),
-  setGitFiles: (files) => set({ gitFiles: files }),
-  setSelectedGitFile: (file) => set({ selectedGitFile: file }),
-  setGitFileDiff: (diff) => set({ gitFileDiff: diff }),
+  setTabLaunchFolder: (tabId, folder) => set(s => ({
+    tabs: s.tabs.map(t => t.id === tabId ? { ...t, launchFolder: folder, showGitPanel: !!folder, gitFiles: [], selectedGitFile: null, gitFileDiff: '' } : t),
+  })),
+  setTabShowGitPanel: (tabId, show) => set(s => ({
+    tabs: s.tabs.map(t => t.id === tabId ? { ...t, showGitPanel: show } : t),
+  })),
+  setTabGitFiles: (tabId, files) => set(s => ({
+    tabs: s.tabs.map(t => t.id === tabId ? { ...t, gitFiles: files } : t),
+  })),
+  setTabSelectedGitFile: (tabId, file) => set(s => ({
+    tabs: s.tabs.map(t => t.id === tabId ? { ...t, selectedGitFile: file } : t),
+  })),
+  setTabGitFileDiff: (tabId, diff) => set(s => ({
+    tabs: s.tabs.map(t => t.id === tabId ? { ...t, gitFileDiff: diff } : t),
+  })),
   helpOpen: false,
   setHelpOpen: (open) => set({ helpOpen: open }),
 }));

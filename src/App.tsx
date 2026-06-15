@@ -123,6 +123,11 @@ export default function App() {
             lastSavedAt: null,
             attachedFiles: [],
             phraseRanges: t.phraseRanges || [],
+            launchFolder: null,
+            showGitPanel: false,
+            gitFiles: [],
+            selectedGitFile: null,
+            gitFileDiff: '',
           }));
         if (restoredTabs.length > 0) {
           const validActiveId = restoredTabs.find(t => t.id === session.activeTabId)

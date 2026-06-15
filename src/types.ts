@@ -55,6 +55,11 @@ export interface Tab {
   lastSavedAt: number | null;
   attachedFiles: AttachedFile[];
   phraseRanges: PhraseRange[];
+  launchFolder?: string | null;
+  showGitPanel?: boolean;
+  gitFiles?: GitFile[];
+  selectedGitFile?: string | null;
+  gitFileDiff?: string;
 }
 
 export type CostTier = 'free' | 1 | 2 | 3 | 4 | 5;
