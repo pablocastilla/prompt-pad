@@ -37,7 +37,7 @@ test.describe('OpenCode icon theme mapping', () => {
       await page.waitForTimeout(300);
 
       // Open Settings panel and select Light theme
-      await page.locator('.activity-btn').nth(4).click();
+      await page.locator('.activity-btn[data-tour-id="settings"]').click();
       await page.locator('.theme-card').first().click();
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
@@ -55,7 +55,7 @@ test.describe('OpenCode icon theme mapping', () => {
       // Close picker, switch to Dark theme, reopen picker
       await page.keyboard.press('Escape');
       await page.waitForTimeout(200);
-      await page.locator('.activity-btn').nth(4).click();
+      await page.locator('.activity-btn[data-tour-id="settings"]').click();
       await page.locator('.theme-card').nth(1).click();
       await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 

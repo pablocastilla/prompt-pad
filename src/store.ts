@@ -70,6 +70,8 @@ interface AppState {
   setGitFiles: (files: GitFile[]) => void;
   setSelectedGitFile: (file: string | null) => void;
   setGitFileDiff: (diff: string) => void;
+  helpOpen: boolean;
+  setHelpOpen: (open: boolean) => void;
 }
 
 const initialTab = createTab();
@@ -215,4 +217,6 @@ export const useStore = create<AppState>((set, get) => ({
   setGitFiles: (files) => set({ gitFiles: files }),
   setSelectedGitFile: (file) => set({ selectedGitFile: file }),
   setGitFileDiff: (diff) => set({ gitFileDiff: diff }),
+  helpOpen: false,
+  setHelpOpen: (open) => set({ helpOpen: open }),
 }));

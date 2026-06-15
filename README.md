@@ -264,6 +264,14 @@ The Gaudy theme is best experienced live. It features:
 - **GitHub PRs**: when the `gh` CLI is installed and authenticated, a third bar shows how many PRs you merged each day. A summary card shows total PRs merged in the last 30 days.
 - **Native Integration**: securely connects directly to your local `opencode.db` using `better-sqlite3` to ensure your data stays on your machine.
 
+### Help Overlay
+- **`?` button in the activity bar**: a pulsing help button sits right below the statistics button so newcomers can find it instantly.
+- **Eye-catching tour banner**: clicking it opens an overlay with a gradient header and a card for each tool — Launches, Phrases, History, Statistics, Help and Settings — each one in its own row.
+- **Animated arrows pointing back to the activity bar**: every row shows a left-pointing arrow that nudges toward the matching activity-bar button, so the link between the explanation and the button is obvious at a glance.
+- **Folder-first launch explanation**: the Launches description deliberately emphasises that each launch points to the *working folder* where your project lives and that the prompt is fired from there at the CLI.
+- **Always-accessible**: the activity bar stays visible while the overlay is open, so you can click another tool to try it out while reading. Close with `Esc`, the X icon, the "Got it" button, or by clicking the dimmed backdrop.
+- **Fully translated**: English and Spanish copy ship out of the box.
+
 ### Auto-Updates
 Prompt Pad automatically keeps itself up to date:
 - Checks for updates on every launch

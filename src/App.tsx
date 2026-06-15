@@ -10,6 +10,7 @@ import { ModelPicker } from './components/ModelPicker';
 import { LaunchSplash } from './components/LaunchSplash';
 import { StatsPanel } from './components/StatsPanel';
 import { GitDiffPanel } from './components/GitDiffPanel';
+import { HelpOverlay } from './components/HelpOverlay';
 import { initPricingData } from './types';
 import type { LaunchConfig, Phrase, Settings, Tab } from './types';
 import './App.css';
@@ -278,6 +279,7 @@ export default function App() {
 
       <ModelPicker />
       <LaunchSplash />
+      <HelpOverlay />
     </div>
   );
 }
