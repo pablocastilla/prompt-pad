@@ -614,8 +614,21 @@ async function executeLaunchOpenCode(config: {
     const yoloArg = yolo ? "'--dangerously-skip-permissions'" : '';
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
+      "$opencodePath = (Get-Command opencode.exe -ErrorAction SilentlyContinue).Source",
+      "if (-not $opencodePath) {",
+      "  $opencodeCommand = Get-Command opencode -ErrorAction SilentlyContinue",
+      "  if ($opencodeCommand -and $opencodeCommand.Source -like '*.cmd') {",
+      "    $bootstrapDir = Split-Path $opencodeCommand.Source -Parent",
+      "    $opencodePath = Join-Path $bootstrapDir 'node_modules\\opencode-ai\\bin\\opencode.exe'",
+      "    if (-not (Test-Path $opencodePath)) {",
+      "      $opencodePath = $opencodeCommand.Source",
+      "    }",
+      "  } else {",
+      "    $opencodePath = 'opencode'",
+      "  }",
+      "}",
       "$ocArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "'" + (yoloArg ? ", " + yoloArg : '') + ", '" + safeMsg + "')",
-      "& opencode @ocArgs",
+      "& $opencodePath @ocArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
     writePS1(psPath, script);
