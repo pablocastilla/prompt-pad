@@ -58,25 +58,21 @@ test.describe('Model Cost Indicators', () => {
       ]);
       savePhrases(testDir, []);
 
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(500);
-
-      await page.evaluate(() => {
-        const api = (window as unknown as {
-          electronAPI: {
-            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
-          };
-        }).electronAPI;
-
-        api.getOpenCodeModels = async () => [
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
           { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
           { id: 'opencode/gpt-5-nano', label: 'GPT 5 Nano' },
           { id: 'opencode/claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
           { id: 'opencode/claude-opus-4.7', label: 'Claude Opus 4.7' },
-        ];
-      });
+        ], null, 2),
+        'utf-8'
+      );
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -164,23 +160,19 @@ test.describe('Model Cost Indicators', () => {
       ]);
       savePhrases(testDir, []);
 
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
+          { id: 'opencode/gpt-5-nano', label: 'GPT 5 Nano' },
+        ], null, 2),
+        'utf-8'
+      );
+
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
-
-      await page.evaluate(() => {
-        const api = (window as unknown as {
-          electronAPI: {
-            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
-          };
-        }).electronAPI;
-
-        api.getOpenCodeModels = async () => [
-          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
-          { id: 'opencode/gpt-5-nano', label: 'GPT 5 Nano' },
-        ];
-      });
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -226,21 +218,9 @@ test.describe('Model Cost Indicators', () => {
       saveLaunches(testDir, [{ id: 'l1', name: 'Tiers', folder: '/tmp/a' }]);
       savePhrases(testDir, []);
 
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(500);
-
-      // Representative Go + Zen models. Each one is chosen to land in a
-      // different tier under the price brackets:
-      //   < 1.50    → 1 bar
-      //   < 3.50    → 2 bars
-      //   < 10.00   → 3 bars
-      //   < 25.00   → 4 bars
-      //   ≥ 25.00   → 5 bars
-      await page.evaluate(() => {
-        const api = (window as any).electronAPI;
-        api.getOpenCodeModels = async () => [
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
           // Free
           { id: 'opencode/big-pickle', label: 'Big Pickle' },
           { id: 'opencode/deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free' },
@@ -269,8 +249,14 @@ test.describe('Model Cost Indicators', () => {
           { id: 'opencode/claude-opus-4.8', label: 'Claude Opus 4.8' },
           { id: 'opencode/gpt-5.5', label: 'GPT 5.5' },
           { id: 'opencode/gpt-5.5-pro', label: 'GPT 5.5 Pro' },
-        ];
-      });
+        ], null, 2),
+        'utf-8'
+      );
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -505,7 +491,14 @@ test.describe('Ctrl+Shift+0 Shortcut', () => {
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
 
-      const saved = JSON.parse(fs.readFileSync(path.join(testDir, 'launches.json'), 'utf-8'));
+      let saved: any[] = [];
+      for (let i = 0; i < 30; i++) {
+        saved = JSON.parse(fs.readFileSync(path.join(testDir, 'launches.json'), 'utf-8'));
+        if (saved[9] && saved[9].shortcut !== undefined) {
+          break;
+        }
+        await page.waitForTimeout(200);
+      }
       expect(saved[9].shortcut).toBe('0');
 
       await page.locator('.editor-textarea').fill('test prompt for shortcut 0');

@@ -100,7 +100,7 @@ function sanitizeLaunches(launches: unknown[]): unknown[] {
   });
 }
 
-function runCommand(command: string, args: string[], timeout = 5000): Promise<string> {
+function runCommand(command: string, args: string[], timeout = 15000): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, {
       timeout,
@@ -357,6 +357,17 @@ let copilotModelsCache: { id: string; label: string }[] | null = null;
 let antigravityModelsCache: { id: string; label: string }[] | null = null;
 
 ipcMain.handle('models:get-opencode', async () => {
+  if (TEST_DIR) {
+    const mockFile = path.join(TEST_DIR, 'mock-opencode-models.json');
+    if (fs.existsSync(mockFile)) {
+      const raw = fs.readFileSync(mockFile, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data && typeof data === 'object' && 'shouldThrow' in data && data.shouldThrow) {
+        throw new Error(data.message || 'CLI not found');
+      }
+      return data;
+    }
+  }
   if (openCodeModelsCache && openCodeModelsCache.length > 0) return openCodeModelsCache;
   const output = await runCommand('opencode', ['models']);
   const parsed = parseOpenCodeModels(output);
@@ -368,6 +379,17 @@ ipcMain.handle('models:get-opencode', async () => {
 });
 
 ipcMain.handle('models:get-antigravity', async () => {
+  if (TEST_DIR) {
+    const mockFile = path.join(TEST_DIR, 'mock-antigravity-models.json');
+    if (fs.existsSync(mockFile)) {
+      const raw = fs.readFileSync(mockFile, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data && typeof data === 'object' && 'shouldThrow' in data && data.shouldThrow) {
+        throw new Error(data.message || 'CLI not found');
+      }
+      return data;
+    }
+  }
   if (antigravityModelsCache && antigravityModelsCache.length > 0) return antigravityModelsCache;
   try {
     const output = await runCommand('agy.exe', ['models'], 8000);
@@ -401,6 +423,17 @@ ipcMain.handle('models:clear-cache', () => {
 });
 
 ipcMain.handle('models:get-copilot', async () => {
+  if (TEST_DIR) {
+    const mockFile = path.join(TEST_DIR, 'mock-copilot-models.json');
+    if (fs.existsSync(mockFile)) {
+      const raw = fs.readFileSync(mockFile, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data && typeof data === 'object' && 'shouldThrow' in data && data.shouldThrow) {
+        throw new Error(data.message || 'CLI not found');
+      }
+      return data;
+    }
+  }
   if (copilotModelsCache && copilotModelsCache.length > 0) return copilotModelsCache;
   const cmd = process.platform === 'win32' ? 'copilot.exe' : 'copilot';
   const output = await runCommand(cmd, ['help', 'config'], 8000);
@@ -541,10 +574,9 @@ async function executeLaunchOpenCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
 }) {
-  const { folder, yolo, prompt, mode, attachedFilePaths = [] } = config;
+  const { folder, yolo, prompt, attachedFilePaths = [] } = config;
   const model = normalizeOpenCodeModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
-  const isInteractive = mode === 'interactive';
   const id = Date.now().toString();
 
   const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
@@ -580,10 +612,9 @@ async function executeLaunchOpenCode(config: {
     const safeMsg   = escapeSingleQuotePS(message);
     const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
     const yoloArg = yolo ? "'--dangerously-skip-permissions'" : '';
-    const interactiveArg = isInteractive ? ", '--interactive'" : '';
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
-      "$ocArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "'" + (yoloArg ? ", " + yoloArg : '') + interactiveArg + ", '" + safeMsg + "')",
+      "$ocArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "'" + (yoloArg ? ", " + yoloArg : '') + ", '" + safeMsg + "')",
       "& opencode @ocArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
@@ -602,11 +633,10 @@ async function executeLaunchOpenCode(config: {
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
     const yoloArg = yolo ? ' --dangerously-skip-permissions' : '';
-    const interactiveArg = isInteractive ? ' --interactive' : '';
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'opencode run --model ' + JSON.stringify(model) + ' --dir ' + JSON.stringify(workDir) + yoloArg + interactiveArg + ' ' + JSON.stringify(message),
+      'opencode run --model ' + JSON.stringify(model) + ' --dir ' + JSON.stringify(workDir) + yoloArg + ' ' + JSON.stringify(message),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');

@@ -639,6 +639,9 @@ test.describe('Git diff panel', () => {
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
+      await page.evaluate(() => localStorage.setItem('gitPanelWidth', '320'));
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
 
       await page.locator('.editor-textarea').fill('test prompt');
@@ -696,6 +699,9 @@ test.describe('Git diff panel', () => {
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
+      await page.evaluate(() => localStorage.setItem('gitPanelWidth', '320'));
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
 
       await page.locator('.editor-textarea').fill('test prompt');
@@ -717,12 +723,14 @@ test.describe('Git diff panel', () => {
       const startX = box.x + box.width / 2;
       const startY = box.y + box.height / 2;
 
-      // Drag left by 100px to make panel wider
+      // Drag left by 150px to make panel wider
       await page.mouse.move(startX, startY);
       await page.mouse.down();
-      await page.mouse.move(startX - 100, startY, { steps: 5 });
+      await page.waitForTimeout(100);
+      await page.mouse.move(startX - 150, startY, { steps: 15 });
+      await page.waitForTimeout(100);
       await page.mouse.up();
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
 
       const newBox = await page.locator('.git-panel').boundingBox();
       expect(newBox).not.toBeNull();

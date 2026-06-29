@@ -258,28 +258,20 @@ test.describe('Model picker behavior', () => {
     const testDir = getTestDir();
     try {
       writeLaunches(testDir);
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free' },
+          { id: 'opencode/mimo-v2.5-free', label: 'Mimo V2.5 Free' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+        ], null, 2),
+        'utf-8'
+      );
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
-
-      await page.evaluate(() => {
-        const api = (window as unknown as {
-          electronAPI: {
-            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
-          };
-        }).electronAPI;
-
-        api.getOpenCodeModels = async () => {
-          await new Promise(resolve => setTimeout(resolve, 150));
-          return [
-            { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
-            { id: 'opencode/deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free' },
-            { id: 'opencode/mimo-v2.5-free', label: 'Mimo V2.5 Free' },
-            { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
-          ];
-        };
-      });
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -296,16 +288,15 @@ test.describe('Model picker behavior', () => {
       }, { timeout: 8000 });
 
       // First, disable Go filter (enabled by default) so we can see all models
-      const goCheckbox = page.locator('.model-picker-go-toggle').first().locator('input[type="checkbox"]');
+      const goCheckbox = page.locator('.model-picker-go-toggle input[type="checkbox"]').first();
       if (await goCheckbox.isChecked()) {
-        await goCheckbox.click();
-        await page.waitForTimeout(300);
+        await page.locator('.model-picker-go-checkbox').first().click();
+        await page.waitForTimeout(500);
       }
 
       // Enable free filter
-      const freeCheckbox = page.locator('.model-picker-go-toggle').nth(1).locator('input[type="checkbox"]');
-      await freeCheckbox.click();
-      await page.waitForTimeout(300);
+      await page.locator('.model-picker-go-checkbox').nth(1).click();
+      await page.waitForTimeout(500);
 
       // Should only show models with "free" in the name
       const modelItems = page.locator('.model-picker-item');

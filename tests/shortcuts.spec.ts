@@ -95,16 +95,19 @@ test.describe('Custom Shortcuts', () => {
       await page.waitForTimeout(500);
 
       const editor = page.locator('.editor-textarea');
+      await editor.click();
+      await page.waitForTimeout(100);
 
       await page.keyboard.press('Control+3');
       await page.waitForTimeout(200);
-        await expect(editor).toContainText('Hello from phrase');
+      await expect(editor).toContainText('Hello from phrase');
       await expect(editor.locator('.phrase-text')).toContainText('Hello from phrase');
 
       await editor.fill('');
+      await editor.click();
       await page.keyboard.press('Control+0');
       await page.waitForTimeout(200);
-        await expect(editor).toContainText('Goodbye');
+      await expect(editor).toContainText('Goodbye');
       await expect(editor.locator('.phrase-text')).toContainText('Goodbye');
 
       await app.close();
@@ -296,13 +299,23 @@ test.describe('Custom Shortcuts', () => {
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
 
-      // Check migration persisted to file
-      const savedLaunches = JSON.parse(fs.readFileSync(path.join(testDir, 'launches.json'), 'utf-8'));
+      // Check migration persisted to file (poll to avoid race conditions under parallel run load)
+      let savedLaunches: any[] = [];
+      let savedPhrases: any[] = [];
+      for (let i = 0; i < 30; i++) {
+        savedLaunches = JSON.parse(fs.readFileSync(path.join(testDir, 'launches.json'), 'utf-8'));
+        savedPhrases = JSON.parse(fs.readFileSync(path.join(testDir, 'phrases.json'), 'utf-8'));
+        if (
+          savedLaunches[0] && savedLaunches[0].shortcut !== undefined &&
+          savedPhrases[0] && savedPhrases[0].shortcut !== undefined
+        ) {
+          break;
+        }
+        await page.waitForTimeout(200);
+      }
       expect(savedLaunches[0].shortcut).toBe('1');
       expect(savedLaunches[1].shortcut).toBe('2');
       expect(savedLaunches[2].shortcut).toBe('3');
-
-      const savedPhrases = JSON.parse(fs.readFileSync(path.join(testDir, 'phrases.json'), 'utf-8'));
       expect(savedPhrases[0].shortcut).toBe('1');
       expect(savedPhrases[1].shortcut).toBe('2');
 

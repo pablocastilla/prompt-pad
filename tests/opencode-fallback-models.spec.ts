@@ -31,23 +31,19 @@ test.describe('OpenCode fallback models with Go filter', () => {
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify({
+          shouldThrow: true,
+          message: 'CLI not found'
+        }, null, 2),
+        'utf-8'
+      );
+
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
-
-      await page.evaluate(() => {
-        const api = (window as unknown as {
-          electronAPI: {
-            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
-          };
-        }).electronAPI;
-
-        api.getOpenCodeModels = async () => {
-          await new Promise(resolve => setTimeout(resolve, 200));
-          throw new Error('CLI not found');
-        };
-      });
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -84,24 +80,22 @@ test.describe('OpenCode fallback models with Go filter', () => {
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
 
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/deepseek-v4-pro', label: 'Deepseek V4 Pro' },
+          { id: 'opencode-go/minimax-m2.5', label: 'Minimax M2.5' },
+          { id: 'opencode-go/minimax-m2.7', label: 'Minimax M2.7' },
+          { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
+          { id: 'opencode-go/kimi-k2.6', label: 'Kimi K2.6' },
+        ], null, 2),
+        'utf-8'
+      );
+
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
-
-      await page.evaluate(() => {
-        const api = (window as any).electronAPI;
-        api.getOpenCodeModels = async () => {
-          await new Promise(resolve => setTimeout(resolve, 600));
-          return [
-            { id: 'opencode-go/deepseek-v4-pro', label: 'Deepseek V4 Pro' },
-            { id: 'opencode-go/minimax-m2.5', label: 'Minimax M2.5' },
-            { id: 'opencode-go/minimax-m2.7', label: 'Minimax M2.7' },
-            { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
-            { id: 'opencode-go/kimi-k2.6', label: 'Kimi K2.6' },
-          ];
-        };
-      });
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
