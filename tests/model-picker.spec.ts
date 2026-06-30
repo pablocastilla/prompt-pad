@@ -240,11 +240,11 @@ test.describe('Model picker behavior', () => {
       await expect(page.locator('.model-picker-overlay')).toBeVisible();
       await selectOpenCodeProvider(page);
 
-      // Both checkboxes should be visible
-      await expect(page.locator('.model-picker-go-toggle')).toHaveCount(2);
+      // Four checkboxes should be visible: Go, Zen, NVIDIA, Free
+      await expect(page.locator('.model-picker-go-toggle')).toHaveCount(4);
 
       // Free filter checkbox should exist and be unchecked by default
-      const freeCheckbox = page.locator('.model-picker-go-toggle').nth(1);
+      const freeCheckbox = page.locator('.model-picker-go-toggle[data-tier="free"]');
       await expect(freeCheckbox).toBeVisible();
       await expect(freeCheckbox.locator('input[type="checkbox"]')).not.toBeChecked();
 
@@ -287,15 +287,15 @@ test.describe('Model picker behavior', () => {
         return items.length > 0;
       }, { timeout: 8000 });
 
-      // First, disable Go filter (enabled by default) so we can see all models
-      const goCheckbox = page.locator('.model-picker-go-toggle input[type="checkbox"]').first();
+      // First, disable Go filter (enabled by default) so we can see Zen models too
+      const goCheckbox = page.locator('.model-picker-go-toggle[data-tier="go"] input[type="checkbox"]');
       if (await goCheckbox.isChecked()) {
-        await page.locator('.model-picker-go-checkbox').first().click();
+        await page.locator('.model-picker-go-toggle[data-tier="go"] .model-picker-go-checkbox').click();
         await page.waitForTimeout(500);
       }
 
       // Enable free filter
-      await page.locator('.model-picker-go-checkbox').nth(1).click();
+      await page.locator('.model-picker-go-toggle[data-tier="free"] .model-picker-go-checkbox').click();
       await page.waitForTimeout(500);
 
       // Should only show models with "free" in the name
@@ -353,12 +353,16 @@ test.describe('Model picker behavior', () => {
     try {
       writeLaunches(testDir);
 
-      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
-        theme: 'light',
-        language: 'auto',
-        useOneDrive: false,
-        showGoModelsOnly: { opencode: false },
-      }, null, 2), 'utf-8');
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode-go/kimi-k2.6', label: 'Kimi K2.6 Go' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          { id: 'opencode/minimax-m2.7', label: 'Minimax M2.7' },
+        ], null, 2),
+        'utf-8'
+      );
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
@@ -381,20 +385,20 @@ test.describe('Model picker behavior', () => {
       // All opencode-go/ models should have a Go badge
       const goItems = page.locator('.model-picker-item').filter({ has: page.locator('.model-tier-go') });
       const goBadgeCount = await goItems.count();
-      expect(goBadgeCount).toBeGreaterThan(0);
+      expect(goBadgeCount).toBe(2);
 
       // All opencode/ (non-go) models should have a Zen badge
       const zenItems = page.locator('.model-picker-item').filter({ has: page.locator('.model-tier-zen') });
       const zenBadgeCount = await zenItems.count();
-      expect(zenBadgeCount).toBeGreaterThan(0);
+      expect(zenBadgeCount).toBe(2);
 
       // Every badge text should be correct
       const allGoBadges = page.locator('.model-tier-go');
       const allZenBadges = page.locator('.model-tier-zen');
       const goCount = await allGoBadges.count();
       const zenCount = await allZenBadges.count();
-      expect(goCount).toBeGreaterThan(0);
-      expect(zenCount).toBeGreaterThan(0);
+      expect(goCount).toBe(2);
+      expect(zenCount).toBe(2);
 
       for (let i = 0; i < goCount; i++) {
         await expect(allGoBadges.nth(i)).toHaveText('Go');
@@ -414,12 +418,14 @@ test.describe('Model picker behavior', () => {
     try {
       writeLaunches(testDir);
 
-      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
-        theme: 'light',
-        language: 'auto',
-        useOneDrive: false,
-        showGoModelsOnly: { opencode: false },
-      }, null, 2), 'utf-8');
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+        ], null, 2),
+        'utf-8'
+      );
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
@@ -469,11 +475,19 @@ test.describe('Model picker behavior', () => {
     try {
       writeLaunches(testDir);
 
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+        ], null, 2),
+        'utf-8'
+      );
+
       fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
         theme: 'light',
         language: 'auto',
         useOneDrive: false,
-        showGoModelsOnly: { opencode: false },
         pinnedModels: {
           opencode: ['opencode-go/glm-5.1'],
         },
@@ -508,6 +522,308 @@ test.describe('Model picker behavior', () => {
         expect(pinnedGoCount).toBe(1);
         await expect(pinnedGoBadge).toHaveText('Go');
       }
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('OpenCode model picker enables Go, Zen and NVIDIA tier checkboxes by default', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir);
+
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          { id: 'nvidia/z-ai/glm-5.1', label: 'GLM 5.1' },
+        ], null, 2),
+        'utf-8'
+      );
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      // All three tier checkboxes should be visible and checked by default
+      const goCheckbox = page.locator('.model-picker-go-toggle[data-tier="go"] input[type="checkbox"]');
+      const zenCheckbox = page.locator('.model-picker-go-toggle[data-tier="zen"] input[type="checkbox"]');
+      const nvidiaCheckbox = page.locator('.model-picker-go-toggle[data-tier="nvidia"] input[type="checkbox"]');
+      await expect(goCheckbox).toBeChecked();
+      await expect(zenCheckbox).toBeChecked();
+      await expect(nvidiaCheckbox).toBeChecked();
+
+      // With all three tier filters on, every mocked model should be visible
+      await page.waitForFunction(() => document.querySelectorAll('.model-picker-item').length >= 3, { timeout: 8000 });
+      const modelCount = await page.locator('.model-picker-item').count();
+      expect(modelCount).toBe(3);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('OpenCode model picker shows NVIDIA badge with logo for nvidia/ models', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir);
+
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          { id: 'nvidia/z-ai/glm-5.1', label: 'GLM 5.1 NVIDIA' },
+        ], null, 2),
+        'utf-8'
+      );
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      await page.waitForFunction(() => document.querySelectorAll('.model-picker-item').length >= 3, { timeout: 8000 });
+
+      // Every nvidia/ model should have an NVIDIA badge with the icon
+      const nvidiaItems = page.locator('.model-picker-item').filter({ has: page.locator('.model-tier-nvidia') });
+      const nvidiaBadgeCount = await nvidiaItems.count();
+      expect(nvidiaBadgeCount).toBe(1);
+      const nvidiaBadge = nvidiaItems.first().locator('.model-tier-nvidia');
+      await expect(nvidiaBadge).toHaveAttribute('title', 'NVIDIA');
+      await expect(nvidiaBadge.locator('svg.model-tier-nvidia-icon')).toHaveCount(1);
+
+      // Badge color should match the NVIDIA green (#76b900 -> rgb(118, 185, 0))
+      const nvidiaColor = await nvidiaBadge.evaluate(el => window.getComputedStyle(el).color);
+      expect(nvidiaColor).toContain('118');
+      expect(nvidiaColor).toContain('185');
+
+      // The icon path should be the NVIDIA simple-icons path
+      const iconPath = await nvidiaBadge.locator('svg.model-tier-nvidia-icon path').getAttribute('d');
+      expect(iconPath).toContain('M8.948 8.798');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('OpenCode model picker hides NVIDIA models when NVIDIA filter is unchecked', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir);
+
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          { id: 'nvidia/z-ai/glm-5.1', label: 'GLM 5.1 NVIDIA' },
+        ], null, 2),
+        'utf-8'
+      );
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      await page.waitForFunction(() => document.querySelectorAll('.model-picker-item').length >= 3, { timeout: 8000 });
+
+      // Uncheck the NVIDIA filter
+      await page.locator('.model-picker-go-toggle[data-tier="nvidia"] .model-picker-go-checkbox').click();
+      await page.waitForTimeout(300);
+
+      // Only Go and Zen models should remain
+      const modelItems = page.locator('.model-picker-item');
+      const count = await modelItems.count();
+      expect(count).toBe(2);
+
+      // None of them should be nvidia/ models
+      const nvidiaCount = await page.locator('.model-picker-item .model-tier-nvidia').count();
+      expect(nvidiaCount).toBe(0);
+
+      // The Go and Zen items should still be there
+      const goCount = await page.locator('.model-picker-item .model-tier-go').count();
+      const zenCount = await page.locator('.model-picker-item .model-tier-zen').count();
+      expect(goCount).toBe(1);
+      expect(zenCount).toBe(1);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('OpenCode model picker hides Zen models when Zen filter is unchecked', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir);
+
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          { id: 'nvidia/z-ai/glm-5.1', label: 'GLM 5.1 NVIDIA' },
+        ], null, 2),
+        'utf-8'
+      );
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      await page.waitForFunction(() => document.querySelectorAll('.model-picker-item').length >= 3, { timeout: 8000 });
+
+      // Uncheck the Zen filter
+      await page.locator('.model-picker-go-toggle[data-tier="zen"] .model-picker-go-checkbox').click();
+      await page.waitForTimeout(300);
+
+      // Only Go and NVIDIA models should remain
+      const modelItems = page.locator('.model-picker-item');
+      const count = await modelItems.count();
+      expect(count).toBe(2);
+
+      // No Zen badges should remain
+      const zenCount = await page.locator('.model-picker-item .model-tier-zen').count();
+      expect(zenCount).toBe(0);
+
+      // Go and NVIDIA still visible
+      const goCount = await page.locator('.model-picker-item .model-tier-go').count();
+      const nvidiaCount = await page.locator('.model-picker-item .model-tier-nvidia').count();
+      expect(goCount).toBe(1);
+      expect(nvidiaCount).toBe(1);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('NVIDIA tier badge is small and rendered as SVG icon only', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir);
+
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'nvidia/z-ai/glm-5.1', label: 'GLM 5.1 NVIDIA' },
+        ], null, 2),
+        'utf-8'
+      );
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      await page.waitForFunction(() => document.querySelectorAll('.model-picker-item').length >= 1, { timeout: 8000 });
+
+      const nvidiaBadge = page.locator('.model-tier-nvidia').first();
+      await expect(nvidiaBadge).toBeVisible();
+
+      // Should contain only SVG, no text
+      const textContent = (await nvidiaBadge.textContent())?.trim() ?? '';
+      expect(textContent).toBe('');
+
+      // SVG should be small (10x10 per the implementation)
+      const box = await nvidiaBadge.locator('svg.model-tier-nvidia-icon').boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBeLessThanOrEqual(12);
+      expect(box!.height).toBeLessThanOrEqual(12);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('NVIDIA tier badge appears in pinned models section when a NVIDIA model is pinned', async () => {
+    const testDir = getTestDir();
+    try {
+      writeLaunches(testDir);
+
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          { id: 'nvidia/z-ai/glm-5.1', label: 'GLM 5.1 NVIDIA' },
+        ], null, 2),
+        'utf-8'
+      );
+
+      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+        theme: 'light',
+        language: 'auto',
+        useOneDrive: false,
+        pinnedModels: {
+          opencode: ['nvidia/z-ai/glm-5.1'],
+        },
+      }, null, 2), 'utf-8');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('trigger model picker');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      await page.waitForFunction(() => document.querySelectorAll('.model-picker-item').length >= 1, { timeout: 8000 });
+
+      const pinnedItems = page.locator('.model-picker-item.pinned');
+      const pinnedCount = await pinnedItems.count();
+      expect(pinnedCount).toBe(1);
+      const pinnedNvidiaBadge = pinnedItems.first().locator('.model-tier-nvidia');
+      await expect(pinnedNvidiaBadge).toHaveCount(1);
 
       await app.close();
     } finally {

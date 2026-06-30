@@ -26,6 +26,8 @@ export interface Settings {
   useOneDrive?: boolean;
   pinnedModels?: Partial<Record<LaunchTool, string[]>>;
   showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
+  showZenModelsOnly?: Partial<Record<LaunchTool, boolean>>;
+  showNvidiaModelsOnly?: Partial<Record<LaunchTool, boolean>>;
   showFreeModelsOnly?: Partial<Record<LaunchTool, boolean>>;
   phraseShortcutModifier: ShortcutModifier;
   launchShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
@@ -192,6 +194,7 @@ const LEGACY_OR_GENERIC_TIER: Array<{ pattern: RegExp; tier: Exclude<CostTier, '
 function getBareId(modelId: string): string {
   return modelId
     .replace(/^opencode(-go)?\//, '')
+    .replace(/^nvidia\//, '')
     .replace(/^antigravity\//, '')
     .replace(/^copilot\//, '')
     .toLowerCase();

@@ -238,14 +238,14 @@ The Gaudy theme is best experienced live. It features:
 - **Hand-off to model picker**: OpenCode, GitHub Copilot and Antigravity open the model picker because they expose multiple models worth choosing from.
 
 ### Model Picker (OpenCode, GitHub Copilot & Antigravity)
-- **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `copilot help config`, or `agy.exe models`) at runtime, including Zen (`opencode/`) and Go (`opencode-go/`) tiers.
+- **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `copilot help config`, or `agy.exe models`) at runtime, including Zen (`opencode/`), Go (`opencode-go/`) and NVIDIA (`nvidia/`) tiers.
 - **Provider-aware**: only shown for OpenCode, GitHub Copilot and Antigravity launches. Claude Code and Codex bypass it and launch with their default model.
-- **Go/Zen filter**: a toggle to show only Go-tier models (opencode-go/) — on by default for OpenCode launches, keeping the list focused on high-capacity models like Qwen3.7 Max, Deepseek V4 Pro, and Kimi K2.6.
-- **Free filter**: a toggle to show only free models — looks for "free" in the model name. Both Go and Free filters can be combined to show only free Go models.
+- **Go / Zen / NVIDIA tier filters**: three independent checkboxes to show or hide each OpenCode tier — Go (`opencode-go/`), Zen (`opencode/`) and NVIDIA (`nvidia/`). All three are enabled by default for OpenCode launches; uncheck any combination to focus the list (e.g. keep only Go and Zen, or only NVIDIA).
+- **Free filter**: a toggle to show only free models — looks for "free" in the model name. Free can be combined with the tier filters to show only free Go models, free Zen models, or free NVIDIA models.
 - **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode brand mark) with theme-aware contrast. OpenCode uses a minimal two-image square logo set (light-theme and dark-theme variants).
 - **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
 - **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) sourced from [models.dev](https://models.dev/api.json) with fallback to hardcoded data.
-- **Tier badges**: Go models (`opencode-go/`) show an orange "Go" badge and Zen models (`opencode/`) show a purple "Zen" badge next to the model name for quick identification.
+- **Tier badges**: Go models (`opencode-go/`) show an orange "Go" badge, Zen models (`opencode/`) show a purple "Zen" badge, and NVIDIA models (`nvidia/`) show a small NVIDIA green logo next to the model name for quick identification.
 - **Expensive model confirmation**: launching tier 4-5 models (including Go `max` tier models) prompts a confirmation dialog to prevent accidental high-cost launches.
 - **Pin favourite models**: press `Ctrl+1` through `Ctrl+0` while hovering a model to pin it to the top. Pinned models appear first and can be launched instantly with `1` through `0`. Press the same shortcut again to unpin.
 - **Drag-to-reorder pinned**: drag the ⠿ handle on pinned models to reorder them.

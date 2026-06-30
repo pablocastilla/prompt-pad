@@ -4,6 +4,7 @@ import { getModelCostInfo } from '../types';
 import { t } from '../i18n';
 import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry } from '../types';
 import { ToolIcon, TOOL_LABELS } from './ToolIcon';
+import { siNvidia } from 'simple-icons';
 
 // Providers offered when launching. Order matters: numeric shortcuts 1..N map by position.
 const ALL_TOOLS: LaunchTool[] = ['opencode', 'copilot', 'claude-code', 'codex', 'antigravity'];
@@ -64,22 +65,34 @@ export function ModelPicker() {
   const tool: LaunchTool = selectedProvider ?? ALL_TOOLS[0];
   const availableModels = modelCache[tool] ?? [];
   const pinnedIds = settings.pinnedModels?.[tool] ?? [];
-  const showGoOnly = settings.showGoModelsOnly?.[tool] ?? (tool === 'opencode' ? true : false);
+  const isOpencode = tool === 'opencode';
+  const showGoOnly = settings.showGoModelsOnly?.[tool] ?? isOpencode;
+  const showZenOnly = settings.showZenModelsOnly?.[tool] ?? isOpencode;
+  const showNvidiaOnly = settings.showNvidiaModelsOnly?.[tool] ?? isOpencode;
   const showFreeOnly = settings.showFreeModelsOnly?.[tool] ?? false;
 
   const filteredModels = useMemo(() => {
     let result = availableModels;
-    if (tool === 'opencode') {
-      if (showGoOnly && showFreeOnly) {
-        result = availableModels.filter(m => m.id.startsWith('opencode-go/') && (m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free')));
-      } else if (showGoOnly) {
-        result = availableModels.filter(m => m.id.startsWith('opencode-go/'));
-      } else if (showFreeOnly) {
-        result = availableModels.filter(m => m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free'));
-      }
+    if (isOpencode) {
+      result = result.filter(m => {
+        const isGo = m.id.startsWith('opencode-go/');
+        const isNvidia = m.id.startsWith('nvidia/');
+        const isZen = m.id.startsWith('opencode/');
+
+        const matchesTier =
+          (isGo && showGoOnly) ||
+          (isZen && showZenOnly) ||
+          (isNvidia && showNvidiaOnly);
+        if (!matchesTier) return false;
+
+        if (showFreeOnly) {
+          return m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free');
+        }
+        return true;
+      });
     }
     return result;
-  }, [availableModels, showGoOnly, showFreeOnly, tool]);
+  }, [availableModels, showGoOnly, showZenOnly, showNvidiaOnly, showFreeOnly, isOpencode]);
 
   const pinnedModels = useMemo(
     () => pinnedIds.map(id => filteredModels.find(m => m.id === id)).filter((m): m is ModelOption => !!m),
@@ -120,6 +133,30 @@ export function ModelPicker() {
       showGoModelsOnly: {
         ...settings.showGoModelsOnly,
         [tool]: !showGoOnly,
+      },
+    };
+    setSettings(nextSettings);
+    await window.electronAPI.saveSettings(nextSettings);
+  };
+
+  const toggleZenOnly = async () => {
+    const nextSettings: Settings = {
+      ...settings,
+      showZenModelsOnly: {
+        ...settings.showZenModelsOnly,
+        [tool]: !showZenOnly,
+      },
+    };
+    setSettings(nextSettings);
+    await window.electronAPI.saveSettings(nextSettings);
+  };
+
+  const toggleNvidiaOnly = async () => {
+    const nextSettings: Settings = {
+      ...settings,
+      showNvidiaModelsOnly: {
+        ...settings.showNvidiaModelsOnly,
+        [tool]: !showNvidiaOnly,
       },
     };
     setSettings(nextSettings);
@@ -383,6 +420,15 @@ export function ModelPicker() {
     if (modelId.startsWith('opencode-go/')) {
       return <span className="model-tier-badge model-tier-go">Go</span>;
     }
+    if (modelId.startsWith('nvidia/')) {
+      return (
+        <span className="model-tier-badge model-tier-nvidia" title="NVIDIA" aria-label="NVIDIA">
+          <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" className="model-tier-nvidia-icon">
+            <path d={siNvidia.path} fill="currentColor" />
+          </svg>
+        </span>
+      );
+    }
     if (modelId.startsWith('opencode/')) {
       return <span className="model-tier-badge model-tier-zen">Zen</span>;
     }
@@ -448,12 +494,22 @@ export function ModelPicker() {
         </div>
         {tool === 'opencode' && (
           <>
-            <label className="model-picker-go-toggle">
+            <label className="model-picker-go-toggle" data-tier="go">
               <input type="checkbox" checked={showGoOnly} onChange={toggleGoOnly} />
               <span className="model-picker-go-checkbox" />
               <span>{t('showGoModelsOnly')}</span>
             </label>
-            <label className="model-picker-go-toggle">
+            <label className="model-picker-go-toggle" data-tier="zen">
+              <input type="checkbox" checked={showZenOnly} onChange={toggleZenOnly} />
+              <span className="model-picker-go-checkbox" />
+              <span>{t('showZenModelsOnly')}</span>
+            </label>
+            <label className="model-picker-go-toggle" data-tier="nvidia">
+              <input type="checkbox" checked={showNvidiaOnly} onChange={toggleNvidiaOnly} />
+              <span className="model-picker-go-checkbox" />
+              <span>{t('showNvidiaModelsOnly')}</span>
+            </label>
+            <label className="model-picker-go-toggle" data-tier="free">
               <input type="checkbox" checked={showFreeOnly} onChange={toggleFreeOnly} />
               <span className="model-picker-go-checkbox" />
               <span>{t('showFreeModelsOnly')}</span>

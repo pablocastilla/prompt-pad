@@ -1655,6 +1655,20 @@ html, body, #root {
   border: 1px solid rgba(99, 102, 241, .2);
 }
 
+.model-tier-nvidia {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  background: rgba(118, 185, 0, .14);
+  color: #76b900;
+  border: 1px solid rgba(118, 185, 0, .25);
+}
+.model-tier-nvidia-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
 .model-picker-item:hover .model-tier-badge {
   transform: scale(1.06);
 }
@@ -1671,6 +1685,13 @@ html, body, #root {
   border-color: rgba(255, 226, 138, .25);
   color: #ffe28a;
   text-shadow: 0 0 6px rgba(255, 226, 138, .3);
+}
+
+[data-theme="gaudy"] .model-tier-nvidia {
+  background: linear-gradient(135deg, rgba(118, 185, 0, .15), rgba(255, 226, 138, .12));
+  border-color: rgba(118, 185, 0, .3);
+  color: #b8ff3a;
+  text-shadow: 0 0 6px rgba(118, 185, 0, .4);
 }
 
 /* ── GAUDY MODEL COST INDICATORS ─────────────────── */

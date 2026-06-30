@@ -123,10 +123,10 @@ function parseOpenCodeModels(raw: string): Array<{ id: string; label: string }> 
   const unique = new Map<string, { id: string; label: string }>();
   for (const line of raw.split(/\r?\n/)) {
     const clean = line.trim();
-    if (!clean.startsWith('opencode/') && !clean.startsWith('opencode-go/')) continue;
+    if (!clean.startsWith('opencode/') && !clean.startsWith('opencode-go/') && !clean.startsWith('nvidia/')) continue;
     unique.set(clean, {
       id: clean,
-      label: clean.replace(/^opencode(-go)?\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      label: clean.replace(/^(opencode|opencode-go|nvidia)\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
     });
   }
   return [...unique.values()];
