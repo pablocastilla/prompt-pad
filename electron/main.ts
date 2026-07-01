@@ -611,7 +611,7 @@ async function executeLaunchOpenCode(config: {
     const safeModel = escapeSingleQuotePS(model);
     const safeMsg   = escapeSingleQuotePS(message);
     const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
-    const yoloArg = yolo ? "'--dangerously-skip-permissions'" : '';
+    const yoloArg = yolo ? "'--auto'" : '';
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
       "$opencodePath = (Get-Command opencode.exe -ErrorAction SilentlyContinue).Source",
@@ -627,7 +627,7 @@ async function executeLaunchOpenCode(config: {
       "    $opencodePath = 'opencode'",
       "  }",
       "}",
-      "$ocArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "'" + (yoloArg ? ", " + yoloArg : '') + ", '" + safeMsg + "')",
+      "$ocArgs = @('--model', '" + safeModel + "', '--prompt', '" + safeMsg + "'" + (yoloArg ? ", " + yoloArg : '') + ", '" + safeDir + "')",
       "& $opencodePath @ocArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
@@ -645,11 +645,11 @@ async function executeLaunchOpenCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
-    const yoloArg = yolo ? ' --dangerously-skip-permissions' : '';
+    const yoloArg = yolo ? ' --auto' : '';
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'opencode run --model ' + JSON.stringify(model) + ' --dir ' + JSON.stringify(workDir) + yoloArg + ' ' + JSON.stringify(message),
+      'opencode --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message) + yoloArg + ' ' + JSON.stringify(workDir),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');
