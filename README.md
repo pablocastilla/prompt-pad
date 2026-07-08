@@ -251,6 +251,7 @@ The Gaudy theme is best experienced live. It features:
 - **Drag-to-reorder pinned**: drag the ⠿ handle on pinned models to reorder them.
 - **CLI sync**: pinned models are saved to `settings.json` and sync via OneDrive when enabled. The model list is always fresh from the CLI — pins just give you quick access to your favourites.
 - **Back button**: a `←` button returns to the provider picker if you change your mind about which CLI to use.
+- **Search box**: a text field at the top of the model list filters models live by name (label or id). Clearing the search restores the full pinned/available grouping, and a "no models match" message shows when nothing matches.
 
 ### Settings
 - **Language**: auto-detect (from system locale), English, or Spanish.

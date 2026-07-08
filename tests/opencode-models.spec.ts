@@ -298,4 +298,123 @@ test.describe('OpenCode Models Feature', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  test('model search box filters models by name', async () => {
+    const testDir = getTestDir();
+    try {
+      const launches = [
+        {
+          id: 'search-launch',
+          name: 'Search Box Test',
+          folder: process.cwd(),
+          shortcut: '1',
+        },
+      ];
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify(launches, null, 2), 'utf-8');
+      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+        theme: 'light', language: 'en', useOneDrive: false,
+      }, null, 2), 'utf-8');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('search box test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      const searchInput = page.locator('.model-picker-search-input');
+      await expect(searchInput).toBeVisible({ timeout: 3000 });
+      await expect(searchInput).toHaveAttribute('placeholder', /(Search models|Buscar modelos)/i);
+
+      await expect(page.locator('.model-picker-item')).not.toHaveCount(0, { timeout: 5000 });
+      const allItemsBefore = await page.locator('.model-picker-item').count();
+      console.log(`Model items before search: ${allItemsBefore}`);
+      expect(allItemsBefore).toBeGreaterThan(1);
+
+      const firstLabel = await page.locator('.model-picker-item-label').first().innerText();
+      console.log(`First model label: ${firstLabel}`);
+      const searchTerm = firstLabel.split(/[\/\s-]/)[0].slice(0, 4);
+      await searchInput.fill(searchTerm);
+
+      await page.waitForTimeout(200);
+
+      const itemsAfter = await page.locator('.model-picker-item').count();
+      console.log(`Model items after searching "${searchTerm}": ${itemsAfter}`);
+      expect(itemsAfter).toBeLessThanOrEqual(allItemsBefore);
+      expect(itemsAfter).toBeGreaterThan(0);
+
+      for (let i = 0; i < itemsAfter; i++) {
+        const label = await page.locator('.model-picker-item-label').nth(i).innerText();
+        expect(label.toLowerCase()).toContain(searchTerm.toLowerCase());
+      }
+
+      await searchInput.fill('zzz-nonexistent-model-xyz');
+      await page.waitForTimeout(200);
+      const emptyMsg = page.locator('.model-picker-empty');
+      await expect(emptyMsg).toBeVisible();
+      await expect(emptyMsg).toHaveText(/(No models match|Ningún modelo coincide)/i);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('search box filters with no OneDrive side effects', async () => {
+    const testDir = getTestDir();
+    try {
+      const launches = [
+        {
+          id: 'search-nodrive-launch',
+          name: 'Search No OneDrive Test',
+          folder: process.cwd(),
+          shortcut: '1',
+        },
+      ];
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify(launches, null, 2), 'utf-8');
+      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+        theme: 'light', language: 'en', useOneDrive: false,
+      }, null, 2), 'utf-8');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('search no onedrive');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      const searchInput = page.locator('.model-picker-search-input');
+      await expect(searchInput).toBeVisible({ timeout: 3000 });
+
+      await page.waitForTimeout(2000);
+      const firstLoadedLabel = await page.locator('.model-picker-item-label').first().innerText();
+      const term = firstLoadedLabel.split(/[\/\s:-]/)[0].slice(0, 4);
+      await searchInput.fill(term);
+      await page.waitForTimeout(200);
+
+      const itemsAfter = await page.locator('.model-picker-item').count();
+      console.log(`Model items after searching "${term}": ${itemsAfter}`);
+      expect(itemsAfter).toBeGreaterThan(0);
+
+      await searchInput.fill('');
+      await page.waitForTimeout(200);
+      const itemsRestored = await page.locator('.model-picker-item').count();
+      console.log(`Model items after clearing search: ${itemsRestored}`);
+      expect(itemsRestored).toBeGreaterThan(1);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });

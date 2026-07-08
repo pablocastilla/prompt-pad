@@ -105,6 +105,15 @@ export function ModelPicker() {
   const allModels = useMemo(() => [...pinnedModels, ...unpinnedModels], [pinnedModels, unpinnedModels]);
 
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const searchedModels = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return allModels;
+    return allModels.filter(m =>
+      m.label.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+    );
+  }, [allModels, searchQuery]);
 
   const setPinnedForTool = async (nextIds: string[]) => {
     const existingPinned = settings.pinnedModels ?? {};
@@ -253,6 +262,7 @@ export function ModelPicker() {
     setProviderIdx(0);
     setSelectedProvider(null);
     setSelectedIdx(0);
+    setSearchQuery('');
   }, [pendingLaunch?.launch.id]);
 
   // Never auto-scroll; keep list at top. User scrolls manually if needed.
@@ -262,6 +272,11 @@ export function ModelPicker() {
     if (!listEl) return;
     listEl.scrollTop = 0;
   }, [pendingLaunch, allModels.length, tool]);
+
+  // Keep selected index within bounds when the search query changes
+  useEffect(() => {
+    setSelectedIdx(i => (searchedModels.length === 0 ? 0 : Math.min(i, searchedModels.length - 1)));
+  }, [searchedModels.length]);
 
   const activeTabId = useStore(s => s.activeTabId);
   const setTabLaunchFolder = useStore(s => s.setTabLaunchFolder);
@@ -304,7 +319,7 @@ export function ModelPicker() {
 
   const execute = async (idx: number) => {
     if (!pendingLaunch) return;
-    const ms = allModels;
+    const ms = searchedModels;
     if (!ms[idx]) return;
     const model = ms[idx].id;
     const cost = getModelCostInfo(model);
@@ -320,6 +335,7 @@ export function ModelPicker() {
     if (TOOLS_WITH_MODEL_PICKER.includes(provider)) {
       setSelectedProvider(provider);
       setProviderStep('model');
+      setSearchQuery('');
       return;
     }
     // Providers without a model picker: launch directly with default model
@@ -362,7 +378,7 @@ export function ModelPicker() {
   // Keyboard handler for the model step (existing behaviour)
   useEffect(() => {
     if (!pendingLaunch || providerStep !== 'model') return;
-    const ms = allModels;
+    const ms = searchedModels;
     if (!ms.length) return;
     const handler = (e: KeyboardEvent) => {
       if (confirmExpensiveIdx !== null) {
@@ -396,7 +412,7 @@ export function ModelPicker() {
     };
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [pendingLaunch, providerStep, selectedIdx, allModels, pinnedModels.length, pinnedIds, confirmExpensiveIdx]);
+  }, [pendingLaunch, providerStep, selectedIdx, searchedModels, pinnedModels.length, pinnedIds, confirmExpensiveIdx]);
 
   function CostIndicator({ modelId }: { modelId: string }) {
     const info = getModelCostInfo(modelId);
@@ -516,6 +532,16 @@ export function ModelPicker() {
             </label>
           </>
         )}
+        <div className="model-picker-search">
+          <input
+            type="text"
+            className="model-picker-search-input"
+            placeholder={t('searchModelsPlaceholder')}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            data-testid="model-search-input"
+          />
+        </div>
         <div className="model-picker-list" ref={listRef}>
           {isLoading && <div className="model-picker-loading"><span className="model-picker-loading-dot" />{t('loadingModels')}</div>}
           {allModels.length === 0 ? (
@@ -523,6 +549,34 @@ export function ModelPicker() {
               <div className="model-picker-error">{modelError[tool]}</div>
             ) : (
               <div className="model-picker-loading">{t('loadingModels')}</div>
+            )
+          ) : searchQuery.trim() ? (
+            searchedModels.length === 0 ? (
+              <div className="model-picker-empty">{t('noModelsMatchSearch')}</div>
+            ) : (
+              searchedModels.map((m, idx) => (
+                <div
+                  key={m.id}
+                  data-model-index={idx}
+                  className={
+                    'model-picker-item' +
+                    (idx === selectedIdx ? ' selected' : '') +
+                    (pinnedIds.includes(m.id) ? ' pinned' : '')
+                  }
+                  onClick={() => execute(idx)}
+                  onMouseEnter={() => setSelectedIdx(idx)}
+                >
+                  <span className="model-picker-item-dot" />
+                  <span className="model-picker-item-label">{m.label}</span>
+                  <TierBadge modelId={m.id} />
+                  <CostIndicator modelId={m.id} />
+                  <button
+                    className={'model-picker-pin-btn' + (pinnedIds.includes(m.id) ? ' pinned' : '')}
+                    onClick={e => { e.stopPropagation(); togglePin(m.id); }}
+                    title={pinnedIds.includes(m.id) ? t('unpinModel') : t('pinModel')}
+                  >{pinnedIds.includes(m.id) ? '📌' : '📍'}</button>
+                </div>
+              ))
             )
           ) : (
             <>
@@ -608,8 +662,8 @@ export function ModelPicker() {
               <div className="model-picker-confirm-icon">⚠️</div>
               <div className="model-picker-confirm-text">{t('expensiveModelConfirm')}</div>
               <div className="model-picker-confirm-model">
-                {allModels[confirmExpensiveIdx]?.label}
-                {allModels[confirmExpensiveIdx] && <TierBadge modelId={allModels[confirmExpensiveIdx].id} />}
+                {searchedModels[confirmExpensiveIdx]?.label}
+                {searchedModels[confirmExpensiveIdx] && <TierBadge modelId={searchedModels[confirmExpensiveIdx].id} />}
               </div>
               <div className="model-picker-confirm-actions">
                 <button className="model-picker-confirm-btn model-picker-confirm-cancel" onClick={() => setConfirmExpensiveIdx(null)}>{t('cancelBtn')}</button>
