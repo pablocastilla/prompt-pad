@@ -197,17 +197,33 @@ export function ModelPicker() {
     void setPinnedForTool([...reorderedVisible, ...hiddenIds]);
   };
 
-  const cleanStalePins = async (selectedTool: LaunchTool, fetchedIds: string[]) => {
+  const cleanStalePins = async (selectedTool: LaunchTool, fetchedList: ModelOption[]) => {
     const pinned = settings.pinnedModels?.[selectedTool] ?? [];
     if (pinned.length === 0) return;
-    const stale = pinned.filter(id => !fetchedIds.includes(id));
-    if (stale.length === 0) return;
-    void setPinnedForTool(pinned.filter(id => !stale.includes(id)));
+    const validIds = new Set(fetchedList.map(m => m.id));
+    const labelToId = new Map(fetchedList.map(m => [m.label, m.id]));
+    let changed = false;
+    const nextPins: string[] = [];
+    for (const p of pinned) {
+      if (validIds.has(p)) {
+        nextPins.push(p);
+      } else if (labelToId.has(p)) {
+        nextPins.push(labelToId.get(p)!);
+        changed = true;
+      } else {
+        changed = true;
+      }
+    }
+    if (changed) {
+      void setPinnedForTool(nextPins);
+    }
   };
 
   const loadModels = async (selectedTool: LaunchTool, force = false) => {
     if (!TOOLS_WITH_MODEL_PICKER.includes(selectedTool)) return;
-    if (!force && (modelCache[selectedTool] || loadingModels[selectedTool])) return;
+    const shouldForce = force || selectedTool === 'antigravity';
+    if (loadingModels[selectedTool]) return;
+    if (!shouldForce && modelCache[selectedTool]) return;
     setLoadingModels(prev => ({ ...prev, [selectedTool]: true }));
     setModelError(prev => ({ ...prev, [selectedTool]: null }));
     try {
@@ -235,7 +251,7 @@ export function ModelPicker() {
         : list;
 
       setModelCache(prev => ({ ...prev, [selectedTool]: normalized }));
-      void cleanStalePins(selectedTool, normalized.map(m => m.id));
+      void cleanStalePins(selectedTool, normalized);
     } catch {
       setModelError(prev => ({ ...prev, [selectedTool]: t('modelsUnavailable') }));
     } finally {
@@ -252,7 +268,7 @@ export function ModelPicker() {
   // Trigger model loading once a provider with model picker support is selected
   useEffect(() => {
     if (pendingLaunch && selectedProvider && TOOLS_WITH_MODEL_PICKER.includes(selectedProvider)) {
-      void loadModels(selectedProvider);
+      void loadModels(selectedProvider, selectedProvider === 'antigravity');
     }
   }, [pendingLaunch?.launch.id, selectedProvider]);
 

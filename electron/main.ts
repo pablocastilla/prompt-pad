@@ -10,7 +10,7 @@ const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
 const DEFAULT_MODEL = 'claude-sonnet-4.6';
 const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.7';
-const DEFAULT_ANTIGRAVITY_MODEL = 'Gemini 3.5 Flash (Medium)';
+const DEFAULT_ANTIGRAVITY_MODEL = 'gemini-3.8-flash-medium';
 
 // Maximum reasoning effort supported by each model
 const MODEL_MAX_EFFORT: Record<string, string> = {
@@ -81,9 +81,12 @@ function normalizeOpenCodeModel(model: unknown): string {
   return candidate || DEFAULT_OPENCODE_MODEL;
 }
 
-function normalizeAntigravityModel(model: unknown): string {
+export function normalizeAntigravityModel(model: unknown): string {
   if (typeof model !== 'string') return DEFAULT_ANTIGRAVITY_MODEL;
-  const candidate = model.trim();
+  let candidate = model.trim();
+  if (candidate.includes('\t')) {
+    candidate = candidate.split('\t')[0].trim();
+  }
   return candidate || DEFAULT_ANTIGRAVITY_MODEL;
 }
 
@@ -132,9 +135,47 @@ function parseOpenCodeModels(raw: string): Array<{ id: string; label: string }> 
   return [...unique.values()];
 }
 
-function parseAntigravityModels(raw: string): Array<{ id: string; label: string }> {
-  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-  return lines.map(name => ({ id: name, label: name }));
+export function parseAntigravityModels(raw: string): Array<{ id: string; label: string }> {
+  if (!raw || typeof raw !== 'string') return [];
+  const clean = raw.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+  const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const result: Array<{ id: string; label: string }> = [];
+  const seen = new Set<string>();
+
+  for (const line of lines) {
+    if (/^(fetching|loading)\b/i.test(line)) continue;
+    if (/^id\s+(name|label|model)/i.test(line)) continue;
+
+    let id = '';
+    let label = '';
+
+    if (line.includes('\t')) {
+      const parts = line.split(/\t+/).map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        id = parts[0];
+        label = parts.slice(1).join(' ');
+      } else if (parts.length === 1) {
+        id = parts[0];
+        label = parts[0];
+      }
+    } else {
+      const spaceParts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
+      if (spaceParts.length >= 2) {
+        id = spaceParts[0];
+        label = spaceParts.slice(1).join(' ');
+      } else {
+        id = line;
+        label = line;
+      }
+    }
+
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      result.push({ id, label: label || id });
+    }
+  }
+
+  return result;
 }
 
 function parseCopilotModels(raw: string): Array<{ id: string; label: string }> {
@@ -390,29 +431,43 @@ ipcMain.handle('models:get-antigravity', async () => {
       return data;
     }
   }
-  if (antigravityModelsCache && antigravityModelsCache.length > 0) return antigravityModelsCache;
+
+  // Always attempt to fetch the latest models from the CLI
   try {
-    const output = await runCommand('agy.exe', ['models'], 8000);
+    const agyCmd = process.platform === 'win32' ? 'agy.exe' : 'agy';
+    const output = await runCommand(agyCmd, ['models'], 15000);
     const parsed = parseAntigravityModels(output);
     if (parsed.length > 0) {
       antigravityModelsCache = parsed;
       return parsed;
     }
   } catch {
-    // CLI failed, fall through to fallback
+    // CLI failed or unavailable, fall through to cache or fallback
   }
-  // Fallback list from agy CLI docs (v1.0.7)
+
+  if (antigravityModelsCache && antigravityModelsCache.length > 0) {
+    return antigravityModelsCache;
+  }
+
   const fallback: Array<{ id: string; label: string }> = [
-    { id: 'Gemini 3.5 Flash (Medium)', label: 'Gemini 3.5 Flash (Medium)' },
-    { id: 'Gemini 3.5 Flash (High)',   label: 'Gemini 3.5 Flash (High)' },
-    { id: 'Gemini 3.5 Flash (Low)',    label: 'Gemini 3.5 Flash (Low)' },
-    { id: 'Gemini 3.1 Pro (Low)',      label: 'Gemini 3.1 Pro (Low)' },
-    { id: 'Gemini 3.1 Pro (High)',     label: 'Gemini 3.1 Pro (High)' },
-    { id: 'Claude Sonnet 4.6 (Thinking)', label: 'Claude Sonnet 4.6 (Thinking)' },
-    { id: 'Claude Opus 4.6 (Thinking)',   label: 'Claude Opus 4.6 (Thinking)' },
-    { id: 'GPT-OSS 120B (Medium)',     label: 'GPT-OSS 120B (Medium)' },
+    { id: 'gemini-3.8-flash-high',        label: 'Gemini 3.8 Flash (High)' },
+    { id: 'gemini-3.8-flash-medium',      label: 'Gemini 3.8 Flash (Medium)' },
+    { id: 'gemini-3.8-flash-low',         label: 'Gemini 3.8 Flash (Low)' },
+    { id: 'gemini-3.7-flash-high',        label: 'Gemini 3.7 Flash (High)' },
+    { id: 'gemini-3.7-flash-medium',      label: 'Gemini 3.7 Flash (Medium)' },
+    { id: 'gemini-3.7-flash-low',         label: 'Gemini 3.7 Flash (Low)' },
+    { id: 'gemini-3.6-flash-high',        label: 'Gemini 3.6 Flash (High)' },
+    { id: 'gemini-3.6-flash-medium',      label: 'Gemini 3.6 Flash (Medium)' },
+    { id: 'gemini-3.6-flash-low',         label: 'Gemini 3.6 Flash (Low)' },
+    { id: 'gemini-3.1-pro-high',         label: 'Gemini 3.1 Pro (High)' },
+    { id: 'gemini-3.1-pro-low',          label: 'Gemini 3.1 Pro (Low)' },
+    { id: 'claude-sonnet-4-6',           label: 'Claude Sonnet 4.6 (Thinking)' },
+    { id: 'claude-opus-4-6-thinking',    label: 'Claude Opus 4.6 (Thinking)' },
+    { id: 'gpt-oss-120b-medium',         label: 'GPT-OSS 120B (Medium)' },
+    { id: 'Gemini 3.5 Flash (Medium)',   label: 'Gemini 3.5 Flash (Medium)' },
+    { id: 'Gemini 3.5 Flash (High)',     label: 'Gemini 3.5 Flash (High)' },
+    { id: 'Gemini 3.5 Flash (Low)',      label: 'Gemini 3.5 Flash (Low)' },
   ];
-  antigravityModelsCache = fallback;
   return fallback;
 });
 
@@ -744,7 +799,7 @@ async function executeLaunchAntigravity(config: {
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'agy.exe --model ' + JSON.stringify(model) + yoloArgNix + ' ' + modeFlag + ' ' + JSON.stringify(message),
+      'agy --model ' + JSON.stringify(model) + yoloArgNix + ' ' + modeFlag + ' ' + JSON.stringify(message),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');

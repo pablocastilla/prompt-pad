@@ -238,7 +238,7 @@ The Gaudy theme is best experienced live. It features:
 - **Hand-off to model picker**: OpenCode, GitHub Copilot and Antigravity open the model picker because they expose multiple models worth choosing from.
 
 ### Model Picker (OpenCode, GitHub Copilot & Antigravity)
-- **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `copilot help config`, or `agy.exe models`) at runtime, including Zen (`opencode/`), Go (`opencode-go/`) and NVIDIA (`nvidia/`) tiers.
+- **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `copilot help config`, or `agy models`) at runtime, including Zen (`opencode/`), Go (`opencode-go/`) and NVIDIA (`nvidia/`) tiers. Antigravity models are always refreshed live directly from the CLI whenever opened so you always have access to the latest models (e.g. Gemini 3.8 Flash).
 - **Provider-aware**: only shown for OpenCode, GitHub Copilot and Antigravity launches. Claude Code and Codex bypass it and launch with their default model.
 - **Go / Zen / NVIDIA tier filters**: three independent checkboxes to show or hide each OpenCode tier — Go (`opencode-go/`), Zen (`opencode/`) and NVIDIA (`nvidia/`). All three are enabled by default for OpenCode launches; uncheck any combination to focus the list (e.g. keep only Go and Zen, or only NVIDIA).
 - **Free filter**: a toggle to show only free models — looks for "free" in the model name. Free can be combined with the tier filters to show only free Go models, free Zen models, or free NVIDIA models.
