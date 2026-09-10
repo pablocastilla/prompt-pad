@@ -417,4 +417,58 @@ test.describe('OpenCode Models Feature', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  test('CLI returns DeepSeek V4.1 Flash with official name and matches deepseek 4.1 search', async () => {
+    const testDir = getTestDir();
+    try {
+      const launches = [
+        {
+          id: 'deepseek-search-launch',
+          name: 'DeepSeek Search Test',
+          folder: process.cwd(),
+          shortcut: '1',
+        },
+      ];
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify(launches, null, 2), 'utf-8');
+      fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
+        theme: 'light', language: 'en', useOneDrive: false,
+      }, null, 2), 'utf-8');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      const models = await page.evaluate(async () => {
+        return (window as unknown as {
+          electronAPI: { getOpenCodeModels: () => Promise<{ id: string; label: string }[]> }
+        }).electronAPI.getOpenCodeModels();
+      });
+
+      const dsFlash = models.find(m => m.id === 'opencode-go/deepseek-flash');
+      expect(dsFlash).toBeDefined();
+      expect(dsFlash?.label).toBe('DeepSeek V4.1 Flash');
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.launch-list-item').first().click();
+      await page.locator('.editor-textarea').fill('deepseek search test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.model-picker-overlay')).toBeVisible();
+      await selectOpenCodeProvider(page);
+
+      const searchInput = page.locator('.model-picker-search-input');
+      await expect(searchInput).toBeVisible({ timeout: 3000 });
+
+      // Search by "deepseek 4.1"
+      await searchInput.fill('deepseek 4.1');
+      await page.waitForTimeout(300);
+
+      const matchedLabels = await page.locator('.model-picker-item-label').allInnerTexts();
+      expect(matchedLabels).toContain('DeepSeek V4.1 Flash');
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
 });

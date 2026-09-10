@@ -31,6 +31,46 @@ const EMPTY_PROVIDER_NUMERIC_SHORTCUT: Record<string, number> = {
   Digit0: 9, Numpad0: 9,
 };
 
+export function matchesModelSearch(m: ModelOption, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const label = m.label.toLowerCase();
+  const id = m.id.toLowerCase();
+
+  // Exact substring check
+  if (label.includes(q) || id.includes(q)) return true;
+
+  // Normalized search: treat 'v4.1' and '4.1' equivalently, normalize separators
+  const norm = (str: string) =>
+    str
+      .toLowerCase()
+      .replace(/\bv(\d)/g, '$1')
+      .replace(/[-_/]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const normQ = norm(q);
+  const normLabel = norm(label);
+  const normId = norm(id);
+
+  if (normLabel.includes(normQ) || normId.includes(normQ)) return true;
+
+  // Multi-term / token matching: every token in query must match
+  const words = normQ.split(' ').filter(Boolean);
+  if (words.length > 1) {
+    const matchesAll = words.every(word =>
+      label.includes(word) ||
+      id.includes(word) ||
+      normLabel.includes(word) ||
+      normId.includes(word)
+    );
+    if (matchesAll) return true;
+  }
+
+  return false;
+}
+
 export function ModelPicker() {
   const pendingLaunch    = useStore(s => s.pendingLaunch);
   const setPendingLaunch = useStore(s => s.setPendingLaunch);
@@ -108,11 +148,9 @@ export function ModelPicker() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const searchedModels = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim();
     if (!q) return allModels;
-    return allModels.filter(m =>
-      m.label.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
-    );
+    return allModels.filter(m => matchesModelSearch(m, q));
   }, [allModels, searchQuery]);
 
   const setPinnedForTool = async (nextIds: string[]) => {

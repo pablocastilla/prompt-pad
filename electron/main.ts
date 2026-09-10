@@ -122,17 +122,71 @@ function runCommand(command: string, args: string[], timeout = 15000): Promise<s
   });
 }
 
-function parseOpenCodeModels(raw: string): Array<{ id: string; label: string }> {
-  const unique = new Map<string, { id: string; label: string }>();
-  for (const line of raw.split(/\r?\n/)) {
-    const clean = line.trim();
-    if (!clean.startsWith('opencode/') && !clean.startsWith('opencode-go/') && !clean.startsWith('nvidia/')) continue;
-    unique.set(clean, {
-      id: clean,
-      label: clean.replace(/^(opencode|opencode-go|nvidia)\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    });
+export function parseOpenCodeModels(raw: string): Array<{ id: string; label: string }> {
+  const result: Array<{ id: string; label: string }> = [];
+  const seen = new Set<string>();
+
+  const lines = raw.split(/\r?\n/);
+  let currentId: string | null = null;
+  let jsonBuffer = '';
+
+  const finishBlock = () => {
+    if (!currentId || seen.has(currentId)) return;
+    let label = '';
+    if (jsonBuffer.trim()) {
+      try {
+        const parsed = JSON.parse(jsonBuffer.trim());
+        if (parsed && typeof parsed.name === 'string' && parsed.name.trim()) {
+          label = parsed.name.trim();
+        }
+      } catch {
+        // Not JSON, fallback to formatting currentId
+      }
+    }
+    if (!label) {
+      label = currentId
+        .replace(/^(opencode|opencode-go|nvidia)\//, '')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+    seen.add(currentId);
+    result.push({ id: currentId, label });
+    currentId = null;
+    jsonBuffer = '';
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (/^(opencode|opencode-go|nvidia)\//.test(trimmed)) {
+      finishBlock();
+      currentId = trimmed;
+      jsonBuffer = '';
+      continue;
+    }
+
+    if (currentId) {
+      jsonBuffer += line + '\n';
+    }
   }
-  return [...unique.values()];
+  finishBlock();
+
+  // If no models were found via verbose blocks, fallback to line-by-line model ID list
+  if (result.length === 0) {
+    for (const line of lines) {
+      const clean = line.trim();
+      if (!clean.startsWith('opencode/') && !clean.startsWith('opencode-go/') && !clean.startsWith('nvidia/')) continue;
+      if (seen.has(clean)) continue;
+      seen.add(clean);
+      result.push({
+        id: clean,
+        label: clean.replace(/^(opencode|opencode-go|nvidia)\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      });
+    }
+  }
+
+  return result;
 }
 
 export function parseAntigravityModels(raw: string): Array<{ id: string; label: string }> {
@@ -392,6 +446,31 @@ ipcMain.handle('session:save', (_e, session: unknown) => {
 // OneDrive detection
 ipcMain.handle('onedrive:detect', () => detectOneDrivePath());
 
+// Remote Pricing & Metadata (models.dev)
+const PRICING_FETCH_TIMEOUT = 5000;
+let modelsDevCache: Record<string, any> | null = null;
+let modelsDevFetchPromise: Promise<Record<string, any> | null> | null = null;
+
+async function fetchModelsDev(): Promise<Record<string, any> | null> {
+  if (modelsDevCache) return modelsDevCache;
+  if (modelsDevFetchPromise) return modelsDevFetchPromise;
+  modelsDevFetchPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PRICING_FETCH_TIMEOUT);
+      const response = await fetch('https://models.dev/api.json', { signal: controller.signal });
+      clearTimeout(timer);
+      modelsDevCache = (await response.json()) as Record<string, any>;
+      return modelsDevCache;
+    } catch {
+      return null;
+    } finally {
+      modelsDevFetchPromise = null;
+    }
+  })();
+  return modelsDevFetchPromise;
+}
+
 // Dynamic model lists (cached in process memory)
 let openCodeModelsCache: { id: string; label: string }[] | null = null;
 let copilotModelsCache: { id: string; label: string }[] | null = null;
@@ -410,7 +489,13 @@ ipcMain.handle('models:get-opencode', async () => {
     }
   }
   if (openCodeModelsCache && openCodeModelsCache.length > 0) return openCodeModelsCache;
-  const output = await runCommand('opencode', ['models']);
+  let output = '';
+  try {
+    output = await runCommand('opencode', ['models', '--verbose']);
+  } catch {
+    output = await runCommand('opencode', ['models']);
+  }
+
   const parsed = parseOpenCodeModels(output);
   if (parsed.length === 0) {
     throw new Error('No models returned from opencode CLI');
@@ -475,6 +560,7 @@ ipcMain.handle('models:clear-cache', () => {
   openCodeModelsCache = null;
   copilotModelsCache = null;
   antigravityModelsCache = null;
+  modelsDevCache = null;
 });
 
 ipcMain.handle('models:get-copilot', async () => {
@@ -1271,16 +1357,10 @@ interface DayCostRow {
   tokensOut: number;
 }
 
-// ── Remote Pricing Data (models.dev) ──────────────────────────────────────────
-const PRICING_FETCH_TIMEOUT = 5000;
-
 ipcMain.handle('pricing:get', async () => {
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PRICING_FETCH_TIMEOUT);
-    const response = await fetch('https://models.dev/api.json', { signal: controller.signal });
-    clearTimeout(timer);
-    const data = await response.json();
+    const data = await fetchModelsDev();
+    if (!data) return null;
     const result: Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> = {};
 
     for (const providerKey of ['opencode', 'opencode-go']) {

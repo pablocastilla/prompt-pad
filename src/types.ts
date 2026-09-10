@@ -105,6 +105,8 @@ const ZEN_PRICING: Record<string, ZenPricing> = {
   'minimax-m2.7':            { input: 0.30,  output: 1.20,   cachedRead: 0.06,  cachedWrite: 0.375 },
   'qwen3.5-plus':            { input: 0.20,  output: 1.20,   cachedRead: 0.02,  cachedWrite: 0.25 },
   'deepseek-v4-flash':       { input: 0.14,  output: 0.28,   cachedRead: 0.03 },
+  'deepseek-flash':          { input: 0.15,  output: 0.60,   cachedRead: 0.003 },
+  'deepseek-v4.1-flash':     { input: 0.15,  output: 0.60,   cachedRead: 0.003 },
   'mimo-v2.5':               { input: 0.14,  output: 0.28,   cachedRead: 0.0028 },
 
   'gpt-5.1-codex-mini':      { input: 0.25,  output: 2.00,   cachedRead: 0.025 },

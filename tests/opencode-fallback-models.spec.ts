@@ -208,7 +208,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       const bodyText = await page.locator('.model-picker-card').innerText();
       expect(bodyText).toContain('Claude');
-      expect(bodyText).toContain('Deepseek');
+      expect(bodyText).toMatch(/deepseek/i);
       expect(bodyText).toContain('Free');
 
       const freeBadges = page.locator('.model-cost-badge.model-cost-free');
