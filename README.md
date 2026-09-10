@@ -280,6 +280,7 @@ Prompt Pad automatically keeps itself up to date:
 - Downloads updates silently in the background
 - Prompts to restart when a new version is ready
 - Manual "Check for updates" button in Settings
+- Resolves the newest version directly from the GitHub releases feed (highest stable `vX.Y.Z` tag), so update checks stay reliable even when GitHub's "latest release" marker is briefly out of sync
 - No need to manually download installers — updates are applied automatically
 
 ---

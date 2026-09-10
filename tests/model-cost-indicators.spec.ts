@@ -416,22 +416,14 @@ test.describe('Model Cost Indicators', () => {
         return document.querySelectorAll('.model-picker-item').length >= 1;
       }, { timeout: 5000 });
 
-      // The most expensive Zen model — 5 filled bars, definitely tier 5.
-      const item = page.locator('.model-picker-item', {
-        has: page.locator('.model-picker-item-label', { hasText: /^Gpt 5\.5 Pro$/i }),
+      // Pick any tier-5 model (5 filled bars) currently shipped by the CLI.
+      // Hardcoded model names go stale as the CLI catalog evolves, so the
+      // test selects the most expensive model shown in the real list.
+      const tierFiveItem = page.locator('.model-picker-item', {
+        has: page.locator('.model-cost-bars', { hasText: '▮▮▮▮▮' }),
       }).first();
-      const exists = await item.count();
-      if (exists === 0) {
-        // Fall back to any other known tier-5 model from the catalog.
-        const fallback = page.locator('.model-picker-item', {
-          has: page.locator('.model-picker-item-label', { hasText: /^Claude Opus 4 7$/i }),
-        }).first();
-        await expect(fallback, 'fallback tier-5 model').toBeVisible();
-        await fallback.click();
-      } else {
-        await expect(item).toBeVisible();
-        await item.click();
-      }
+      await expect(tierFiveItem, 'at least one tier-5 model should be listed').toBeVisible({ timeout: 5000 });
+      await tierFiveItem.click();
       await expect(page.locator('.model-picker-confirm-overlay')).toBeVisible({ timeout: 3000 });
       await expect(page.locator('.model-picker-confirm-launch')).toBeVisible();
 

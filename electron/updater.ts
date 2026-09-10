@@ -1,8 +1,27 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
+import { RELEASES_BASE_URL, resolveNewestStableTag } from './updateFeed';
 
 let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+async function checkForUpdates(): Promise<void> {
+  if (!app.isPackaged) {
+    log.info('Skipping update check in development mode.');
+    return;
+  }
+  const tag = await resolveNewestStableTag();
+  if (tag) {
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: `${RELEASES_BASE_URL}/download/${tag}`,
+      useMultipleRangeRequest: false,
+    });
+  } else {
+    log.info('Falling back to GitHub latest release marker for update check.');
+  }
+  await autoUpdater.checkForUpdatesAndNotify();
+}
 
 export function setupAutoUpdater(mainWindow: Electron.BrowserWindow | null) {
   log.transports.file.level = 'info';
@@ -60,12 +79,12 @@ export function setupAutoUpdater(mainWindow: Electron.BrowserWindow | null) {
     });
   });
 
-  void autoUpdater.checkForUpdatesAndNotify();
+  void checkForUpdates();
 
   // Periodic check every 4 hours
   if (updateCheckInterval) clearInterval(updateCheckInterval);
   updateCheckInterval = setInterval(() => {
-    void autoUpdater.checkForUpdatesAndNotify();
+    void checkForUpdates();
   }, 4 * 60 * 60 * 1000);
 }
 
@@ -107,7 +126,7 @@ export function checkForUpdatesManually(mainWindow: Electron.BrowserWindow | nul
       detail: `${err.message}\n\n${detail}`,
     });
   });
-  void autoUpdater.checkForUpdatesAndNotify();
+  void checkForUpdates();
 }
 
 // IPC handler for manual update check
