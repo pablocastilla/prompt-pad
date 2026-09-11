@@ -29,6 +29,8 @@ const translations = {
     storage: 'Storage',
     syncOneDrive: 'Sync with OneDrive (launches & phrases)',
     oneDriveNotFound: 'OneDrive not detected on this system.',
+    notifications: 'Notifications',
+    sessionSound: 'Play a sound when an OpenCode session finishes or asks a question',
     selectModelToLaunch: 'Select model',
     selectProviderToLaunch: 'Select provider',
     providerPickerHint: '↑↓ navigate · Enter select · Esc cancel',
@@ -101,6 +103,7 @@ const translations = {
     sessionsLoading: 'Reading OpenCode sessions…', sessionsClosesIn: 'Closes in',
     sessionsActivity: 'Recent activity', sessionsNoActivity: 'No messages yet.',
     sessionsNoModel: 'Model pending', sessionsChild: 'Sub-session', sessionsYou: 'You', sessionsLastCheck: 'Last checked',
+    sessionsSound: 'Sound', sessionsSoundHint: 'Play a soft chime when a session finishes or asks a question',
     helpSessionsTitle: 'OpenCode sessions',
     helpSessionsText: 'All local OpenCode sessions in live columns, including sessions launched outside Prompt Pad. Read recent messages and tool progress, close columns yourself, or let finished turns disappear after 30 minutes.',
     // Statistics panel
@@ -169,6 +172,8 @@ const translations = {
     storage: 'Almacenamiento',
     syncOneDrive: 'Sincronizar con OneDrive (lanzamientos y frases)',
     oneDriveNotFound: 'OneDrive no detectado en este sistema.',
+    notifications: 'Notificaciones',
+    sessionSound: 'Reproducir un sonido al finalizar una sesión de OpenCode o cuando haga una pregunta',
     selectModelToLaunch: 'Seleccionar modelo',
     selectProviderToLaunch: 'Seleccionar proveedor',
     providerPickerHint: '↑↓ navegar · Enter seleccionar · Esc cancelar',
@@ -241,6 +246,7 @@ const translations = {
     sessionsLoading: 'Leyendo sesiones de OpenCode…', sessionsClosesIn: 'Se cierra en',
     sessionsActivity: 'Actividad reciente', sessionsNoActivity: 'Todavía no hay mensajes.',
     sessionsNoModel: 'Modelo pendiente', sessionsChild: 'Subsesión', sessionsYou: 'Tú', sessionsLastCheck: 'Última consulta',
+    sessionsSound: 'Sonido', sessionsSoundHint: 'Reproducir un tono suave al finalizar una sesión o cuando haga una pregunta',
     helpSessionsTitle: 'Sesiones de OpenCode',
     helpSessionsText: 'Todas las sesiones locales de OpenCode en columnas en vivo, incluidas las iniciadas fuera de Prompt Pad. Lee mensajes y progreso de herramientas, cierra columnas manualmente o deja que los turnos finalizados desaparezcan tras 30 minutos.',
     // Panel de estadísticas

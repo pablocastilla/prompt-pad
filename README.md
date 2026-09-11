@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.0.0** — now with a central, live OpenCode sessions board.
+**Version 3.1.0** — now with sound notifications when an OpenCode session finishes or asks a question.
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex** or **Antigravity** — without leaving your keyboard.
 
@@ -132,6 +132,7 @@ Your launch history is basically a prompt journal you didn't have to write. Ever
 Click **▥ OpenCode sessions** in the activity bar to open a dashboard tab next to your prompts and statistics. Each local OpenCode session gets its own column, including sessions started directly in a terminal or in other project folders.
 
 - **Live view:** refreshes every 3 seconds with the project folder, model, latest messages and tool progress. Active work appears first; scroll horizontally for more sessions and vertically within each column. New output follows automatically unless you scroll up to read.
+- **Sound notifications:** a soft two-note chime plays when a turn finishes or errors, and a distinct chime plays when the agent needs you — an open `question` tool, or a tool stuck waiting for your approval. Notifications work in the background, even while you are in the terminal or on another tab, and are transition-based so sessions already finished at startup stay silent. Toggle them with the **Sound** checkbox on the sessions board or in Settings.
 - **Automatic cleanup:** a finished or failed turn stays visible for **30 minutes from its recorded completion**, then its column disappears. Intermediate tool-call steps do not start this countdown. A new prompt in the same session brings the column back.
 - **Manual close:** the **×** on a column hides the current turn, including across Prompt Pad restarts. **Restore hidden** brings back unexpired hidden columns. Closing a column does not stop OpenCode, delete a session or alter its database.
 - **Search:** filter by session title, folder or model. English/Spanish and all four themes are supported.
@@ -272,6 +273,7 @@ The Gaudy theme is best experienced live. It features:
 
 ### Settings
 - **Language**: auto-detect (from system locale), English, or Spanish.
+- **Session sound notifications**: toggle the chime that plays when an OpenCode session finishes or asks a question. The same switch is available on the OpenCode sessions board.
 - **OneDrive sync**: `phrases.json` and `launches.json` can be synced via OneDrive. First-enable migrates existing files automatically.
 - **Auto-updates**: automatically checks for new versions on startup and every 4 hours. Downloads and installs updates silently — just restart when prompted. Manual check button also available.
 
@@ -342,9 +344,10 @@ npm run dist         # All platforms (Windows + macOS)
 npm run build
 npm test             # Full Playwright/Electron suite
 npx playwright test tests/opencode-sessions.spec.ts
+npx playwright test tests/session-sound.spec.ts
 ```
 
-Tests launch with `PROMPT_PAD_TEST_DIR` in temporary folders. App files and the Electron browser profile are isolated there, and OneDrive sync is bypassed even if enabled in test settings. OpenCode database discovery in test mode only reads `<test-dir>/opencode.db`, never the personal database. Session-board tests use real SQLite fixtures through Electron's native driver to cover streaming, WAL concurrency, completion/expiry, manual hiding/restart/restore, schema recovery, search, tab behavior, language and themes. The 30-minute boundary is verified with a controlled clock.
+Tests launch with `PROMPT_PAD_TEST_DIR` in temporary folders. App files and the Electron browser profile are isolated there, and OneDrive sync is bypassed even if enabled in test settings. OpenCode database discovery in test mode only reads `<test-dir>/opencode.db`, never the personal database. Session-board tests use real SQLite fixtures through Electron's native driver to cover streaming, WAL concurrency, completion/expiry, manual hiding/restart/restore, schema recovery, search, tab behavior, language and themes. The 30-minute boundary is verified with a controlled clock. Session-sound tests stub `AudioContext` to count chime notes and verify finish, error and question triggers, silence for pre-existing state, and the board/Settings toggles. No sound is emitted during tests.
 
 ### macOS installer
 The macOS build produces a `.dmg` installer for both Intel (`x64`) and Apple Silicon (`arm64`) Macs. Download the appropriate `.dmg` from GitHub Releases, open it, and drag Prompt Pad to your Applications folder.

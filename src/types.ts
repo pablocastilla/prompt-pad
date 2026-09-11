@@ -27,6 +27,7 @@ export interface Settings {
   theme: 'light' | 'dark' | 'gaudy' | 'cyberpunk';
   language: 'auto' | 'es' | 'en';
   useOneDrive?: boolean;
+  sessionSoundEnabled?: boolean;
   pinnedModels?: Partial<Record<LaunchTool, string[]>>;
   showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
   showZenModelsOnly?: Partial<Record<LaunchTool, boolean>>;

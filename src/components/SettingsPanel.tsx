@@ -41,6 +41,12 @@ export function SettingsPanel() {
     await window.electronAPI.saveSettings(next);
   };
 
+  const toggleSessionSound = async () => {
+    const next = { ...settings, sessionSoundEnabled: settings.sessionSoundEnabled === false };
+    setSettings(next);
+    await window.electronAPI.saveSettings(next);
+  };
+
   const updateShortcutModifier = async (
     key: 'phraseShortcutModifier' | 'launchShortcutModifier' | 'openVsCodeShortcutModifier',
     value: Settings['phraseShortcutModifier'] | Settings['launchShortcutModifier'] | Settings['openVsCodeShortcutModifier']
@@ -115,6 +121,18 @@ export function SettingsPanel() {
         ) : (
           <div className="settings-info settings-muted">{t('oneDriveNotFound')}</div>
         )}
+      </div>
+
+      <div className="settings-section">
+        <h4>{t('notifications')}</h4>
+        <label className="settings-toggle">
+          <input
+            type="checkbox"
+            checked={settings.sessionSoundEnabled !== false}
+            onChange={toggleSessionSound}
+          />
+          <span>{t('sessionSound')}</span>
+        </label>
       </div>
 
       <div className="settings-section">

@@ -56,7 +56,8 @@ function SessionColumn({ session, now, closing, onClose }: {
 }
 
 export function SessionsPanel() {
-  useStore(s => s.settings); // Re-render translations when language changes.
+  const settings = useStore(s => s.settings); // Re-render translations when language changes.
+  const setSettings = useStore(s => s.setSettings);
   const [snapshot, setSnapshot] = useState<OpenCodeSessionsSnapshot | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -90,6 +91,11 @@ export function SessionsPanel() {
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { setClosing(null); }
   };
+  const toggleSound = async () => {
+    const next = { ...settings, sessionSoundEnabled: settings.sessionSoundEnabled === false };
+    setSettings(next);
+    try { await window.electronAPI.saveSettings(next); } catch { /* keep the UI responsive on save failure */ }
+  };
   const query = search.trim().toLocaleLowerCase();
   const sessions = snapshot?.sessions.filter(s => `${s.title} ${s.directory} ${s.model}`.toLocaleLowerCase().includes(query)) || [];
   return <section className="sessions-panel" aria-label={t('sessionsTitle')}>
@@ -101,6 +107,10 @@ export function SessionsPanel() {
       <input type="search" aria-label={t('sessionsSearch')} placeholder={t('sessionsSearch')}
         value={search} onChange={e => setSearch(e.target.value)} />
       <span>{sessions.length} {t('statsSessions').toLocaleLowerCase()}</span>
+      <label className="sessions-sound" title={t('sessionsSoundHint')}>
+        <input type="checkbox" checked={settings.sessionSoundEnabled !== false} onChange={() => void toggleSound()} />
+        <span>{t('sessionsSound')}</span>
+      </label>
       {!!snapshot?.hiddenCount && <button className="btn" disabled={closing !== null} onClick={() => void changeVisibility()}>
         {t('sessionsRestore')} ({snapshot.hiddenCount})
       </button>}

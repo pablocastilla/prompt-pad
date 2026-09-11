@@ -12,6 +12,7 @@ import { StatsPanel } from './components/StatsPanel';
 import { SessionsPanel } from './components/SessionsPanel';
 import { GitDiffPanel } from './components/GitDiffPanel';
 import { HelpOverlay } from './components/HelpOverlay';
+import { useSessionSound } from './sessionSound';
 import { initPricingData, isDashboardTab } from './types';
 import type { LaunchConfig, Phrase, Settings, Tab } from './types';
 import './App.css';
@@ -49,6 +50,9 @@ export default function App() {
   const setPendingLaunch  = useStore(s => s.setPendingLaunch);
   const activeTab = tabs.find(tab => tab.id === activeTabId);
 
+  // ── Chime when an OpenCode session finishes or needs you (any tab, background) ──
+  useSessionSound(settings.sessionSoundEnabled !== false);
+
   // ── Initial load: settings, phrases, launches, session ──────────────
   useEffect(() => {
     (async () => {
@@ -64,6 +68,7 @@ export default function App() {
         ...{
           theme: 'dark' as const,
           language: 'auto' as const,
+          sessionSoundEnabled: true,
           pinnedModels: { copilot: [], opencode: [] },
           phraseShortcutModifier: 'ctrl' as const,
           launchShortcutModifier: 'ctrl+shift' as const,

@@ -5,6 +5,8 @@
 .sessions-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .sessions-controls input { flex: 1; min-width: 160px; padding: 8px 12px; background: var(--input-bg); color: var(--text); border: 1px solid var(--input-bd); border-radius: 6px; }
 .sessions-controls > span { color: var(--text2); font-size: 12px; }
+.sessions-sound { display: flex; align-items: center; gap: 6px; color: var(--text2); font-size: 12px; cursor: pointer; user-select: none; }
+.sessions-controls .sessions-sound input[type="checkbox"] { flex: none; min-width: 0; width: 15px; height: 15px; padding: 0; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .sessions-board { display: flex; flex: 1; min-height: 0; overflow-x: auto; gap: 14px; padding-bottom: 8px; }
 .session-column { flex: 0 0 350px; max-width: 100%; display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-bg); overflow: hidden; }
 .session-column-header { padding: 14px; border-bottom: 1px solid var(--border); }

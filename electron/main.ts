@@ -339,6 +339,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Keep the background session poll accurate and let the finish chime play
+      // without requiring a user gesture (the window is often unfocused).
+      backgroundThrottling: false,
+      autoplayPolicy: 'no-user-gesture-required',
     },
   };
   if (icon) {
