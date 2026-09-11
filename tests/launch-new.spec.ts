@@ -357,7 +357,7 @@ test.describe('Provider picker navigation', () => {
         const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
         (api as { getOpenCodeModels: () => Promise<unknown> }).getOpenCodeModels = async () => [
           { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
-          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
         ];
       });
 
@@ -400,7 +400,7 @@ test.describe('Provider picker navigation', () => {
       await page.evaluate(() => {
         const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
         (api as { getOpenCodeModels: () => Promise<unknown> }).getOpenCodeModels = async () => [
-          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
         ];
       });
 
@@ -447,8 +447,8 @@ test.describe('Provider picker navigation', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI;
         api.getCopilotModels = async () => [
-          { id: 'gpt-5', label: 'GPT-5' },
-          { id: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
+          { id: 'auto', label: 'auto' },
+          { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
         ];
       });
 
@@ -564,8 +564,8 @@ test.describe('Provider picker navigation', () => {
       await page.evaluate(() => {
         const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
         (api as { getAntigravityModels: () => Promise<unknown> }).getAntigravityModels = async () => [
-          { id: 'Gemini 3.5 Flash (Medium)', label: 'Gemini 3.5 Flash (Medium)' },
-          { id: 'Claude Sonnet 4.6 (Thinking)', label: 'Claude Sonnet 4.6 (Thinking)' },
+          { id: 'gemini-3.8-flash-low', label: 'Gemini 3.8 Flash (Low)' },
+          { id: 'gemini-3.8-flash-medium', label: 'Gemini 3.8 Flash (Medium)' },
         ];
       });
 
@@ -610,7 +610,7 @@ test.describe('Provider picker navigation', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI;
         api.getOpenCodeModels = async () => [
-          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
         ];
       });
 

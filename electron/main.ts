@@ -10,9 +10,9 @@ const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
 const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
 if (TEST_DIR) app.setPath('userData', path.join(TEST_DIR, 'electron-profile'));
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
-const DEFAULT_MODEL = 'claude-sonnet-4.6';
-const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.7';
-const DEFAULT_ANTIGRAVITY_MODEL = 'gemini-3.8-flash-medium';
+export const DEFAULT_MODEL = 'auto';
+export const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.5-free';
+export const DEFAULT_ANTIGRAVITY_MODEL = 'gemini-3.8-flash-medium';
 
 // Maximum reasoning effort supported by each model
 const MODEL_MAX_EFFORT: Record<string, string> = {
@@ -71,13 +71,13 @@ function getSettingsPath(): string {
   return syncSettingsPath;
 }
 
-function normalizeModel(model: unknown): string {
+export function normalizeModel(model: unknown): string {
   if (typeof model !== 'string') return DEFAULT_MODEL;
   const candidate = model.trim();
   return candidate || DEFAULT_MODEL;
 }
 
-function normalizeOpenCodeModel(model: unknown): string {
+export function normalizeOpenCodeModel(model: unknown): string {
   if (typeof model !== 'string') return DEFAULT_OPENCODE_MODEL;
   const candidate = model.trim();
   return candidate || DEFAULT_OPENCODE_MODEL;
@@ -569,6 +569,12 @@ ipcMain.handle('models:clear-cache', () => {
   modelsDevCache = null;
 });
 
+ipcMain.handle('models:get-defaults', () => ({
+  copilot: DEFAULT_MODEL,
+  opencode: DEFAULT_OPENCODE_MODEL,
+  antigravity: DEFAULT_ANTIGRAVITY_MODEL,
+}));
+
 ipcMain.handle('models:get-copilot', async () => {
   if (TEST_DIR) {
     const mockFile = path.join(TEST_DIR, 'mock-copilot-models.json');
@@ -691,10 +697,15 @@ ipcMain.handle('launch:execute', async (_e, config: {
   // In test mode we never spawn real terminals. We capture the call so tests can assert on it.
   if (TEST_DIR) {
     try {
+      const normalizedModel =
+        tool === 'opencode' ? normalizeOpenCodeModel(config.model) :
+        tool === 'antigravity' ? normalizeAntigravityModel(config.model) :
+        tool === 'copilot' ? normalizeModel(config.model) : config.model;
+
       const id = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
       fs.writeFileSync(
         path.join(APP_DIR, 'launch-call-' + id + '.json'),
-        JSON.stringify({ ...config, tool }, null, 2),
+        JSON.stringify({ ...config, tool, normalizedModel }, null, 2),
         'utf-8'
       );
     } catch {

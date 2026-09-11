@@ -126,7 +126,10 @@ export function ModelPicker() {
         if (!matchesTier) return false;
 
         if (showFreeOnly) {
-          return m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free');
+          const cost = getModelCostInfo(m.id);
+          const isFreeByCost = cost?.tier === 'free';
+          const isFreeByName = m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free');
+          return isFreeByCost || isFreeByName;
         }
         return true;
       });

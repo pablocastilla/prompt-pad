@@ -356,6 +356,7 @@ export interface ElectronAPI {
   getOpenCodeModels: () => Promise<ModelOption[]>;
   getCopilotModels: () => Promise<ModelOption[]>;
   getAntigravityModels: () => Promise<ModelOption[]>;
+  getDefaultModels: () => Promise<{ copilot: string; opencode: string; antigravity: string }>;
   clearModelCache: () => Promise<void>;
   readClipboardImage: () => Promise<{ name: string; path: string; size: number } | null>;
   clipboardHasImage: () => boolean;
