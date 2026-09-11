@@ -32,8 +32,8 @@ test.describe('Help overlay', () => {
       await page.waitForTimeout(400);
 
       const buttons = page.locator('.activity-bar .activity-btn');
-      // launches, phrases, history, stats, help, settings -> 6 buttons
-      await expect(buttons).toHaveCount(6);
+      // launches, phrases, history, sessions, stats, help, settings
+      await expect(buttons).toHaveCount(7);
 
       const statsBtn = page.locator('.activity-btn[data-tour-id="statistics"]');
       const helpBtn = page.locator('.activity-btn[data-tour-id="help"]');
@@ -91,11 +91,11 @@ test.describe('Help overlay', () => {
       await expect(card.locator('.help-card-title')).toContainText(/Prompt Pad/i);
       await expect(card.locator('.help-card-subtitle')).not.toBeEmpty();
 
-      // All six features should be explained.
+      // Every activity-bar feature should be explained.
       const items = card.locator('.help-item');
-      await expect(items).toHaveCount(6);
+      await expect(items).toHaveCount(7);
 
-      for (const id of ['launches', 'phrases', 'history', 'statistics', 'help', 'settings']) {
+      for (const id of ['launches', 'phrases', 'history', 'sessions', 'statistics', 'help', 'settings']) {
         const item = card.locator(`.help-item[data-help-for="${id}"]`);
         await expect(item).toBeVisible();
         // Each item carries an arrow icon and a non-empty title + text.
@@ -265,9 +265,10 @@ test.describe('Help overlay', () => {
 
   test('help overlay positions to the right of the activity bar and points its arrows back toward it', async () => {
     const testDir = getTestDir();
+    let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
     try {
       saveSettings(testDir);
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(400);
@@ -287,14 +288,14 @@ test.describe('Help overlay', () => {
       // Every help-item arrow renders text content (the actual arrow glyph).
       const arrows = page.locator('.help-arrow');
       const arrowCount = await arrows.count();
-      expect(arrowCount).toBe(6);
+      expect(arrowCount).toBe(7);
       for (let i = 0; i < arrowCount; i++) {
         const txt = await arrows.nth(i).textContent();
         expect(txt?.trim().length ?? 0).toBeGreaterThan(0);
       }
 
-      await app.close();
     } finally {
+      await app?.close();
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });

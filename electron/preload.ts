@@ -75,6 +75,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Statistics
   getOpenCodeStats: () => ipcRenderer.invoke('stats:opencode'),
   getPRStats: () => ipcRenderer.invoke('prs:stats'),
+  getOpenCodeSessions: () => ipcRenderer.invoke('opencode-sessions:list'),
+  dismissOpenCodeSession: (id: string, turnId: string) => ipcRenderer.invoke('opencode-sessions:dismiss', id, turnId),
+  restoreOpenCodeSessions: () => ipcRenderer.invoke('opencode-sessions:restore'),
 
   // Git integration
   getGitStatus: (folder: string) => ipcRenderer.invoke('git:status', folder),

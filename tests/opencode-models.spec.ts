@@ -418,8 +418,9 @@ test.describe('OpenCode Models Feature', () => {
     }
   });
 
-  test('CLI returns DeepSeek V4.1 Flash with official name and matches deepseek 4.1 search', async () => {
+  test('official CLI model names match normalized version searches', async () => {
     const testDir = getTestDir();
+    let app: Awaited<ReturnType<typeof electron.launch>> | undefined;
     try {
       const launches = [
         {
@@ -433,8 +434,12 @@ test.describe('OpenCode Models Feature', () => {
       fs.writeFileSync(path.join(testDir, 'settings.json'), JSON.stringify({
         theme: 'light', language: 'en', useOneDrive: false,
       }, null, 2), 'utf-8');
+      // The live catalog changes independently of Prompt Pad. Pin this search regression's input.
+      fs.writeFileSync(path.join(testDir, 'mock-opencode-models.json'), JSON.stringify([
+        { id: 'opencode-go/deepseek-flash', label: 'DeepSeek V4.1 Flash' },
+      ]));
 
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
 
@@ -466,8 +471,8 @@ test.describe('OpenCode Models Feature', () => {
       const matchedLabels = await page.locator('.model-picker-item-label').allInnerTexts();
       expect(matchedLabels).toContain('DeepSeek V4.1 Flash');
 
-      await app.close();
     } finally {
+      await app?.close();
       fs.rmSync(testDir, { recursive: true, force: true });
     }
   });

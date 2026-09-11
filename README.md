@@ -1,5 +1,7 @@
 # Prompt Pad
 
+**Version 3.0.0** — now with a central, live OpenCode sessions board.
+
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex** or **Antigravity** — without leaving your keyboard.
 
 ---
@@ -125,6 +127,21 @@ Enter the **Launch History** panel. Every time you fire a prompt, Prompt Pad rem
 
 Your launch history is basically a prompt journal you didn't have to write. Every fire-and-forget prompt is catalogued, searchable, and one double-click away from resurrection.
 
+### OpenCode Sessions — All Your Agents in One Place
+
+Click **▥ OpenCode sessions** in the activity bar to open a dashboard tab next to your prompts and statistics. Each local OpenCode session gets its own column, including sessions started directly in a terminal or in other project folders.
+
+- **Live view:** refreshes every 3 seconds with the project folder, model, latest messages and tool progress. Active work appears first; scroll horizontally for more sessions and vertically within each column. New output follows automatically unless you scroll up to read.
+- **Automatic cleanup:** a finished or failed turn stays visible for **30 minutes from its recorded completion**, then its column disappears. Intermediate tool-call steps do not start this countdown. A new prompt in the same session brings the column back.
+- **Manual close:** the **×** on a column hides the current turn, including across Prompt Pad restarts. **Restore hidden** brings back unexpired hidden columns. Closing a column does not stop OpenCode, delete a session or alter its database.
+- **Search:** filter by session title, folder or model. English/Spanish and all four themes are supported.
+
+**How status works:** OpenCode keeps its exact `busy`/`idle` status in memory, not SQLite. The board therefore infers **Working**, **Waiting**, **Finished** and **Error / interrupted** from persisted messages and tools. Unfinished sessions with no recorded activity for 5 minutes are marked **Uncertain**, kept open and placed after active/recently finished sessions. They may be waiting for permission, running a long tool, or left over from an interrupted process; SQLite alone cannot distinguish these. Only a recorded final answer/error starts the 30-minute removal timer. Archived sessions are omitted.
+
+The reader opens `opencode.db` **read-only**, using short, consistent SQLite transactions compatible with concurrent WAL writes. It displays the latest 12 messages (up to 80 visible text/tool entries, with long text excerpts bounded to 6,000 characters). Checked against the installed **OpenCode 1.18.30** schema; extra columns are ignored and optional session metadata is not required. Missing databases and incompatible schemas are shown in the panel and retried automatically.
+
+The default location on Windows, macOS and Linux is `$XDG_DATA_HOME/opencode/opencode.db`, falling back to `~/.local/share/opencode/opencode.db`, with legacy AppData/Application Support locations also detected. For a custom installation, set `PROMPT_PAD_OPENCODE_DB` before starting Prompt Pad. The board reads one local database; it does not aggregate other machines or providers.
+
 ### Why This Beats Terminal Tabs
 
 | Terminal Tabs | Prompt Pad |
@@ -190,7 +207,7 @@ The Gaudy theme is best experienced live. It features:
 ## Features
 
 ### Editor
-- **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close. Statistics opens as a tab too — close it to return to your editor tabs.
+- **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close. Statistics and OpenCode sessions open as tabs too — close them to return to your editor tabs.
 - **Auto-session**: tab state (title, content, path) is saved every 600 ms and restored on the next launch.
 - **Plain-text contenteditable core**: editor now uses a `contenteditable` surface with strict plain-text sync, so launches always send plain text/markdown (no rich-text styles or HTML).
 - **Save/Open**: `Ctrl+S` (save), `Ctrl+Shift+S` (save as), `Ctrl+O` (open).
@@ -267,7 +284,7 @@ The Gaudy theme is best experienced live. It features:
 
 ### Help Overlay
 - **`?` button in the activity bar**: a pulsing help button sits right below the statistics button so newcomers can find it instantly.
-- **Eye-catching tour banner**: clicking it opens an overlay with a gradient header and a card for each tool — Launches, Phrases, History, Statistics, Help and Settings — each one in its own row.
+- **Eye-catching tour banner**: clicking it opens an overlay with a gradient header and a card for each tool — Launches, Phrases, History, OpenCode sessions, Statistics, Help and Settings — each one in its own row.
 - **Animated arrows pointing back to the activity bar**: every row shows a left-pointing arrow that nudges toward the matching activity-bar button, so the link between the explanation and the button is obvious at a glance.
 - **Folder-first launch explanation**: the Launches description deliberately emphasises that each launch points to the *working folder* where your project lives and that the prompt is fired from there at the CLI.
 - **Always-accessible**: the activity bar stays visible while the overlay is open, so you can click another tool to try it out while reading. Close with `Esc`, the X icon, the "Got it" button, or by clicking the dimmed backdrop.
@@ -319,6 +336,16 @@ npm run dist:win     # Windows NSIS installer  (x64)
 npm run dist         # All platforms (Windows + macOS)
 ```
 
+### Tests
+
+```bash
+npm run build
+npm test             # Full Playwright/Electron suite
+npx playwright test tests/opencode-sessions.spec.ts
+```
+
+Tests launch with `PROMPT_PAD_TEST_DIR` in temporary folders. App files and the Electron browser profile are isolated there, and OneDrive sync is bypassed even if enabled in test settings. OpenCode database discovery in test mode only reads `<test-dir>/opencode.db`, never the personal database. Session-board tests use real SQLite fixtures through Electron's native driver to cover streaming, WAL concurrency, completion/expiry, manual hiding/restart/restore, schema recovery, search, tab behavior, language and themes. The 30-minute boundary is verified with a controlled clock.
+
 ### macOS installer
 The macOS build produces a `.dmg` installer for both Intel (`x64`) and Apple Silicon (`arm64`) Macs. Download the appropriate `.dmg` from GitHub Releases, open it, and drag Prompt Pad to your Applications folder.
 
@@ -335,6 +362,7 @@ All local data lives in `~/.prompt-pad/`:
 | `launches.json` | Launch configurations *(moved to OneDrive when sync is on)* |
 | `launch-history.json` | Launch history *(moved to OneDrive when sync is on)* |
 | `session.json` | Open tabs state (autosaved; ephemeral) |
+| `opencode-sessions-hidden.json` | Locally hidden OpenCode session turns (never synced to OneDrive) |
 | `prompts/` | Explicitly saved prompt files |
 
 ### OneDrive paths (when sync is enabled)

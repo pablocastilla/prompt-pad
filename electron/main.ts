@@ -4,9 +4,11 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { spawn } from 'child_process';
+import { findOpenCodeDb as locateOpenCodeDb, OpenCodeSessionMonitor } from './opencodeSessions';
 
 const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
 const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
+if (TEST_DIR) app.setPath('userData', path.join(TEST_DIR, 'electron-profile'));
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
 const DEFAULT_MODEL = 'claude-sonnet-4.6';
 const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.7';
@@ -1334,20 +1336,13 @@ ipcMain.handle('vscode:open', async (_e, folder: string) => {
 // ── OpenCode Statistics ───────────────────────────────────────────────────────
 // Locate opencode.db based on OS defaults
 function findOpenCodeDb(): string | null {
-  const candidates: string[] = [];
-  if (process.platform === 'win32') {
-    // Windows: %APPDATA%/opencode/opencode.db  OR  ~/.local/share/opencode/opencode.db
-    const appData = process.env['APPDATA'];
-    if (appData) candidates.push(path.join(appData, 'opencode', 'opencode.db'));
-    candidates.push(path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db'));
-    candidates.push(path.join(os.homedir(), 'AppData', 'Roaming', 'opencode', 'opencode.db'));
-  } else if (process.platform === 'darwin') {
-    candidates.push(path.join(os.homedir(), 'Library', 'Application Support', 'opencode', 'opencode.db'));
-  } else {
-    candidates.push(path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db'));
-  }
-  return candidates.find(p => fs.existsSync(p)) ?? null;
+  return locateOpenCodeDb(TEST_DIR);
 }
+
+const sessionMonitor = new OpenCodeSessionMonitor(findOpenCodeDb, path.join(APP_DIR, 'opencode-sessions-hidden.json'));
+ipcMain.handle('opencode-sessions:list', () => sessionMonitor.read());
+ipcMain.handle('opencode-sessions:dismiss', (_e, id: string, turnId: string) => sessionMonitor.dismiss(id, turnId));
+ipcMain.handle('opencode-sessions:restore', () => sessionMonitor.restore());
 
 interface DayCostRow {
   date: string;
@@ -1554,4 +1549,3 @@ ipcMain.handle('prs:stats', async () => {
     return { days: [], total: 0 };
   }
 });
-

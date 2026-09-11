@@ -3,16 +3,17 @@ import { useStore } from '../store';
 import { t } from '../i18n';
 
 interface HelpItem {
-  tourId: 'launches' | 'phrases' | 'history' | 'statistics' | 'help' | 'settings';
+  tourId: 'launches' | 'phrases' | 'history' | 'sessions' | 'statistics' | 'help' | 'settings';
   icon: string;
-  titleKey: 'helpLaunchesTitle' | 'helpPhrasesTitle' | 'helpHistoryTitle' | 'helpStatsTitle' | 'helpHelpTitle' | 'helpSettingsTitle';
-  textKey: 'helpLaunchesText' | 'helpPhrasesText' | 'helpHistoryText' | 'helpStatsText' | 'helpHelpText' | 'helpSettingsText';
+  titleKey: 'helpLaunchesTitle' | 'helpPhrasesTitle' | 'helpHistoryTitle' | 'helpSessionsTitle' | 'helpStatsTitle' | 'helpHelpTitle' | 'helpSettingsTitle';
+  textKey: 'helpLaunchesText' | 'helpPhrasesText' | 'helpHistoryText' | 'helpSessionsText' | 'helpStatsText' | 'helpHelpText' | 'helpSettingsText';
 }
 
 const ITEMS: HelpItem[] = [
   { tourId: 'launches',   icon: '🚀',  titleKey: 'helpLaunchesTitle', textKey: 'helpLaunchesText' },
   { tourId: 'phrases',    icon: '📝',  titleKey: 'helpPhrasesTitle',  textKey: 'helpPhrasesText' },
   { tourId: 'history',    icon: '📜',  titleKey: 'helpHistoryTitle',  textKey: 'helpHistoryText' },
+  { tourId: 'sessions',   icon: '▥',   titleKey: 'helpSessionsTitle', textKey: 'helpSessionsText' },
   { tourId: 'statistics', icon: '📊',  titleKey: 'helpStatsTitle',    textKey: 'helpStatsText' },
   { tourId: 'help',       icon: '❓',  titleKey: 'helpHelpTitle',     textKey: 'helpHelpText' },
   { tourId: 'settings',   icon: '⚙️', titleKey: 'helpSettingsTitle', textKey: 'helpSettingsText' },

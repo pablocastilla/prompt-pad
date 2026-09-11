@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import { TabContextMenu } from './TabContextMenu';
+import { isDashboardTab } from '../types';
 
 export function TabBar() {
   const tabs        = useStore(s => s.tabs);
@@ -36,9 +37,9 @@ export function TabBar() {
           >
             <span className="tab-title">
               {tab.dirty && <span className="tab-dot" />}
-              {tab.title || t('untitled')}
+              {tab.content === '__SESSIONS__' ? `▥ ${t('sessionsTitle')}` : tab.title || t('untitled')}
             </span>
-            {(tabs.length > 1 || tab.content === '__STATS__') && (
+            {(tabs.length > 1 || isDashboardTab(tab)) && (
               <button
                 className="tab-close"
                 onClick={e => {

@@ -1,3 +1,6 @@
+import type { OpenCodeSessionsSnapshot } from '../electron/sessionTypes';
+export type { OpenCodeSession, OpenCodeSessionStatus, OpenCodeSessionsSnapshot } from '../electron/sessionTypes';
+
 // ── Phrase ──
 export interface Phrase {
   id: string;
@@ -62,6 +65,10 @@ export interface Tab {
   gitFiles?: GitFile[];
   selectedGitFile?: string | null;
   gitFileDiff?: string;
+}
+
+export function isDashboardTab(tab: { content: string } | undefined): boolean {
+  return tab?.content === '__STATS__' || tab?.content === '__SESSIONS__';
 }
 
 export type CostTier = 'free' | 1 | 2 | 3 | 4 | 5;
@@ -360,6 +367,9 @@ export interface ElectronAPI {
   checkForUpdates: () => Promise<boolean>;
   openVsCode: (folder: string) => Promise<boolean>;
   getOpenCodeStats: () => Promise<OpenCodeStats>;
+  getOpenCodeSessions: () => Promise<OpenCodeSessionsSnapshot>;
+  dismissOpenCodeSession: (id: string, turnId: string) => Promise<void>;
+  restoreOpenCodeSessions: () => Promise<void>;
   getPRStats: () => Promise<PRStats>;
   getPricingData: () => Promise<Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> | null>;
   getGitStatus: (folder: string) => Promise<GitFile[]>;

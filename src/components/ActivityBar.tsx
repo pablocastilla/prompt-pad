@@ -8,6 +8,8 @@ export function ActivityBar() {
   const tabs = useStore(s => s.tabs);
   const activeTabId = useStore(s => s.activeTabId);
   const openStatsTab = useStore(s => s.openStatsTab);
+  const openSessionsTab = useStore(s => s.openSessionsTab);
+  const activeIsSessions = tabs.some(t => t.id === activeTabId && t.content === '__SESSIONS__');
   const helpOpen = useStore(s => s.helpOpen);
   const setHelpOpen = useStore(s => s.setHelpOpen);
   const activeIsStats = tabs.some(t => t.id === activeTabId && t.content === '__STATS__');
@@ -32,6 +34,13 @@ export function ActivityBar() {
         title={t('launchHistory')}
         data-tour-id="history"
       >📜</button>
+      <button
+        className={'activity-btn' + (activeIsSessions ? ' active' : '')}
+        onClick={openSessionsTab}
+        title={t('sessionsTitle')}
+        aria-label={t('sessionsTitle')}
+        data-tour-id="sessions"
+      >▥</button>
       <button
         className={'activity-btn' + (activeIsStats ? ' active' : '')}
         onClick={() => openStatsTab()}

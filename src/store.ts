@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isDashboardTab } from './types';
 import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry } from './types';
 
 type ActivePanel = 'launches' | 'phrases' | 'settings' | 'history' | 'statistics' | null;
@@ -27,6 +28,7 @@ interface AppState {
   loadFileIntoTab: (id: string, path: string, content: string, title: string) => void;
   restoreSession: (tabs: Tab[], activeTabId: string) => void;
   openStatsTab: () => void;
+  openSessionsTab: () => void;
   attachFileToTab: (tabId: string, file: AttachedFile) => void;
   removeFileFromTab: (tabId: string, fileId: string) => void;
   phrases: Phrase[];
@@ -96,10 +98,17 @@ export const useStore = create<AppState>((set, get) => ({
       activePanel: null,
     }));
   },
+  openSessionsTab: () => {
+    const existing = get().tabs.find(t => t.content === '__SESSIONS__');
+    if (existing) { set({ activeTabId: existing.id, activePanel: null }); return; }
+    const tab = createTab('▥ OpenCode');
+    tab.content = '__SESSIONS__';
+    set(s => ({ tabs: [...s.tabs, tab], activeTabId: tab.id, activePanel: null }));
+  },
   closeTab: (id) => {
     const { tabs, activeTabId } = get();
     const tab = tabs.find(t => t.id === id);
-    const isStats = tab?.content === '__STATS__';
+    const isStats = isDashboardTab(tab);
     if (tabs.length <= 1) {
       if (isStats) {
         const newTab = createTab();
@@ -146,7 +155,7 @@ export const useStore = create<AppState>((set, get) => ({
   markTabSaved: (id, path, title) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, path, title, dirty: false, lastSavedAt: Date.now() } : t) })),
   loadFileIntoTab: (id, path, content, title) => set(s => ({ tabs: s.tabs.map(t => t.id === id ? { ...t, path, content, title, dirty: false, lastSavedAt: Date.now() } : t) })),
   restoreSession: (tabs, activeTabId) => {
-    const filtered = tabs.filter(t => t.content !== '__STATS__');
+    const filtered = tabs.filter(t => !isDashboardTab(t));
     const safeTabs = filtered.length > 0 ? filtered : [createTab()];
     const safeActive = safeTabs.some(t => t.id === activeTabId) ? activeTabId : safeTabs[0].id;
     set({ tabs: safeTabs, activeTabId: safeActive });
@@ -196,7 +205,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
   removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
   insertionSignal: null,
-  requestInsertion: (tabId, text, source = 'shortcut') => set({ insertionSignal: { tabId, text, source } }),
+  requestInsertion: (tabId, text, source = 'shortcut') => {
+    if (!isDashboardTab(get().tabs.find(t => t.id === tabId))) set({ insertionSignal: { tabId, text, source } });
+  },
   clearInsertion: () => set({ insertionSignal: null }),
   pendingLaunch: null,
   setPendingLaunch: (data) => set({ pendingLaunch: data }),

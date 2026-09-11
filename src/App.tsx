@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from './store';
 import { setLanguage, detectLanguage, t } from './i18n';
 import { Header } from './components/Header';
@@ -9,9 +9,10 @@ import { GaudyToast } from './components/GaudyToast';
 import { ModelPicker } from './components/ModelPicker';
 import { LaunchSplash } from './components/LaunchSplash';
 import { StatsPanel } from './components/StatsPanel';
+import { SessionsPanel } from './components/SessionsPanel';
 import { GitDiffPanel } from './components/GitDiffPanel';
 import { HelpOverlay } from './components/HelpOverlay';
-import { initPricingData } from './types';
+import { initPricingData, isDashboardTab } from './types';
 import type { LaunchConfig, Phrase, Settings, Tab } from './types';
 import './App.css';
 
@@ -29,6 +30,9 @@ function shortcutKeyFromEvent(e: KeyboardEvent): string | null {
 
 export default function App() {
   const settings    = useStore(s => s.settings);
+  const [systemLocale, setSystemLocale] = useState('en');
+  // Resolve before rendering children; a late auto-locale request must not override an explicit language.
+  setLanguage(settings.language === 'auto' ? detectLanguage(systemLocale) : settings.language);
   const setSettings = useStore(s => s.setSettings);
   const setPhrases  = useStore(s => s.setPhrases);
   const setLaunches = useStore(s => s.setLaunches);
@@ -102,6 +106,7 @@ export default function App() {
         window.electronAPI.saveLaunches(launches);
       }
 
+      setSystemLocale(locale);
       setSettings(s);
       setPhrases(phrases);
       setLaunches(launches);
@@ -113,7 +118,7 @@ export default function App() {
       // Restore session if there are saved tabs with content
       if (session && Array.isArray(session.tabs) && session.tabs.length > 0) {
         const restoredTabs: Tab[] = session.tabs
-          .filter((t: any) => t.content !== '__STATS__')
+          .filter((t: any) => !isDashboardTab(t))
           .map((t: Pick<Tab, 'id' | 'title' | 'content' | 'path' | 'phraseRanges'>) => ({
             id: t.id,
             title: t.title || 'Untitled',
@@ -144,8 +149,8 @@ export default function App() {
   useEffect(() => {
     if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
     sessionTimerRef.current = setTimeout(() => {
-      const savedTabs = tabs.filter(t => t.content !== '__STATS__');
-      const activeIsStats = activeTab?.content === '__STATS__';
+      const savedTabs = tabs.filter(t => !isDashboardTab(t));
+      const activeIsStats = isDashboardTab(activeTab);
       window.electronAPI.saveSession({
         tabs: savedTabs.map(t => ({ id: t.id, title: t.title, content: t.content, path: t.path, phraseRanges: t.phraseRanges })),
         activeTabId: activeIsStats ? (savedTabs[0]?.id || '') : activeTabId,
@@ -157,14 +162,6 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme);
   }, [settings.theme]);
-
-  useEffect(() => {
-    if (settings.language !== 'auto') {
-      setLanguage(settings.language);
-    } else {
-      window.electronAPI.getLocale().then(locale => setLanguage(detectLanguage(locale)));
-    }
-  }, [settings.language]);
 
   const phraseByShortcut = useMemo(() => {
     const map = new Map<string, Phrase>();
@@ -193,6 +190,7 @@ export default function App() {
       if (!key) return;
       const phrase = phraseByShortcut.get(key);
       if (!phrase) return;
+      if (isDashboardTab(activeTab)) return;
 
       e.preventDefault();
       requestInsertion(activeTabId, phrase.content, 'catalog');
@@ -201,7 +199,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [phraseByShortcut, activeTabId, requestInsertion, settings.theme, settings.phraseShortcutModifier, addToast]);
+  }, [phraseByShortcut, activeTabId, activeTab, requestInsertion, settings.theme, settings.phraseShortcutModifier, addToast]);
 
   const launchByShortcut = useMemo(() => {
     const map = new Map<string, LaunchConfig>();
@@ -228,7 +226,7 @@ export default function App() {
       const key = shortcutKeyFromEvent(e);
       if (!key) return;
       const launch = launchByShortcut.get(key);
-      if (!launch || !activeTab?.content.trim()) return;
+      if (!launch || !activeTab?.content.trim() || isDashboardTab(activeTab)) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -277,7 +275,8 @@ export default function App() {
       <div className="workspace">
         <ActivityBar />
         {activePanel && <SidePanel />}
-        {activeTab?.content === '__STATS__' ? <StatsPanel /> : <Editor key={activeTabId} />}
+        {activeTab?.content === '__STATS__' ? <StatsPanel /> :
+          activeTab?.content === '__SESSIONS__' ? <SessionsPanel /> : <Editor key={activeTabId} />}
         <GitDiffPanel />
       </div>
       {toasts.length > 0 && <GaudyToast />}
