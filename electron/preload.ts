@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     attachedFilePaths?: string[];
   }) => ipcRenderer.invoke('launch:execute', config),
   getOpenCodeModels: () => ipcRenderer.invoke('models:get-opencode'),
+  getOpenCode2Models: () => ipcRenderer.invoke('models:get-opencode2'),
   getCopilotModels: () => ipcRenderer.invoke('models:get-copilot'),
   getAntigravityModels: () => ipcRenderer.invoke('models:get-antigravity'),
   getDefaultModels: () => ipcRenderer.invoke('models:get-defaults'),

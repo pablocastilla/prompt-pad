@@ -11,7 +11,7 @@ export interface Phrase {
 
 // ── Launch Configuration ──
 // 'gemini' is kept for backward compatibility with old launch history entries.
-export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex' | 'gemini';
+export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex' | 'gemini' | 'opencode2';
 
 export interface LaunchConfig {
   id: string;
@@ -354,6 +354,7 @@ export interface ElectronAPI {
     attachedFilePaths?: string[];
   }) => Promise<boolean>;
   getOpenCodeModels: () => Promise<ModelOption[]>;
+  getOpenCode2Models: () => Promise<ModelOption[]>;
   getCopilotModels: () => Promise<ModelOption[]>;
   getAntigravityModels: () => Promise<ModelOption[]>;
   getDefaultModels: () => Promise<{ copilot: string; opencode: string; antigravity: string }>;

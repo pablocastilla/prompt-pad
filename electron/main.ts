@@ -479,20 +479,25 @@ async function fetchModelsDev(): Promise<Record<string, any> | null> {
 
 // Dynamic model lists (cached in process memory)
 let openCodeModelsCache: { id: string; label: string }[] | null = null;
+let openCode2ModelsCache: { id: string; label: string }[] | null = null;
 let copilotModelsCache: { id: string; label: string }[] | null = null;
 let antigravityModelsCache: { id: string; label: string }[] | null = null;
 
+function mockModelsFor(testFile: string): { id: string; label: string }[] | null {
+  const mockFile = path.join(TEST_DIR!, testFile);
+  if (!fs.existsSync(mockFile)) return null;
+  const raw = fs.readFileSync(mockFile, 'utf-8');
+  const data = JSON.parse(raw);
+  if (data && typeof data === 'object' && 'shouldThrow' in data && data.shouldThrow) {
+    throw new Error(data.message || 'CLI not found');
+  }
+  return data;
+}
+
 ipcMain.handle('models:get-opencode', async () => {
   if (TEST_DIR) {
-    const mockFile = path.join(TEST_DIR, 'mock-opencode-models.json');
-    if (fs.existsSync(mockFile)) {
-      const raw = fs.readFileSync(mockFile, 'utf-8');
-      const data = JSON.parse(raw);
-      if (data && typeof data === 'object' && 'shouldThrow' in data && data.shouldThrow) {
-        throw new Error(data.message || 'CLI not found');
-      }
-      return data;
-    }
+    const mock = mockModelsFor('mock-opencode-models.json');
+    if (mock) return mock;
   }
   if (openCodeModelsCache && openCodeModelsCache.length > 0) return openCodeModelsCache;
   let output = '';
@@ -507,6 +512,31 @@ ipcMain.handle('models:get-opencode', async () => {
     throw new Error('No models returned from opencode CLI');
   }
   openCodeModelsCache = parsed;
+  return parsed;
+});
+
+ipcMain.handle('models:get-opencode2', async () => {
+  if (TEST_DIR) {
+    const mock = mockModelsFor('mock-opencode2-models.json');
+    if (mock) return mock;
+  }
+  if (openCode2ModelsCache && openCode2ModelsCache.length > 0) return openCode2ModelsCache;
+  let output = '';
+  try {
+    output = await runCommand('opencode2', ['models']);
+  } catch {
+    // Retry without shell resolution quirks (e.g. .cmd shim issues on Windows)
+    const exe = process.platform === 'win32'
+      ? path.join(process.env.APPDATA || '', 'npm', 'node_modules', '@opencode-ai', 'cli', 'bin', 'opencode2.exe')
+      : 'opencode2';
+    output = await runCommand(exe, ['models']);
+  }
+
+  const parsed = parseOpenCodeModels(output);
+  if (parsed.length === 0) {
+    throw new Error('No models returned from opencode2 CLI');
+  }
+  openCode2ModelsCache = parsed;
   return parsed;
 });
 
@@ -564,6 +594,7 @@ ipcMain.handle('models:get-antigravity', async () => {
 
 ipcMain.handle('models:clear-cache', () => {
   openCodeModelsCache = null;
+  openCode2ModelsCache = null;
   copilotModelsCache = null;
   antigravityModelsCache = null;
   modelsDevCache = null;
@@ -689,6 +720,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
   attachedFilePaths?: string[];
 }) => {
   const tool = config.tool === 'opencode' ? 'opencode' :
+               config.tool === 'opencode2' ? 'opencode2' :
                config.tool === 'antigravity' ? 'antigravity' :
                config.tool === 'claude-code' ? 'claude-code' :
                config.tool === 'codex' ? 'codex' :
@@ -698,7 +730,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
   if (TEST_DIR) {
     try {
       const normalizedModel =
-        tool === 'opencode' ? normalizeOpenCodeModel(config.model) :
+        tool === 'opencode' || tool === 'opencode2' ? normalizeOpenCodeModel(config.model) :
         tool === 'antigravity' ? normalizeAntigravityModel(config.model) :
         tool === 'copilot' ? normalizeModel(config.model) : config.model;
 
@@ -715,7 +747,9 @@ ipcMain.handle('launch:execute', async (_e, config: {
   }
 
   if (tool === 'opencode') {
-    return executeLaunchOpenCode(config);
+    return executeLaunchOpenCode(config, 'opencode');
+  } else if (tool === 'opencode2') {
+    return executeLaunchOpenCode(config, 'opencode2');
   } else if (tool === 'antigravity') {
     return executeLaunchAntigravity(config);
   } else if (tool === 'claude-code') {
@@ -731,7 +765,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
 async function executeLaunchOpenCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-}) {
+}, cli: 'opencode' | 'opencode2' = 'opencode') {
   const { folder, yolo, prompt, attachedFilePaths = [] } = config;
   const model = normalizeOpenCodeModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
@@ -770,19 +804,22 @@ async function executeLaunchOpenCode(config: {
     const safeMsg   = escapeSingleQuotePS(message);
     const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
     const yoloArg = yolo ? "'--auto'" : '';
+    const bootstrapRelPath = cli === 'opencode2'
+      ? 'node_modules\\@opencode-ai\\cli\\bin\\opencode2.exe'
+      : 'node_modules\\opencode-ai\\bin\\opencode.exe';
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
-      "$opencodePath = (Get-Command opencode.exe -ErrorAction SilentlyContinue).Source",
+      "$opencodePath = (Get-Command " + cli + ".exe -ErrorAction SilentlyContinue).Source",
       "if (-not $opencodePath) {",
-      "  $opencodeCommand = Get-Command opencode -ErrorAction SilentlyContinue",
+      "  $opencodeCommand = Get-Command " + cli + " -ErrorAction SilentlyContinue",
       "  if ($opencodeCommand -and $opencodeCommand.Source -like '*.cmd') {",
       "    $bootstrapDir = Split-Path $opencodeCommand.Source -Parent",
-      "    $opencodePath = Join-Path $bootstrapDir 'node_modules\\opencode-ai\\bin\\opencode.exe'",
+      "    $opencodePath = Join-Path $bootstrapDir '" + bootstrapRelPath + "'",
       "    if (-not (Test-Path $opencodePath)) {",
       "      $opencodePath = $opencodeCommand.Source",
       "    }",
       "  } else {",
-      "    $opencodePath = 'opencode'",
+      "    $opencodePath = '" + cli + "'",
       "  }",
       "}",
       "$ocArgs = @('--model', '" + safeModel + "', '--prompt', '" + safeMsg + "'" + (yoloArg ? ", " + yoloArg : '') + ", '" + safeDir + "')",
@@ -807,7 +844,7 @@ async function executeLaunchOpenCode(config: {
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'opencode --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message) + yoloArg + ' ' + JSON.stringify(workDir),
+      cli + ' --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message) + yoloArg + ' ' + JSON.stringify(workDir),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');

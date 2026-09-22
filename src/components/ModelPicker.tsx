@@ -7,10 +7,10 @@ import { ToolIcon, TOOL_LABELS } from './ToolIcon';
 import { siNvidia } from 'simple-icons';
 
 // Providers offered when launching. Order matters: numeric shortcuts 1..N map by position.
-const ALL_TOOLS: LaunchTool[] = ['opencode', 'copilot', 'claude-code', 'codex', 'antigravity'];
+const ALL_TOOLS: LaunchTool[] = ['opencode', 'copilot', 'claude-code', 'codex', 'antigravity', 'opencode2'];
 
 // Providers that expose a CLI-driven model list; others launch with the CLI's default model.
-const TOOLS_WITH_MODEL_PICKER: LaunchTool[] = ['opencode', 'copilot', 'antigravity'];
+const TOOLS_WITH_MODEL_PICKER: LaunchTool[] = ['opencode', 'copilot', 'antigravity', 'opencode2'];
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -92,6 +92,7 @@ export function ModelPicker() {
     'claude-code': value,
     codex: value,
     gemini: value,
+    opencode2: value,
   });
 
   const [modelCache, setModelCache] = useState<Record<LaunchTool, ModelOption[] | null>>(() => emptyToolRecord<ModelOption[] | null>(null));
@@ -105,7 +106,7 @@ export function ModelPicker() {
   const tool: LaunchTool = selectedProvider ?? ALL_TOOLS[0];
   const availableModels = modelCache[tool] ?? [];
   const pinnedIds = settings.pinnedModels?.[tool] ?? [];
-  const isOpencode = tool === 'opencode';
+  const isOpencode = tool === 'opencode' || tool === 'opencode2';
   const showGoOnly = settings.showGoModelsOnly?.[tool] ?? isOpencode;
   const showZenOnly = settings.showZenModelsOnly?.[tool] ?? isOpencode;
   const showNvidiaOnly = settings.showNvidiaModelsOnly?.[tool] ?? isOpencode;
@@ -271,6 +272,8 @@ export function ModelPicker() {
       let fetched: ModelOption[] = [];
       if (selectedTool === 'opencode') {
         fetched = await window.electronAPI.getOpenCodeModels();
+      } else if (selectedTool === 'opencode2') {
+        fetched = await window.electronAPI.getOpenCode2Models();
       } else if (selectedTool === 'copilot') {
         fetched = await window.electronAPI.getCopilotModels();
       } else if (selectedTool === 'antigravity') {
@@ -565,7 +568,7 @@ export function ModelPicker() {
             title={t('refreshModels')}
           >{isLoading ? '⏳' : '🔄'}</button>
         </div>
-        {tool === 'opencode' && (
+        {(tool === 'opencode' || tool === 'opencode2') && (
           <>
             <label className="model-picker-go-toggle" data-tier="go">
               <input type="checkbox" checked={showGoOnly} onChange={toggleGoOnly} />

@@ -1,8 +1,8 @@
 # Prompt Pad
 
-**Version 3.1.0** — now with sound notifications when an OpenCode session finishes or asks a question.
+**Version 3.3.0** — now with **OpenCode 2** as a launch provider (`6` in the provider picker, powered by the `opencode2` CLI).
 
-A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex** or **Antigravity** — without leaving your keyboard.
+A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 
 ---
 
@@ -14,8 +14,8 @@ Prompt Pad was built for people who don't want to juggle terminal tabs, `cd` int
 
 1. **Write your prompt** in the editor.
 2. **Press `Ctrl+Shift+1`** (or whatever number your launcher is) — the launcher only stores the **folder**, nothing else.
-3. **Pick a provider** (`1` = OpenCode, `2` = GitHub Copilot, `3` = Claude Code, `4` = Codex, `5` = Antigravity) with a single keystroke.
-4. **Pick a model** (OpenCode, GitHub Copilot and Antigravity show a model picker — Claude and Codex launch straight away).
+3. **Pick a provider** (`1` = OpenCode, `2` = GitHub Copilot, `3` = Claude Code, `4` = Codex, `5` = Antigravity, `6` = OpenCode 2) with a single keystroke.
+4. **Pick a model** (OpenCode, GitHub Copilot, Antigravity and OpenCode 2 show a model picker — Claude and Codex launch straight away).
 5. **Done** — a terminal window opens, runs the CLI with `--yolo`/interactive flags, and feeds it your prompt.
 
 That's it. No terminals to manage. No context switching. Launchers are just folders — the provider and model are chosen at launch time, every time.
@@ -149,7 +149,7 @@ The default location on Windows, macOS and Linux is `$XDG_DATA_HOME/opencode/ope
 |---|---|
 | Open 4 terminals, `cd` 4 times | One window, one editor |
 | Remember which flags each CLI needs | Always `--yolo` + interactive, baked in |
-| Switch CLI = open new terminal + remember command | One keystroke (`1`/`2`/`3`/`4`/`5`) picks the provider (now with Antigravity) |
+| Switch CLI = open new terminal + remember command | One keystroke (`1`/`2`/`3`/`4`/`5`/`6`) picks the provider (now with Antigravity and OpenCode 2) |
 | Lose track of which model you picked | Provider picker + model picker every time, fresh choice |
 | Scroll back through walls of output | Each CLI gets its own terminal window |
 | Accidentally run command in wrong dir | Each launcher locks to its folder |
@@ -174,9 +174,9 @@ The default location on Windows, macOS and Linux is `$XDG_DATA_HOME/opencode/ope
 
 *(Screenshot coming soon — your history is too personal to screenshot anyway)*
 
-### Provider Picker — pick the CLI at launch time (`1`/`2`/`3`/`4`/`5`)
+### Provider Picker — pick the CLI at launch time (`1`/`2`/`3`/`4`/`5`/`6`)
 
-The provider picker is the first dialog that appears after pressing `Ctrl+Shift+N`. Each provider has a numeric shortcut so you can launch with a single keystroke. OpenCode, GitHub Copilot and Antigravity hand off to the model picker so you can pick any of their available models; Claude Code and Codex launch straight away.
+The provider picker is the first dialog that appears after pressing `Ctrl+Shift+N`. Each provider has a numeric shortcut so you can launch with a single keystroke. OpenCode, GitHub Copilot, Antigravity and OpenCode 2 hand off to the model picker so you can pick any of their available models; Claude Code and Codex launch straight away.
 
 ### Model Picker — choose the model (↑↓ + Enter)
 
@@ -224,9 +224,9 @@ The Gaudy theme is best experienced live. It features:
 - **Search**: filter phrases by name or content with the search bar.
 
 ### Launch Configurations
-- **Folder-only launchers**: each config stores just a **name** and a **working folder**. The provider (OpenCode / GitHub Copilot / Claude Code / Codex / Antigravity) and the model are chosen at launch time — every launch is a fresh choice.
+- **Folder-only launchers**: each config stores just a **name** and a **working folder**. The provider (OpenCode / GitHub Copilot / Claude Code / Codex / Antigravity / OpenCode 2) and the model are chosen at launch time — every launch is a fresh choice.
 - **Always YOLO + interactive**: Prompt Pad always launches the CLI in "yolo" / `--dangerously-skip-permissions` mode and interactive (`-i`) mode. No checkboxes to fiddle with — that decision is baked in.
-- **Provider picker at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **provider picker** appears first. Press `1` for OpenCode, `2` for GitHub Copilot, `3` for Claude Code, `4` for Codex, `5` for Antigravity, or use ↑↓ + Enter. Claude and Codex launch straight away; OpenCode, GitHub Copilot and Antigravity hand off to the model picker.
+- **Provider picker at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **provider picker** appears first. Press `1` for OpenCode, `2` for GitHub Copilot, `3` for Claude Code, `4` for Codex, `5` for Antigravity, `6` for OpenCode 2, or use ↑↓ + Enter. Claude and Codex launch straight away; OpenCode, GitHub Copilot, Antigravity and OpenCode 2 hand off to the model picker.
 - **Drag-to-reorder**: drag the ⠿ handle to reprioritise configs. The `Ctrl+Shift+N` shortcuts follow the list order and are auto-saved.
 - **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
 - **Open folder in VS Code**: each launch shortcut can also open the launch folder in VS Code using a configurable modifier in Settings (`Ctrl+Shift`, `Ctrl+Alt`, or `Ctrl+Alt+Shift`).
@@ -250,14 +250,14 @@ The Gaudy theme is best experienced live. It features:
 - **Gaudy theme toasts**: even clearing history gets a dramatic notification.
 
 ### Provider Picker
-- **Five providers**: OpenCode, GitHub Copilot, Claude Code, Codex, Antigravity — pre-numbered `1`–`5`.
-- **One-key launch**: press `1`/`2`/`3`/`4`/`5` to pick a provider, or use ↑↓ + Enter for keyboard-arrow lovers.
+- **Six providers**: OpenCode, GitHub Copilot, Claude Code, Codex, Antigravity, OpenCode 2 — pre-numbered `1`–`6`.
+- **One-key launch**: press `1`/`2`/`3`/`4`/`5`/`6` to pick a provider, or use ↑↓ + Enter for keyboard-arrow lovers.
 - **Direct launch for non-model-API providers**: Claude Code and Codex are launched immediately with their default model (CLI handles model selection via login/config).
-- **Hand-off to model picker**: OpenCode, GitHub Copilot and Antigravity open the model picker because they expose multiple models worth choosing from.
+- **Hand-off to model picker**: OpenCode, GitHub Copilot, Antigravity and OpenCode 2 open the model picker because they expose multiple models worth choosing from.
 
-### Model Picker (OpenCode, GitHub Copilot & Antigravity)
-- **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `copilot help config`, or `agy models`) at runtime, including Zen (`opencode/`), Go (`opencode-go/`) and NVIDIA (`nvidia/`) tiers. Antigravity models are always refreshed live directly from the CLI whenever opened so you always have access to the latest models (e.g. Gemini 3.8 Flash).
-- **Provider-aware**: only shown for OpenCode, GitHub Copilot and Antigravity launches. Claude Code and Codex bypass it and launch with their default model.
+### Model Picker (OpenCode, GitHub Copilot, Antigravity & OpenCode 2)
+- **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `opencode2 models`, `copilot help config`, or `agy models`) at runtime, including Zen (`opencode/`), Go (`opencode-go/`) and NVIDIA (`nvidia/`) tiers. Antigravity models are always refreshed live directly from the CLI whenever opened so you always have access to the latest models (e.g. Gemini 3.8 Flash).
+- **Provider-aware**: only shown for OpenCode, GitHub Copilot, Antigravity and OpenCode 2 launches. Claude Code and Codex bypass it and launch with their default model.
 - **Go / Zen / NVIDIA tier filters**: three independent checkboxes to show or hide each OpenCode tier — Go (`opencode-go/`), Zen (`opencode/`) and NVIDIA (`nvidia/`). All three are enabled by default for OpenCode launches; uncheck any combination to focus the list (e.g. keep only Go and Zen, or only NVIDIA).
 - **Free filter**: a toggle to show only free models — matches models with "free" in the name or with free zero-cost pricing tiers. Free can be combined with tier filters to show only free Go models, free Zen models, or free NVIDIA models.
 - **Free and lowest-cost defaults**: launches and fallback configurations default to free and lowest-cost models across providers (`auto` for GitHub Copilot, `opencode/minimax-m2.5-free` for OpenCode, and `gemini-3.8-flash-medium` for Antigravity) to prevent unexpected usage costs.
@@ -311,7 +311,7 @@ Prompt Pad automatically keeps itself up to date:
 |---|---|
 | `Ctrl/⌘ + 1–9, 0` | Insert phrase #1–10 at cursor |
 | `Ctrl/⌘ + Shift + 1–9, 0` | Open provider picker for launch config #1–10 |
-| `1`/`2`/`3`/`4`/`5` (in provider picker) | Launch OpenCode / GitHub Copilot / Claude Code / Codex / Antigravity |
+| `1`/`2`/`3`/`4`/`5`/`6` (in provider picker) | Launch OpenCode / GitHub Copilot / Claude Code / Codex / Antigravity / OpenCode 2 |
 | `↑↓ + Enter` (in provider picker) | Navigate and select provider |
 | `Ctrl/⌘ + S` | Save current tab |
 | `Ctrl/⌘ + Shift + S` | Save current tab as… |

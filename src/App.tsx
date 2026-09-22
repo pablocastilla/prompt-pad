@@ -76,6 +76,7 @@ export default function App() {
         },
         ...loadedSettings,
         pinnedModels: {
+          ...loadedSettings?.pinnedModels,
           copilot: loadedSettings?.pinnedModels?.copilot ?? [],
           opencode: loadedSettings?.pinnedModels?.opencode ?? [],
         },
