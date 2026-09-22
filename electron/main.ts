@@ -740,6 +740,21 @@ ipcMain.handle('launch:execute', async (_e, config: {
         JSON.stringify({ ...config, tool, normalizedModel }, null, 2),
         'utf-8'
       );
+      // Also capture the exact launch script so tests can assert on the CLI args
+      if (tool === 'opencode' || tool === 'opencode2') {
+        const tmpId = 'pp-launch-' + id;
+        const promptPath = path.join(os.tmpdir(), tmpId, 'pp-prompt-' + id + '.txt');
+        const script = buildOpenCodeWinScript({
+          cli: tool,
+          workDir: config.folder || 'C:\\tmp',
+          model: normalizedModel,
+          message: config.prompt,
+          yolo: !!config.yolo,
+          promptPath,
+          launchTmpDir: path.join(os.tmpdir(), tmpId),
+        });
+        fs.writeFileSync(path.join(APP_DIR, 'launch-script-' + id + '.ps1'), script, 'utf-8');
+      }
     } catch {
       // best-effort capture only
     }
@@ -761,6 +776,78 @@ ipcMain.handle('launch:execute', async (_e, config: {
   }
   return executeLaunchCopilot(config);
 });
+
+// Build the Windows PowerShell script that launches OpenCode or OpenCode 2.
+// OpenCode 1 supports top-level `--model` / `--prompt` flags on its TUI.
+// OpenCode 2 (preview) does NOT accept `--model` at the top level — the model
+// is only available on the `run` subcommand, which also attaches files via
+// `--file` and auto-approves with `--auto`.
+export function buildOpenCodeWinScript(opts: {
+  cli: 'opencode' | 'opencode2';
+  workDir: string; model: string; message: string;
+  yolo: boolean; promptPath: string; launchTmpDir: string;
+}): string {
+  const { cli, workDir, model, message, yolo, promptPath, launchTmpDir } = opts;
+  const safeDir    = escapeSingleQuotePS(workDir);
+  const safeModel  = escapeSingleQuotePS(model);
+  const safeMsg    = escapeSingleQuotePS(message);
+  const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
+  const bootstrapRelPath = cli === 'opencode2'
+    ? 'node_modules\\@opencode-ai\\cli\\bin\\opencode2.exe'
+    : 'node_modules\\opencode-ai\\bin\\opencode.exe';
+
+  let ocArgs: string;
+  if (cli === 'opencode2') {
+    ocArgs = "@('run', '--model', '" + safeModel + "', '--file', '" + escapeSingleQuotePS(promptPath) + "'"
+      + (yolo ? ", '--auto'" : '')
+      + ", '" + safeMsg + "')";
+  } else {
+    ocArgs = "@('--model', '" + safeModel + "', '--prompt', '" + safeMsg + "'"
+      + (yolo ? ", '--auto'" : '')
+      + ", '" + safeDir + "')";
+  }
+
+  return [
+    "Set-Location -LiteralPath '" + safeDir + "'",
+    "$opencodePath = (Get-Command " + cli + ".exe -ErrorAction SilentlyContinue).Source",
+    "if (-not $opencodePath) {",
+    "  $opencodeCommand = Get-Command " + cli + " -ErrorAction SilentlyContinue",
+    "  if ($opencodeCommand -and $opencodeCommand.Source -like '*.cmd') {",
+    "    $bootstrapDir = Split-Path $opencodeCommand.Source -Parent",
+    "    $opencodePath = Join-Path $bootstrapDir '" + bootstrapRelPath + "'",
+    "    if (-not (Test-Path $opencodePath)) {",
+    "      $opencodePath = $opencodeCommand.Source",
+    "    }",
+    "  } else {",
+    "    $opencodePath = '" + cli + "'",
+    "  }",
+    "}",
+    "$ocArgs = " + ocArgs,
+    "& $opencodePath @ocArgs",
+    "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
+  ].join('\n');
+}
+
+// Build the Linux/macOS shell script that launches OpenCode or OpenCode 2.
+export function buildOpenCodeShScript(opts: {
+  cli: 'opencode' | 'opencode2';
+  workDir: string; model: string; message: string;
+  yolo: boolean; promptPath: string; launchTmpDir: string;
+}): string {
+  const { cli, workDir, model, message, yolo, promptPath, launchTmpDir } = opts;
+  const launchLine = cli === 'opencode2'
+    ? cli + ' run --model ' + JSON.stringify(model) + ' --file ' + JSON.stringify(promptPath)
+      + (yolo ? ' --auto' : '') + ' ' + JSON.stringify(message)
+    : cli + ' --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message)
+      + (yolo ? ' --auto' : '') + ' ' + JSON.stringify(workDir);
+  return [
+    '#!/bin/bash',
+    'cd ' + JSON.stringify(workDir),
+    launchLine,
+    'rm -rf ' + JSON.stringify(launchTmpDir),
+    'rm -f "$0"',
+  ].join('\n');
+}
 
 async function executeLaunchOpenCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
@@ -799,33 +886,7 @@ async function executeLaunchOpenCode(config: {
 
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.ps1');
-    const safeDir   = escapeSingleQuotePS(workDir);
-    const safeModel = escapeSingleQuotePS(model);
-    const safeMsg   = escapeSingleQuotePS(message);
-    const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
-    const yoloArg = yolo ? "'--auto'" : '';
-    const bootstrapRelPath = cli === 'opencode2'
-      ? 'node_modules\\@opencode-ai\\cli\\bin\\opencode2.exe'
-      : 'node_modules\\opencode-ai\\bin\\opencode.exe';
-    const script = [
-      "Set-Location -LiteralPath '" + safeDir + "'",
-      "$opencodePath = (Get-Command " + cli + ".exe -ErrorAction SilentlyContinue).Source",
-      "if (-not $opencodePath) {",
-      "  $opencodeCommand = Get-Command " + cli + " -ErrorAction SilentlyContinue",
-      "  if ($opencodeCommand -and $opencodeCommand.Source -like '*.cmd') {",
-      "    $bootstrapDir = Split-Path $opencodeCommand.Source -Parent",
-      "    $opencodePath = Join-Path $bootstrapDir '" + bootstrapRelPath + "'",
-      "    if (-not (Test-Path $opencodePath)) {",
-      "      $opencodePath = $opencodeCommand.Source",
-      "    }",
-      "  } else {",
-      "    $opencodePath = '" + cli + "'",
-      "  }",
-      "}",
-      "$ocArgs = @('--model', '" + safeModel + "', '--prompt', '" + safeMsg + "'" + (yoloArg ? ", " + yoloArg : '') + ", '" + safeDir + "')",
-      "& $opencodePath @ocArgs",
-      "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
-    ].join('\n');
+    const script = buildOpenCodeWinScript({ cli, workDir, model, message, yolo, promptPath, launchTmpDir });
     writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
@@ -840,14 +901,7 @@ async function executeLaunchOpenCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
-    const yoloArg = yolo ? ' --auto' : '';
-    const script = [
-      '#!/bin/bash',
-      'cd ' + JSON.stringify(workDir),
-      cli + ' --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message) + yoloArg + ' ' + JSON.stringify(workDir),
-      'rm -rf ' + JSON.stringify(launchTmpDir),
-      'rm -f "$0"',
-    ].join('\n');
+    const script = buildOpenCodeShScript({ cli, workDir, model, message, yolo, promptPath, launchTmpDir });
     fs.writeFileSync(shPath, script, { mode: 0o755 });
     if (process.platform === 'darwin') {
       const appleScript = [

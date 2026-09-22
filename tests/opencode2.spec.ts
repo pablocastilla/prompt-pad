@@ -29,6 +29,11 @@ function readLaunchCalls(testDir: string): Array<{ tool: string; model: string; 
   return files.map(f => JSON.parse(fs.readFileSync(path.join(testDir, f), 'utf-8')));
 }
 
+function readLaunchScripts(testDir: string): string[] {
+  const files = fs.readdirSync(testDir).filter(f => f.startsWith('launch-script-') && f.endsWith('.ps1'));
+  return files.map(f => fs.readFileSync(path.join(testDir, f), 'utf-8'));
+}
+
 // Electron can keep file handles (e.g. electron-profile/DIPS) briefly after
 // app.close(); retry so a slow handle release never fails the test.
 async function cleanupTestDir(testDir: string) {
@@ -166,6 +171,95 @@ test.describe('OpenCode 2 launch option', () => {
       expect(history[0].model).toBe('opencode-go/glm-5.3-flash');
 
       await app.close();
+    } finally {
+      await cleanupTestDir(testDir);
+    }
+  });
+
+  test('opencode2 launch script uses the run subcommand with --model and --file, never top-level --model', async () => {
+    const testDir = getTestDir();
+    try {
+      saveTestSettings(testDir);
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'OC2 Script Test', folder: '/tmp/oc2' },
+      ]));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+      fs.writeFileSync(path.join(testDir, 'mock-opencode2-models.json'), JSON.stringify([
+        { id: 'opencode-go/glm-5.3-flash', label: 'GLM 5.3 Flash Go' },
+      ]));
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.editor-textarea').fill('script test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
+      await page.keyboard.press('6');
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.locator('.model-picker-item').first().click();
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      await page.waitForTimeout(500);
+
+      await app.close();
+
+      const scripts = readLaunchScripts(testDir);
+      expect(scripts).toHaveLength(1);
+      const script = scripts[0];
+
+      // OpenCode 2 must go through the `run` subcommand (top-level --model is not supported)
+      expect(script).toContain("$ocArgs = @('run', '--model', 'opencode-go/glm-5.3-flash', '--file',");
+      expect(script).toContain(", '--auto',");
+      expect(script).toContain("& $opencodePath @ocArgs");
+      expect(script).not.toContain("@('--model'");
+      expect(script).not.toContain("'--prompt'");
+      // The message is passed as a positional argument after the flags
+      expect(script).toContain(", 'script test')");
+      // No stray empty-string arguments from conditional flags
+      expect(script).not.toContain(", ''");
+    } finally {
+      await cleanupTestDir(testDir);
+    }
+  });
+
+  test('opencode (v1) launch script keeps top-level --model and --prompt flags', async () => {
+    const testDir = getTestDir();
+    try {
+      saveTestSettings(testDir);
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'OC1 Script Test', folder: '/tmp/oc1' },
+      ]));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+      fs.writeFileSync(path.join(testDir, 'mock-opencode-models.json'), JSON.stringify([
+        { id: 'opencode/glm-5.3-flash', label: 'GLM 5.3 Flash' },
+      ]));
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.editor-textarea').fill('v1 script test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
+      await page.keyboard.press('1');
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.locator('.model-picker-item').first().click();
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      await page.waitForTimeout(500);
+
+      await app.close();
+
+      const scripts = readLaunchScripts(testDir);
+      expect(scripts).toHaveLength(1);
+      const script = scripts[0];
+      expect(script).toContain("@('--model', 'opencode/glm-5.3-flash', '--prompt',");
+      expect(script).not.toContain("@('run'");
     } finally {
       await cleanupTestDir(testDir);
     }

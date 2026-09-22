@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.3.0** — now with **OpenCode 2** as a launch provider (`6` in the provider picker, powered by the `opencode2` CLI).
+**Version 3.4.0** — OpenCode 2 launches fixed for the 2.0 preview CLI (model + prompt now go through the `run` subcommand).
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 
@@ -254,6 +254,7 @@ The Gaudy theme is best experienced live. It features:
 - **One-key launch**: press `1`/`2`/`3`/`4`/`5`/`6` to pick a provider, or use ↑↓ + Enter for keyboard-arrow lovers.
 - **Direct launch for non-model-API providers**: Claude Code and Codex are launched immediately with their default model (CLI handles model selection via login/config).
 - **Hand-off to model picker**: OpenCode, GitHub Copilot, Antigravity and OpenCode 2 open the model picker because they expose multiple models worth choosing from.
+- **OpenCode 2 preview compatibility**: the OpenCode 2.0 preview CLI does not accept `--model` at the top level, so OpenCode 2 launches run through `opencode2 run --model <model> --file <prompt> [--auto]` instead of the interactive TUI flags used by OpenCode 1. The prompt is attached as a file and the selected model is honored on every launch.
 
 ### Model Picker (OpenCode, GitHub Copilot, Antigravity & OpenCode 2)
 - **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `opencode2 models`, `copilot help config`, or `agy models`) at runtime, including Zen (`opencode/`), Go (`opencode-go/`) and NVIDIA (`nvidia/`) tiers. Antigravity models are always refreshed live directly from the CLI whenever opened so you always have access to the latest models (e.g. Gemini 3.8 Flash).
