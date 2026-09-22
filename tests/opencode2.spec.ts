@@ -176,7 +176,7 @@ test.describe('OpenCode 2 launch option', () => {
     }
   });
 
-  test('opencode2 launch script uses the run subcommand with --model and --file, never top-level --model', async () => {
+  test('opencode2 launch script opens the interactive TUI with the model via OPENCODE_CONFIG_CONTENT', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -210,14 +210,13 @@ test.describe('OpenCode 2 launch option', () => {
       expect(scripts).toHaveLength(1);
       const script = scripts[0];
 
-      // OpenCode 2 must go through the `run` subcommand (top-level --model is not supported)
-      expect(script).toContain("$ocArgs = @('run', '--model', 'opencode-go/glm-5.3-flash', '--file',");
-      expect(script).toContain(", '--auto',");
+      // OpenCode 2 must open the interactive TUI (never the one-shot `run` subcommand)
+      expect(script).toContain("$env:OPENCODE_CONFIG_CONTENT = '{\"model\":\"opencode-go/glm-5.3-flash\"}'");
+      expect(script).toContain("$ocArgs = @('--prompt', 'script test'");
+      expect(script).toContain("'--auto')");
       expect(script).toContain("& $opencodePath @ocArgs");
+      expect(script).not.toContain("'run'");
       expect(script).not.toContain("@('--model'");
-      expect(script).not.toContain("'--prompt'");
-      // The message is passed as a positional argument after the flags
-      expect(script).toContain(", 'script test')");
       // No stray empty-string arguments from conditional flags
       expect(script).not.toContain(", ''");
     } finally {

@@ -365,6 +365,30 @@ function createWindow() {
   }
 }
 
+// Preload OpenCode model lists in the background at startup so the model
+// picker shows models immediately and the first CLI call never blocks the UI.
+async function preloadOpenCodeModels(): Promise<void> {
+  const loadCli = async (cli: 'opencode' | 'opencode2') => {
+    const cached = cli === 'opencode2' ? openCode2ModelsCache : openCodeModelsCache;
+    if (cached && cached.length > 0) return;
+    let output = '';
+    if (cli === 'opencode') {
+      try {
+        output = await runCommand('opencode', ['models', '--verbose'], 30000);
+      } catch {
+        output = await runCommand('opencode', ['models'], 30000);
+      }
+    } else {
+      output = await runCommand('opencode2', ['models'], 30000);
+    }
+    const parsed = parseOpenCodeModels(output);
+    if (parsed.length === 0) return;
+    if (cli === 'opencode2') openCode2ModelsCache = parsed;
+    else openCodeModelsCache = parsed;
+  };
+  await Promise.allSettled([loadCli('opencode'), loadCli('opencode2')]);
+}
+
 app.whenReady().then(() => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.prompt-pad.app');
@@ -377,6 +401,9 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   createWindow();
   setupAutoUpdater(mainWindow);
+  if (!TEST_DIR) {
+    void preloadOpenCodeModels();
+  }
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
@@ -521,15 +548,21 @@ ipcMain.handle('models:get-opencode2', async () => {
     if (mock) return mock;
   }
   if (openCode2ModelsCache && openCode2ModelsCache.length > 0) return openCode2ModelsCache;
+  const exe = process.platform === 'win32'
+    ? path.join(process.env.APPDATA || '', 'npm', 'node_modules', '@opencode-ai', 'cli', 'bin', 'opencode2.exe')
+    : 'opencode2';
+  // The first call may cold-start the shared background service, so allow a
+  // generous timeout and retry once before giving up (a warm service is fast).
   let output = '';
   try {
-    output = await runCommand('opencode2', ['models']);
+    output = await runCommand('opencode2', ['models'], 30000);
   } catch {
-    // Retry without shell resolution quirks (e.g. .cmd shim issues on Windows)
-    const exe = process.platform === 'win32'
-      ? path.join(process.env.APPDATA || '', 'npm', 'node_modules', '@opencode-ai', 'cli', 'bin', 'opencode2.exe')
-      : 'opencode2';
-    output = await runCommand(exe, ['models']);
+    try {
+      output = await runCommand('opencode2', ['models'], 30000);
+    } catch {
+      // Retry without shell resolution quirks (e.g. .cmd shim issues on Windows)
+      output = await runCommand(exe, ['models'], 30000);
+    }
   }
 
   const parsed = parseOpenCodeModels(output);
@@ -777,11 +810,13 @@ ipcMain.handle('launch:execute', async (_e, config: {
   return executeLaunchCopilot(config);
 });
 
+// JSON-escape a model id for embedding inside a config JSON literal
+function escapeJsonPS(s: string): string { return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }
+
 // Build the Windows PowerShell script that launches OpenCode or OpenCode 2.
-// OpenCode 1 supports top-level `--model` / `--prompt` flags on its TUI.
-// OpenCode 2 (preview) does NOT accept `--model` at the top level — the model
-// is only available on the `run` subcommand, which also attaches files via
-// `--file` and auto-approves with `--auto`.
+// Both launch the interactive TUI. OpenCode 1 supports a top-level `--model`
+// flag; OpenCode 2 (preview) does not, so its model is passed through the
+// OPENCODE_CONFIG_CONTENT environment variable instead.
 export function buildOpenCodeWinScript(opts: {
   cli: 'opencode' | 'opencode2';
   workDir: string; model: string; message: string;
@@ -796,18 +831,22 @@ export function buildOpenCodeWinScript(opts: {
     ? 'node_modules\\@opencode-ai\\cli\\bin\\opencode2.exe'
     : 'node_modules\\opencode-ai\\bin\\opencode.exe';
 
+  let modelConfig = '';
   let ocArgs: string;
   if (cli === 'opencode2') {
-    ocArgs = "@('run', '--model', '" + safeModel + "', '--file', '" + escapeSingleQuotePS(promptPath) + "'"
+    modelConfig = '{"model":"' + escapeJsonPS(model) + '"}';
+    modelConfig = escapeSingleQuotePS(modelConfig);
+    modelConfig = "$env:OPENCODE_CONFIG_CONTENT = '" + modelConfig + "'";
+    ocArgs = "@('--prompt', '" + safeMsg + "'"
       + (yolo ? ", '--auto'" : '')
-      + ", '" + safeMsg + "')";
+      + ")";
   } else {
     ocArgs = "@('--model', '" + safeModel + "', '--prompt', '" + safeMsg + "'"
       + (yolo ? ", '--auto'" : '')
       + ", '" + safeDir + "')";
   }
 
-  return [
+  const lines = [
     "Set-Location -LiteralPath '" + safeDir + "'",
     "$opencodePath = (Get-Command " + cli + ".exe -ErrorAction SilentlyContinue).Source",
     "if (-not $opencodePath) {",
@@ -822,10 +861,14 @@ export function buildOpenCodeWinScript(opts: {
     "    $opencodePath = '" + cli + "'",
     "  }",
     "}",
+  ];
+  if (modelConfig) lines.push(modelConfig);
+  lines.push(
     "$ocArgs = " + ocArgs,
     "& $opencodePath @ocArgs",
     "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
 // Build the Linux/macOS shell script that launches OpenCode or OpenCode 2.
@@ -835,18 +878,25 @@ export function buildOpenCodeShScript(opts: {
   yolo: boolean; promptPath: string; launchTmpDir: string;
 }): string {
   const { cli, workDir, model, message, yolo, promptPath, launchTmpDir } = opts;
+  const jsonModel = '{"model":"' + model.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"}';
+  const modelExport = cli === 'opencode2'
+    ? 'export OPENCODE_CONFIG_CONTENT=' + JSON.stringify(jsonModel)
+    : '';
   const launchLine = cli === 'opencode2'
-    ? cli + ' run --model ' + JSON.stringify(model) + ' --file ' + JSON.stringify(promptPath)
-      + (yolo ? ' --auto' : '') + ' ' + JSON.stringify(message)
+    ? cli + ' --prompt ' + JSON.stringify(message) + (yolo ? ' --auto' : '')
     : cli + ' --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message)
       + (yolo ? ' --auto' : '') + ' ' + JSON.stringify(workDir);
-  return [
+  const lines = [
     '#!/bin/bash',
     'cd ' + JSON.stringify(workDir),
+  ];
+  if (modelExport) lines.push(modelExport);
+  lines.push(
     launchLine,
     'rm -rf ' + JSON.stringify(launchTmpDir),
     'rm -f "$0"',
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
 async function executeLaunchOpenCode(config: {
