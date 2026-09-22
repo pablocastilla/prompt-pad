@@ -1,3 +1,6 @@
+import type { OpenCodeSessionsSnapshot } from '../electron/sessionTypes';
+export type { OpenCodeSession, OpenCodeSessionStatus, OpenCodeSessionsSnapshot } from '../electron/sessionTypes';
+
 // ── Phrase ──
 export interface Phrase {
   id: string;
@@ -8,7 +11,7 @@ export interface Phrase {
 
 // ── Launch Configuration ──
 // 'gemini' is kept for backward compatibility with old launch history entries.
-export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex' | 'gemini';
+export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex' | 'gemini' | 'opencode2';
 
 export interface LaunchConfig {
   id: string;
@@ -24,8 +27,11 @@ export interface Settings {
   theme: 'light' | 'dark' | 'gaudy' | 'cyberpunk';
   language: 'auto' | 'es' | 'en';
   useOneDrive?: boolean;
+  sessionSoundEnabled?: boolean;
   pinnedModels?: Partial<Record<LaunchTool, string[]>>;
   showGoModelsOnly?: Partial<Record<LaunchTool, boolean>>;
+  showZenModelsOnly?: Partial<Record<LaunchTool, boolean>>;
+  showNvidiaModelsOnly?: Partial<Record<LaunchTool, boolean>>;
   showFreeModelsOnly?: Partial<Record<LaunchTool, boolean>>;
   phraseShortcutModifier: ShortcutModifier;
   launchShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
@@ -60,6 +66,10 @@ export interface Tab {
   gitFiles?: GitFile[];
   selectedGitFile?: string | null;
   gitFileDiff?: string;
+}
+
+export function isDashboardTab(tab: { content: string } | undefined): boolean {
+  return tab?.content === '__STATS__' || tab?.content === '__SESSIONS__';
 }
 
 export type CostTier = 'free' | 1 | 2 | 3 | 4 | 5;
@@ -103,6 +113,8 @@ const ZEN_PRICING: Record<string, ZenPricing> = {
   'minimax-m2.7':            { input: 0.30,  output: 1.20,   cachedRead: 0.06,  cachedWrite: 0.375 },
   'qwen3.5-plus':            { input: 0.20,  output: 1.20,   cachedRead: 0.02,  cachedWrite: 0.25 },
   'deepseek-v4-flash':       { input: 0.14,  output: 0.28,   cachedRead: 0.03 },
+  'deepseek-flash':          { input: 0.15,  output: 0.60,   cachedRead: 0.003 },
+  'deepseek-v4.1-flash':     { input: 0.15,  output: 0.60,   cachedRead: 0.003 },
   'mimo-v2.5':               { input: 0.14,  output: 0.28,   cachedRead: 0.0028 },
 
   'gpt-5.1-codex-mini':      { input: 0.25,  output: 2.00,   cachedRead: 0.025 },
@@ -192,6 +204,7 @@ const LEGACY_OR_GENERIC_TIER: Array<{ pattern: RegExp; tier: Exclude<CostTier, '
 function getBareId(modelId: string): string {
   return modelId
     .replace(/^opencode(-go)?\//, '')
+    .replace(/^nvidia\//, '')
     .replace(/^antigravity\//, '')
     .replace(/^copilot\//, '')
     .toLowerCase();
@@ -341,8 +354,10 @@ export interface ElectronAPI {
     attachedFilePaths?: string[];
   }) => Promise<boolean>;
   getOpenCodeModels: () => Promise<ModelOption[]>;
+  getOpenCode2Models: () => Promise<ModelOption[]>;
   getCopilotModels: () => Promise<ModelOption[]>;
   getAntigravityModels: () => Promise<ModelOption[]>;
+  getDefaultModels: () => Promise<{ copilot: string; opencode: string; antigravity: string }>;
   clearModelCache: () => Promise<void>;
   readClipboardImage: () => Promise<{ name: string; path: string; size: number } | null>;
   clipboardHasImage: () => boolean;
@@ -355,6 +370,9 @@ export interface ElectronAPI {
   checkForUpdates: () => Promise<boolean>;
   openVsCode: (folder: string) => Promise<boolean>;
   getOpenCodeStats: () => Promise<OpenCodeStats>;
+  getOpenCodeSessions: () => Promise<OpenCodeSessionsSnapshot>;
+  dismissOpenCodeSession: (id: string, turnId: string) => Promise<void>;
+  restoreOpenCodeSessions: () => Promise<void>;
   getPRStats: () => Promise<PRStats>;
   getPricingData: () => Promise<Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> | null>;
   getGitStatus: (folder: string) => Promise<GitFile[]>;

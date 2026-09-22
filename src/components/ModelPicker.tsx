@@ -4,12 +4,13 @@ import { getModelCostInfo } from '../types';
 import { t } from '../i18n';
 import type { LaunchTool, ModelOption, Settings, LaunchHistoryEntry } from '../types';
 import { ToolIcon, TOOL_LABELS } from './ToolIcon';
+import { siNvidia } from 'simple-icons';
 
 // Providers offered when launching. Order matters: numeric shortcuts 1..N map by position.
-const ALL_TOOLS: LaunchTool[] = ['opencode', 'copilot', 'claude-code', 'codex', 'antigravity'];
+const ALL_TOOLS: LaunchTool[] = ['opencode', 'copilot', 'claude-code', 'codex', 'antigravity', 'opencode2'];
 
 // Providers that expose a CLI-driven model list; others launch with the CLI's default model.
-const TOOLS_WITH_MODEL_PICKER: LaunchTool[] = ['opencode', 'copilot', 'antigravity'];
+const TOOLS_WITH_MODEL_PICKER: LaunchTool[] = ['opencode', 'copilot', 'antigravity', 'opencode2'];
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -29,6 +30,46 @@ const EMPTY_PROVIDER_NUMERIC_SHORTCUT: Record<string, number> = {
   Digit9: 8, Numpad9: 8,
   Digit0: 9, Numpad0: 9,
 };
+
+export function matchesModelSearch(m: ModelOption, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const label = m.label.toLowerCase();
+  const id = m.id.toLowerCase();
+
+  // Exact substring check
+  if (label.includes(q) || id.includes(q)) return true;
+
+  // Normalized search: treat 'v4.1' and '4.1' equivalently, normalize separators
+  const norm = (str: string) =>
+    str
+      .toLowerCase()
+      .replace(/\bv(\d)/g, '$1')
+      .replace(/[-_/]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const normQ = norm(q);
+  const normLabel = norm(label);
+  const normId = norm(id);
+
+  if (normLabel.includes(normQ) || normId.includes(normQ)) return true;
+
+  // Multi-term / token matching: every token in query must match
+  const words = normQ.split(' ').filter(Boolean);
+  if (words.length > 1) {
+    const matchesAll = words.every(word =>
+      label.includes(word) ||
+      id.includes(word) ||
+      normLabel.includes(word) ||
+      normId.includes(word)
+    );
+    if (matchesAll) return true;
+  }
+
+  return false;
+}
 
 export function ModelPicker() {
   const pendingLaunch    = useStore(s => s.pendingLaunch);
@@ -51,6 +92,7 @@ export function ModelPicker() {
     'claude-code': value,
     codex: value,
     gemini: value,
+    opencode2: value,
   });
 
   const [modelCache, setModelCache] = useState<Record<LaunchTool, ModelOption[] | null>>(() => emptyToolRecord<ModelOption[] | null>(null));
@@ -64,22 +106,37 @@ export function ModelPicker() {
   const tool: LaunchTool = selectedProvider ?? ALL_TOOLS[0];
   const availableModels = modelCache[tool] ?? [];
   const pinnedIds = settings.pinnedModels?.[tool] ?? [];
-  const showGoOnly = settings.showGoModelsOnly?.[tool] ?? (tool === 'opencode' ? true : false);
+  const isOpencode = tool === 'opencode' || tool === 'opencode2';
+  const showGoOnly = settings.showGoModelsOnly?.[tool] ?? isOpencode;
+  const showZenOnly = settings.showZenModelsOnly?.[tool] ?? isOpencode;
+  const showNvidiaOnly = settings.showNvidiaModelsOnly?.[tool] ?? isOpencode;
   const showFreeOnly = settings.showFreeModelsOnly?.[tool] ?? false;
 
   const filteredModels = useMemo(() => {
     let result = availableModels;
-    if (tool === 'opencode') {
-      if (showGoOnly && showFreeOnly) {
-        result = availableModels.filter(m => m.id.startsWith('opencode-go/') && (m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free')));
-      } else if (showGoOnly) {
-        result = availableModels.filter(m => m.id.startsWith('opencode-go/'));
-      } else if (showFreeOnly) {
-        result = availableModels.filter(m => m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free'));
-      }
+    if (isOpencode) {
+      result = result.filter(m => {
+        const isGo = m.id.startsWith('opencode-go/');
+        const isNvidia = m.id.startsWith('nvidia/');
+        const isZen = m.id.startsWith('opencode/');
+
+        const matchesTier =
+          (isGo && showGoOnly) ||
+          (isZen && showZenOnly) ||
+          (isNvidia && showNvidiaOnly);
+        if (!matchesTier) return false;
+
+        if (showFreeOnly) {
+          const cost = getModelCostInfo(m.id);
+          const isFreeByCost = cost?.tier === 'free';
+          const isFreeByName = m.id.toLowerCase().includes('free') || m.label.toLowerCase().includes('free');
+          return isFreeByCost || isFreeByName;
+        }
+        return true;
+      });
     }
     return result;
-  }, [availableModels, showGoOnly, showFreeOnly, tool]);
+  }, [availableModels, showGoOnly, showZenOnly, showNvidiaOnly, showFreeOnly, isOpencode]);
 
   const pinnedModels = useMemo(
     () => pinnedIds.map(id => filteredModels.find(m => m.id === id)).filter((m): m is ModelOption => !!m),
@@ -92,6 +149,13 @@ export function ModelPicker() {
   const allModels = useMemo(() => [...pinnedModels, ...unpinnedModels], [pinnedModels, unpinnedModels]);
 
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const searchedModels = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return allModels;
+    return allModels.filter(m => matchesModelSearch(m, q));
+  }, [allModels, searchQuery]);
 
   const setPinnedForTool = async (nextIds: string[]) => {
     const existingPinned = settings.pinnedModels ?? {};
@@ -126,6 +190,30 @@ export function ModelPicker() {
     await window.electronAPI.saveSettings(nextSettings);
   };
 
+  const toggleZenOnly = async () => {
+    const nextSettings: Settings = {
+      ...settings,
+      showZenModelsOnly: {
+        ...settings.showZenModelsOnly,
+        [tool]: !showZenOnly,
+      },
+    };
+    setSettings(nextSettings);
+    await window.electronAPI.saveSettings(nextSettings);
+  };
+
+  const toggleNvidiaOnly = async () => {
+    const nextSettings: Settings = {
+      ...settings,
+      showNvidiaModelsOnly: {
+        ...settings.showNvidiaModelsOnly,
+        [tool]: !showNvidiaOnly,
+      },
+    };
+    setSettings(nextSettings);
+    await window.electronAPI.saveSettings(nextSettings);
+  };
+
   const toggleFreeOnly = async () => {
     const nextSettings: Settings = {
       ...settings,
@@ -151,23 +239,41 @@ export function ModelPicker() {
     void setPinnedForTool([...reorderedVisible, ...hiddenIds]);
   };
 
-  const cleanStalePins = async (selectedTool: LaunchTool, fetchedIds: string[]) => {
+  const cleanStalePins = async (selectedTool: LaunchTool, fetchedList: ModelOption[]) => {
     const pinned = settings.pinnedModels?.[selectedTool] ?? [];
     if (pinned.length === 0) return;
-    const stale = pinned.filter(id => !fetchedIds.includes(id));
-    if (stale.length === 0) return;
-    void setPinnedForTool(pinned.filter(id => !stale.includes(id)));
+    const validIds = new Set(fetchedList.map(m => m.id));
+    const labelToId = new Map(fetchedList.map(m => [m.label, m.id]));
+    let changed = false;
+    const nextPins: string[] = [];
+    for (const p of pinned) {
+      if (validIds.has(p)) {
+        nextPins.push(p);
+      } else if (labelToId.has(p)) {
+        nextPins.push(labelToId.get(p)!);
+        changed = true;
+      } else {
+        changed = true;
+      }
+    }
+    if (changed) {
+      void setPinnedForTool(nextPins);
+    }
   };
 
   const loadModels = async (selectedTool: LaunchTool, force = false) => {
     if (!TOOLS_WITH_MODEL_PICKER.includes(selectedTool)) return;
-    if (!force && (modelCache[selectedTool] || loadingModels[selectedTool])) return;
+    const shouldForce = force || selectedTool === 'antigravity';
+    if (loadingModels[selectedTool]) return;
+    if (!shouldForce && modelCache[selectedTool]) return;
     setLoadingModels(prev => ({ ...prev, [selectedTool]: true }));
     setModelError(prev => ({ ...prev, [selectedTool]: null }));
     try {
       let fetched: ModelOption[] = [];
       if (selectedTool === 'opencode') {
         fetched = await window.electronAPI.getOpenCodeModels();
+      } else if (selectedTool === 'opencode2') {
+        fetched = await window.electronAPI.getOpenCode2Models();
       } else if (selectedTool === 'copilot') {
         fetched = await window.electronAPI.getCopilotModels();
       } else if (selectedTool === 'antigravity') {
@@ -189,7 +295,7 @@ export function ModelPicker() {
         : list;
 
       setModelCache(prev => ({ ...prev, [selectedTool]: normalized }));
-      void cleanStalePins(selectedTool, normalized.map(m => m.id));
+      void cleanStalePins(selectedTool, normalized);
     } catch {
       setModelError(prev => ({ ...prev, [selectedTool]: t('modelsUnavailable') }));
     } finally {
@@ -206,7 +312,7 @@ export function ModelPicker() {
   // Trigger model loading once a provider with model picker support is selected
   useEffect(() => {
     if (pendingLaunch && selectedProvider && TOOLS_WITH_MODEL_PICKER.includes(selectedProvider)) {
-      void loadModels(selectedProvider);
+      void loadModels(selectedProvider, selectedProvider === 'antigravity');
     }
   }, [pendingLaunch?.launch.id, selectedProvider]);
 
@@ -216,6 +322,7 @@ export function ModelPicker() {
     setProviderIdx(0);
     setSelectedProvider(null);
     setSelectedIdx(0);
+    setSearchQuery('');
   }, [pendingLaunch?.launch.id]);
 
   // Never auto-scroll; keep list at top. User scrolls manually if needed.
@@ -225,6 +332,11 @@ export function ModelPicker() {
     if (!listEl) return;
     listEl.scrollTop = 0;
   }, [pendingLaunch, allModels.length, tool]);
+
+  // Keep selected index within bounds when the search query changes
+  useEffect(() => {
+    setSelectedIdx(i => (searchedModels.length === 0 ? 0 : Math.min(i, searchedModels.length - 1)));
+  }, [searchedModels.length]);
 
   const activeTabId = useStore(s => s.activeTabId);
   const setTabLaunchFolder = useStore(s => s.setTabLaunchFolder);
@@ -267,7 +379,7 @@ export function ModelPicker() {
 
   const execute = async (idx: number) => {
     if (!pendingLaunch) return;
-    const ms = allModels;
+    const ms = searchedModels;
     if (!ms[idx]) return;
     const model = ms[idx].id;
     const cost = getModelCostInfo(model);
@@ -283,6 +395,7 @@ export function ModelPicker() {
     if (TOOLS_WITH_MODEL_PICKER.includes(provider)) {
       setSelectedProvider(provider);
       setProviderStep('model');
+      setSearchQuery('');
       return;
     }
     // Providers without a model picker: launch directly with default model
@@ -325,7 +438,7 @@ export function ModelPicker() {
   // Keyboard handler for the model step (existing behaviour)
   useEffect(() => {
     if (!pendingLaunch || providerStep !== 'model') return;
-    const ms = allModels;
+    const ms = searchedModels;
     if (!ms.length) return;
     const handler = (e: KeyboardEvent) => {
       if (confirmExpensiveIdx !== null) {
@@ -359,7 +472,7 @@ export function ModelPicker() {
     };
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [pendingLaunch, providerStep, selectedIdx, allModels, pinnedModels.length, pinnedIds, confirmExpensiveIdx]);
+  }, [pendingLaunch, providerStep, selectedIdx, searchedModels, pinnedModels.length, pinnedIds, confirmExpensiveIdx]);
 
   function CostIndicator({ modelId }: { modelId: string }) {
     const info = getModelCostInfo(modelId);
@@ -382,6 +495,15 @@ export function ModelPicker() {
   function TierBadge({ modelId }: { modelId: string }) {
     if (modelId.startsWith('opencode-go/')) {
       return <span className="model-tier-badge model-tier-go">Go</span>;
+    }
+    if (modelId.startsWith('nvidia/')) {
+      return (
+        <span className="model-tier-badge model-tier-nvidia" title="NVIDIA" aria-label="NVIDIA">
+          <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" className="model-tier-nvidia-icon">
+            <path d={siNvidia.path} fill="currentColor" />
+          </svg>
+        </span>
+      );
     }
     if (modelId.startsWith('opencode/')) {
       return <span className="model-tier-badge model-tier-zen">Zen</span>;
@@ -446,20 +568,40 @@ export function ModelPicker() {
             title={t('refreshModels')}
           >{isLoading ? '⏳' : '🔄'}</button>
         </div>
-        {tool === 'opencode' && (
+        {(tool === 'opencode' || tool === 'opencode2') && (
           <>
-            <label className="model-picker-go-toggle">
+            <label className="model-picker-go-toggle" data-tier="go">
               <input type="checkbox" checked={showGoOnly} onChange={toggleGoOnly} />
               <span className="model-picker-go-checkbox" />
               <span>{t('showGoModelsOnly')}</span>
             </label>
-            <label className="model-picker-go-toggle">
+            <label className="model-picker-go-toggle" data-tier="zen">
+              <input type="checkbox" checked={showZenOnly} onChange={toggleZenOnly} />
+              <span className="model-picker-go-checkbox" />
+              <span>{t('showZenModelsOnly')}</span>
+            </label>
+            <label className="model-picker-go-toggle" data-tier="nvidia">
+              <input type="checkbox" checked={showNvidiaOnly} onChange={toggleNvidiaOnly} />
+              <span className="model-picker-go-checkbox" />
+              <span>{t('showNvidiaModelsOnly')}</span>
+            </label>
+            <label className="model-picker-go-toggle" data-tier="free">
               <input type="checkbox" checked={showFreeOnly} onChange={toggleFreeOnly} />
               <span className="model-picker-go-checkbox" />
               <span>{t('showFreeModelsOnly')}</span>
             </label>
           </>
         )}
+        <div className="model-picker-search">
+          <input
+            type="text"
+            className="model-picker-search-input"
+            placeholder={t('searchModelsPlaceholder')}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            data-testid="model-search-input"
+          />
+        </div>
         <div className="model-picker-list" ref={listRef}>
           {isLoading && <div className="model-picker-loading"><span className="model-picker-loading-dot" />{t('loadingModels')}</div>}
           {allModels.length === 0 ? (
@@ -467,6 +609,34 @@ export function ModelPicker() {
               <div className="model-picker-error">{modelError[tool]}</div>
             ) : (
               <div className="model-picker-loading">{t('loadingModels')}</div>
+            )
+          ) : searchQuery.trim() ? (
+            searchedModels.length === 0 ? (
+              <div className="model-picker-empty">{t('noModelsMatchSearch')}</div>
+            ) : (
+              searchedModels.map((m, idx) => (
+                <div
+                  key={m.id}
+                  data-model-index={idx}
+                  className={
+                    'model-picker-item' +
+                    (idx === selectedIdx ? ' selected' : '') +
+                    (pinnedIds.includes(m.id) ? ' pinned' : '')
+                  }
+                  onClick={() => execute(idx)}
+                  onMouseEnter={() => setSelectedIdx(idx)}
+                >
+                  <span className="model-picker-item-dot" />
+                  <span className="model-picker-item-label">{m.label}</span>
+                  <TierBadge modelId={m.id} />
+                  <CostIndicator modelId={m.id} />
+                  <button
+                    className={'model-picker-pin-btn' + (pinnedIds.includes(m.id) ? ' pinned' : '')}
+                    onClick={e => { e.stopPropagation(); togglePin(m.id); }}
+                    title={pinnedIds.includes(m.id) ? t('unpinModel') : t('pinModel')}
+                  >{pinnedIds.includes(m.id) ? '📌' : '📍'}</button>
+                </div>
+              ))
             )
           ) : (
             <>
@@ -552,8 +722,8 @@ export function ModelPicker() {
               <div className="model-picker-confirm-icon">⚠️</div>
               <div className="model-picker-confirm-text">{t('expensiveModelConfirm')}</div>
               <div className="model-picker-confirm-model">
-                {allModels[confirmExpensiveIdx]?.label}
-                {allModels[confirmExpensiveIdx] && <TierBadge modelId={allModels[confirmExpensiveIdx].id} />}
+                {searchedModels[confirmExpensiveIdx]?.label}
+                {searchedModels[confirmExpensiveIdx] && <TierBadge modelId={searchedModels[confirmExpensiveIdx].id} />}
               </div>
               <div className="model-picker-confirm-actions">
                 <button className="model-picker-confirm-btn model-picker-confirm-cancel" onClick={() => setConfirmExpensiveIdx(null)}>{t('cancelBtn')}</button>

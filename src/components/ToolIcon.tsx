@@ -17,6 +17,7 @@ export const TOOL_LABELS: Record<LaunchTool, string> = {
   'claude-code': 'Claude Code',
   codex: 'Codex',
   gemini: 'Gemini',
+  opencode2: 'OpenCode 2',
 };
 
 function getOpenCodeIconForTheme(): string {
@@ -36,11 +37,11 @@ export function ToolIcon({ tool, size = 14, className }: ToolIconProps) {
       </svg>
     );
   }
-  if (tool === 'opencode') {
+  if (tool === 'opencode' || tool === 'opencode2') {
     return (
       <img
         src={getOpenCodeIconForTheme()}
-        alt="OpenCode"
+        alt={tool === 'opencode2' ? 'OpenCode 2' : 'OpenCode'}
         className={`tool-icon-image ${className ?? ''}`.trim()}
         width={size}
         height={size}

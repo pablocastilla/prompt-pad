@@ -1405,6 +1405,33 @@ html, body, #root {
   border-color: var(--accent);
 }
 
+.model-picker-search {
+  padding: 0 0 8px;
+}
+.model-picker-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid var(--border, #3a3a3a);
+  border-radius: 9px;
+  background: var(--bg2, #1e1e1e);
+  color: var(--text, #e6e6e6);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .1s, box-shadow .1s;
+}
+.model-picker-search-input:focus {
+  border-color: var(--accent, #4a9eff);
+  box-shadow: 0 0 0 2px var(--accent-dim, rgba(74,158,255,.2));
+}
+.model-picker-empty {
+  padding: 18px 12px;
+  color: var(--text3, #888);
+  font-size: 13px;
+  text-align: center;
+}
+
 .model-picker-list {
   display: flex;
   flex-direction: column;
@@ -1655,6 +1682,20 @@ html, body, #root {
   border: 1px solid rgba(99, 102, 241, .2);
 }
 
+.model-tier-nvidia {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  background: rgba(118, 185, 0, .14);
+  color: #76b900;
+  border: 1px solid rgba(118, 185, 0, .25);
+}
+.model-tier-nvidia-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
 .model-picker-item:hover .model-tier-badge {
   transform: scale(1.06);
 }
@@ -1671,6 +1712,13 @@ html, body, #root {
   border-color: rgba(255, 226, 138, .25);
   color: #ffe28a;
   text-shadow: 0 0 6px rgba(255, 226, 138, .3);
+}
+
+[data-theme="gaudy"] .model-tier-nvidia {
+  background: linear-gradient(135deg, rgba(118, 185, 0, .15), rgba(255, 226, 138, .12));
+  border-color: rgba(118, 185, 0, .3);
+  color: #b8ff3a;
+  text-shadow: 0 0 6px rgba(118, 185, 0, .4);
 }
 
 /* ── GAUDY MODEL COST INDICATORS ─────────────────── */

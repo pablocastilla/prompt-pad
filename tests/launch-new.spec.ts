@@ -294,7 +294,7 @@ test.describe('Launch configuration form', () => {
 });
 
 test.describe('Provider picker navigation', () => {
-  test('provider picker shows exactly 5 providers in opencode/copilot/claude-code/codex/antigravity order', async () => {
+  test('provider picker shows exactly 6 providers in opencode/copilot/claude-code/codex/antigravity/opencode2 order', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -321,13 +321,13 @@ test.describe('Provider picker navigation', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible();
 
       const providers = page.locator('.provider-picker-list .provider-picker-item');
-      await expect(providers).toHaveCount(5);
+      await expect(providers).toHaveCount(6);
 
       const providerNames = await providers.evaluateAll((els) => els.map((el) => el.getAttribute('data-provider')));
-      expect(providerNames).toEqual(['opencode', 'copilot', 'claude-code', 'codex', 'antigravity']);
+      expect(providerNames).toEqual(['opencode', 'copilot', 'claude-code', 'codex', 'antigravity', 'opencode2']);
 
-      // Each item shows its numeric shortcut (1..5)
-      for (let i = 0; i < 5; i++) {
+      // Each item shows its numeric shortcut (1..6)
+      for (let i = 0; i < 6; i++) {
         const shortcut = providers.nth(i).locator('.provider-picker-shortcut');
         await expect(shortcut).toHaveText(String(i + 1));
       }
@@ -357,7 +357,7 @@ test.describe('Provider picker navigation', () => {
         const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
         (api as { getOpenCodeModels: () => Promise<unknown> }).getOpenCodeModels = async () => [
           { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
-          { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
+          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
         ];
       });
 
@@ -400,7 +400,7 @@ test.describe('Provider picker navigation', () => {
       await page.evaluate(() => {
         const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
         (api as { getOpenCodeModels: () => Promise<unknown> }).getOpenCodeModels = async () => [
-          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
         ];
       });
 
@@ -447,8 +447,8 @@ test.describe('Provider picker navigation', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI;
         api.getCopilotModels = async () => [
-          { id: 'gpt-5', label: 'GPT-5' },
-          { id: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
+          { id: 'auto', label: 'auto' },
+          { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
         ];
       });
 
@@ -564,8 +564,8 @@ test.describe('Provider picker navigation', () => {
       await page.evaluate(() => {
         const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI;
         (api as { getAntigravityModels: () => Promise<unknown> }).getAntigravityModels = async () => [
-          { id: 'Gemini 3.5 Flash (Medium)', label: 'Gemini 3.5 Flash (Medium)' },
-          { id: 'Claude Sonnet 4.6 (Thinking)', label: 'Claude Sonnet 4.6 (Thinking)' },
+          { id: 'gemini-3.8-flash-low', label: 'Gemini 3.8 Flash (Low)' },
+          { id: 'gemini-3.8-flash-medium', label: 'Gemini 3.8 Flash (Medium)' },
         ];
       });
 
@@ -610,7 +610,7 @@ test.describe('Provider picker navigation', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI;
         api.getOpenCodeModels = async () => [
-          { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
+          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
         ];
       });
 
@@ -626,6 +626,52 @@ test.describe('Provider picker navigation', () => {
       // OpenCode has a model picker, so the overlay stays visible with the model list
       await expect(page.locator('.model-picker-list')).toBeVisible();
       await expect(page.locator('.provider-picker-list')).not.toBeVisible();
+
+      // No launch call should have happened yet (still in model picker)
+      const calls = readLaunchCalls(testDir);
+      expect(calls).toHaveLength(0);
+
+      await app.close();
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('numeric key 6 opens model picker for opencode2 (it has a model API)', async () => {
+    const testDir = getTestDir();
+    try {
+      saveTestSettings(testDir);
+      savePhrases(testDir, []);
+      saveLaunches(testDir, [
+        { id: 'l1', name: 'Test', folder: '/tmp' },
+      ]);
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api = (window as any).electronAPI;
+        api.getOpenCode2Models = async () => [
+          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
+        ];
+      });
+
+      await page.locator('.editor-textarea').fill('test prompt');
+      await page.waitForTimeout(100);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+
+      await page.keyboard.press('6');
+      await page.waitForTimeout(500);
+
+      // OpenCode 2 has a model picker, so the overlay stays visible with the model list
+      await expect(page.locator('.model-picker-list')).toBeVisible();
+      await expect(page.locator('.provider-picker-list')).not.toBeVisible();
+      await expect(page.locator('.model-picker-tool-badge')).toContainText('OpenCode 2');
 
       // No launch call should have happened yet (still in model picker)
       const calls = readLaunchCalls(testDir);

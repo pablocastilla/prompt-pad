@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import { TabBar } from './TabBar';
+import { isDashboardTab } from '../types';
 
 export function Header() {
   const tabs           = useStore(s => s.tabs);
@@ -16,7 +17,7 @@ export function Header() {
   const gaudy = (key: Parameters<typeof t>[0]) => { if (settings.theme === 'gaudy') addToast(t(key)); };
 
   const handleCopyPrompt = async () => {
-    if (!activeTab) return;
+    if (!activeTab || isDashboardTab(activeTab)) return;
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(activeTab.content);
@@ -37,7 +38,7 @@ export function Header() {
   };
 
   const handleSave = async () => {
-    if (!activeTab) return;
+    if (!activeTab || isDashboardTab(activeTab)) return;
     if (activeTab.path) {
       await window.electronAPI.saveFile(activeTab.path, activeTab.content);
       markTabSaved(activeTab.id, activeTab.path, activeTab.title);
@@ -48,7 +49,7 @@ export function Header() {
   };
 
   const handleSaveAs = async () => {
-    if (!activeTab) return;
+    if (!activeTab || isDashboardTab(activeTab)) return;
     const filePath = await window.electronAPI.saveFileAs(activeTab.content, activeTab.title + '.txt');
     if (filePath) {
       const name = filePath.split(/[\\/]/).pop()?.replace(/\.\w+$/, '') || activeTab.title;
@@ -98,13 +99,14 @@ export function Header() {
       <TabBar />
       <div className="header-actions">
         <button className="header-btn" onClick={handleOpen} title={t('open')}>📂</button>
-        <button className="header-btn" onClick={handleCopyPrompt} title={t('copyPrompt')}>📋</button>
+        <button className="header-btn" disabled={isDashboardTab(activeTab)} onClick={handleCopyPrompt} title={t('copyPrompt')}>📋</button>
         <button
           className={'header-btn' + (activeTab?.dirty ? ' dirty' : '')}
           onClick={handleSave}
+          disabled={isDashboardTab(activeTab)}
           title={t('save')}
         >💾</button>
-        <button className="header-btn" onClick={handleSaveAs} title={t('saveAs')}>↓</button>
+        <button className="header-btn" disabled={isDashboardTab(activeTab)} onClick={handleSaveAs} title={t('saveAs')}>↓</button>
       </div>
     </header>
   );

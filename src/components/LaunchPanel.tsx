@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { t } from '../i18n';
 import type { LaunchConfig, Settings } from '../types';
+import { isDashboardTab } from '../types';
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -84,7 +85,7 @@ export function LaunchPanel() {
 
   // Open model picker (model chosen at launch time)
   const handleLaunch = () => {
-    if (!selectedLaunch || !activeTab?.content.trim()) return;
+    if (!selectedLaunch || !activeTab?.content.trim() || isDashboardTab(activeTab)) return;
     setPendingLaunch({
       launch: selectedLaunch,
       prompt: activeTab.content,
@@ -163,7 +164,7 @@ export function LaunchPanel() {
             <button
               className="btn-icon"
               onClick={handleLaunch}
-              disabled={!selectedLaunch || !activeTab?.content.trim()}
+              disabled={!selectedLaunch || !activeTab?.content.trim() || isDashboardTab(activeTab)}
               title={t('noLaunchSelected')}
             ><IconRocket /></button>
             <button className="btn-icon" onClick={handleStartAdd} title={t('addLaunch')}><IconPlus /></button>
@@ -201,7 +202,7 @@ export function LaunchPanel() {
               onClick={() => setSelectedLaunchId(launch.id)}
               onDoubleClick={() => {
                 setSelectedLaunchId(launch.id);
-                if (activeTab?.content.trim()) {
+                if (activeTab?.content.trim() && !isDashboardTab(activeTab)) {
                   setPendingLaunch({
                     launch,
                     prompt: activeTab.content,

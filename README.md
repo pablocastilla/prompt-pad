@@ -1,6 +1,8 @@
 # Prompt Pad
 
-A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex** or **Antigravity** — without leaving your keyboard.
+**Version 3.3.0** — now with **OpenCode 2** as a launch provider (`6` in the provider picker, powered by the `opencode2` CLI).
+
+A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 
 ---
 
@@ -12,8 +14,8 @@ Prompt Pad was built for people who don't want to juggle terminal tabs, `cd` int
 
 1. **Write your prompt** in the editor.
 2. **Press `Ctrl+Shift+1`** (or whatever number your launcher is) — the launcher only stores the **folder**, nothing else.
-3. **Pick a provider** (`1` = OpenCode, `2` = GitHub Copilot, `3` = Claude Code, `4` = Codex, `5` = Antigravity) with a single keystroke.
-4. **Pick a model** (OpenCode, GitHub Copilot and Antigravity show a model picker — Claude and Codex launch straight away).
+3. **Pick a provider** (`1` = OpenCode, `2` = GitHub Copilot, `3` = Claude Code, `4` = Codex, `5` = Antigravity, `6` = OpenCode 2) with a single keystroke.
+4. **Pick a model** (OpenCode, GitHub Copilot, Antigravity and OpenCode 2 show a model picker — Claude and Codex launch straight away).
 5. **Done** — a terminal window opens, runs the CLI with `--yolo`/interactive flags, and feeds it your prompt.
 
 That's it. No terminals to manage. No context switching. Launchers are just folders — the provider and model are chosen at launch time, every time.
@@ -125,13 +127,29 @@ Enter the **Launch History** panel. Every time you fire a prompt, Prompt Pad rem
 
 Your launch history is basically a prompt journal you didn't have to write. Every fire-and-forget prompt is catalogued, searchable, and one double-click away from resurrection.
 
+### OpenCode Sessions — All Your Agents in One Place
+
+Click **▥ OpenCode sessions** in the activity bar to open a dashboard tab next to your prompts and statistics. Each local OpenCode session gets its own column, including sessions started directly in a terminal or in other project folders.
+
+- **Live view:** refreshes every 3 seconds with the project folder, model, latest messages and tool progress. Active work appears first; scroll horizontally for more sessions and vertically within each column. New output follows automatically unless you scroll up to read.
+- **Sound notifications:** a soft two-note chime plays when a turn finishes or errors, and a distinct chime plays when the agent needs you — an open `question` tool, or a tool stuck waiting for your approval. Notifications work in the background, even while you are in the terminal or on another tab, and are transition-based so sessions already finished at startup stay silent. Toggle them with the **Sound** checkbox on the sessions board or in Settings.
+- **Automatic cleanup:** a finished or failed turn stays visible for **30 minutes from its recorded completion**, then its column disappears. Intermediate tool-call steps do not start this countdown. A new prompt in the same session brings the column back.
+- **Manual close:** the **×** on a column hides the current turn, including across Prompt Pad restarts. **Restore hidden** brings back unexpired hidden columns. Closing a column does not stop OpenCode, delete a session or alter its database.
+- **Search:** filter by session title, folder or model. English/Spanish and all four themes are supported.
+
+**How status works:** OpenCode keeps its exact `busy`/`idle` status in memory, not SQLite. The board therefore infers **Working**, **Waiting**, **Finished** and **Error / interrupted** from persisted messages and tools. Unfinished sessions with no recorded activity for 5 minutes are marked **Uncertain**, kept open and placed after active/recently finished sessions. They may be waiting for permission, running a long tool, or left over from an interrupted process; SQLite alone cannot distinguish these. Only a recorded final answer/error starts the 30-minute removal timer. Archived sessions are omitted.
+
+The reader opens `opencode.db` **read-only**, using short, consistent SQLite transactions compatible with concurrent WAL writes. It displays the latest 12 messages (up to 80 visible text/tool entries, with long text excerpts bounded to 6,000 characters). Checked against the installed **OpenCode 1.18.30** schema; extra columns are ignored and optional session metadata is not required. Missing databases and incompatible schemas are shown in the panel and retried automatically.
+
+The default location on Windows, macOS and Linux is `$XDG_DATA_HOME/opencode/opencode.db`, falling back to `~/.local/share/opencode/opencode.db`, with legacy AppData/Application Support locations also detected. For a custom installation, set `PROMPT_PAD_OPENCODE_DB` before starting Prompt Pad. The board reads one local database; it does not aggregate other machines or providers.
+
 ### Why This Beats Terminal Tabs
 
 | Terminal Tabs | Prompt Pad |
 |---|---|
 | Open 4 terminals, `cd` 4 times | One window, one editor |
 | Remember which flags each CLI needs | Always `--yolo` + interactive, baked in |
-| Switch CLI = open new terminal + remember command | One keystroke (`1`/`2`/`3`/`4`/`5`) picks the provider (now with Antigravity) |
+| Switch CLI = open new terminal + remember command | One keystroke (`1`/`2`/`3`/`4`/`5`/`6`) picks the provider (now with Antigravity and OpenCode 2) |
 | Lose track of which model you picked | Provider picker + model picker every time, fresh choice |
 | Scroll back through walls of output | Each CLI gets its own terminal window |
 | Accidentally run command in wrong dir | Each launcher locks to its folder |
@@ -156,9 +174,9 @@ Your launch history is basically a prompt journal you didn't have to write. Ever
 
 *(Screenshot coming soon — your history is too personal to screenshot anyway)*
 
-### Provider Picker — pick the CLI at launch time (`1`/`2`/`3`/`4`/`5`)
+### Provider Picker — pick the CLI at launch time (`1`/`2`/`3`/`4`/`5`/`6`)
 
-The provider picker is the first dialog that appears after pressing `Ctrl+Shift+N`. Each provider has a numeric shortcut so you can launch with a single keystroke. OpenCode, GitHub Copilot and Antigravity hand off to the model picker so you can pick any of their available models; Claude Code and Codex launch straight away.
+The provider picker is the first dialog that appears after pressing `Ctrl+Shift+N`. Each provider has a numeric shortcut so you can launch with a single keystroke. OpenCode, GitHub Copilot, Antigravity and OpenCode 2 hand off to the model picker so you can pick any of their available models; Claude Code and Codex launch straight away.
 
 ### Model Picker — choose the model (↑↓ + Enter)
 
@@ -190,7 +208,7 @@ The Gaudy theme is best experienced live. It features:
 ## Features
 
 ### Editor
-- **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close. Statistics opens as a tab too — close it to return to your editor tabs.
+- **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close. Statistics and OpenCode sessions open as tabs too — close them to return to your editor tabs.
 - **Auto-session**: tab state (title, content, path) is saved every 600 ms and restored on the next launch.
 - **Plain-text contenteditable core**: editor now uses a `contenteditable` surface with strict plain-text sync, so launches always send plain text/markdown (no rich-text styles or HTML).
 - **Save/Open**: `Ctrl+S` (save), `Ctrl+Shift+S` (save as), `Ctrl+O` (open).
@@ -206,9 +224,9 @@ The Gaudy theme is best experienced live. It features:
 - **Search**: filter phrases by name or content with the search bar.
 
 ### Launch Configurations
-- **Folder-only launchers**: each config stores just a **name** and a **working folder**. The provider (OpenCode / GitHub Copilot / Claude Code / Codex / Antigravity) and the model are chosen at launch time — every launch is a fresh choice.
+- **Folder-only launchers**: each config stores just a **name** and a **working folder**. The provider (OpenCode / GitHub Copilot / Claude Code / Codex / Antigravity / OpenCode 2) and the model are chosen at launch time — every launch is a fresh choice.
 - **Always YOLO + interactive**: Prompt Pad always launches the CLI in "yolo" / `--dangerously-skip-permissions` mode and interactive (`-i`) mode. No checkboxes to fiddle with — that decision is baked in.
-- **Provider picker at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **provider picker** appears first. Press `1` for OpenCode, `2` for GitHub Copilot, `3` for Claude Code, `4` for Codex, `5` for Antigravity, or use ↑↓ + Enter. Claude and Codex launch straight away; OpenCode, GitHub Copilot and Antigravity hand off to the model picker.
+- **Provider picker at launch time**: when you fire a config (🚀 button or `Ctrl+Shift+1–9`), a **provider picker** appears first. Press `1` for OpenCode, `2` for GitHub Copilot, `3` for Claude Code, `4` for Codex, `5` for Antigravity, `6` for OpenCode 2, or use ↑↓ + Enter. Claude and Codex launch straight away; OpenCode, GitHub Copilot, Antigravity and OpenCode 2 hand off to the model picker.
 - **Drag-to-reorder**: drag the ⠿ handle to reprioritise configs. The `Ctrl+Shift+N` shortcuts follow the list order and are auto-saved.
 - **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
 - **Open folder in VS Code**: each launch shortcut can also open the launch folder in VS Code using a configurable modifier in Settings (`Ctrl+Shift`, `Ctrl+Alt`, or `Ctrl+Alt+Shift`).
@@ -232,28 +250,31 @@ The Gaudy theme is best experienced live. It features:
 - **Gaudy theme toasts**: even clearing history gets a dramatic notification.
 
 ### Provider Picker
-- **Five providers**: OpenCode, GitHub Copilot, Claude Code, Codex, Antigravity — pre-numbered `1`–`5`.
-- **One-key launch**: press `1`/`2`/`3`/`4`/`5` to pick a provider, or use ↑↓ + Enter for keyboard-arrow lovers.
+- **Six providers**: OpenCode, GitHub Copilot, Claude Code, Codex, Antigravity, OpenCode 2 — pre-numbered `1`–`6`.
+- **One-key launch**: press `1`/`2`/`3`/`4`/`5`/`6` to pick a provider, or use ↑↓ + Enter for keyboard-arrow lovers.
 - **Direct launch for non-model-API providers**: Claude Code and Codex are launched immediately with their default model (CLI handles model selection via login/config).
-- **Hand-off to model picker**: OpenCode, GitHub Copilot and Antigravity open the model picker because they expose multiple models worth choosing from.
+- **Hand-off to model picker**: OpenCode, GitHub Copilot, Antigravity and OpenCode 2 open the model picker because they expose multiple models worth choosing from.
 
-### Model Picker (OpenCode, GitHub Copilot & Antigravity)
-- **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `copilot help config`, or `agy.exe models`) at runtime, including Zen (`opencode/`) and Go (`opencode-go/`) tiers.
-- **Provider-aware**: only shown for OpenCode, GitHub Copilot and Antigravity launches. Claude Code and Codex bypass it and launch with their default model.
-- **Go/Zen filter**: a toggle to show only Go-tier models (opencode-go/) — on by default for OpenCode launches, keeping the list focused on high-capacity models like Qwen3.7 Max, Deepseek V4 Pro, and Kimi K2.6.
-- **Free filter**: a toggle to show only free models — looks for "free" in the model name. Both Go and Free filters can be combined to show only free Go models.
+### Model Picker (OpenCode, GitHub Copilot, Antigravity & OpenCode 2)
+- **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `opencode2 models`, `copilot help config`, or `agy models`) at runtime, including Zen (`opencode/`), Go (`opencode-go/`) and NVIDIA (`nvidia/`) tiers. Antigravity models are always refreshed live directly from the CLI whenever opened so you always have access to the latest models (e.g. Gemini 3.8 Flash).
+- **Provider-aware**: only shown for OpenCode, GitHub Copilot, Antigravity and OpenCode 2 launches. Claude Code and Codex bypass it and launch with their default model.
+- **Go / Zen / NVIDIA tier filters**: three independent checkboxes to show or hide each OpenCode tier — Go (`opencode-go/`), Zen (`opencode/`) and NVIDIA (`nvidia/`). All three are enabled by default for OpenCode launches; uncheck any combination to focus the list (e.g. keep only Go and Zen, or only NVIDIA).
+- **Free filter**: a toggle to show only free models — matches models with "free" in the name or with free zero-cost pricing tiers. Free can be combined with tier filters to show only free Go models, free Zen models, or free NVIDIA models.
+- **Free and lowest-cost defaults**: launches and fallback configurations default to free and lowest-cost models across providers (`auto` for GitHub Copilot, `opencode/minimax-m2.5-free` for OpenCode, and `gemini-3.8-flash-medium` for Antigravity) to prevent unexpected usage costs.
 - **Official tool branding**: launch rows and picker badges use official tool icons (including OpenCode brand mark) with theme-aware contrast. OpenCode uses a minimal two-image square logo set (light-theme and dark-theme variants).
 - **Always starts at the top**: the model list stays at the top when loading — scroll down manually to browse all models.
 - **Cost indicators**: each model shows a `free` badge or signal bars (1-5) based on pricing — hover for exact pricing per 1M tokens (input, output, cached) sourced from [models.dev](https://models.dev/api.json) with fallback to hardcoded data.
-- **Tier badges**: Go models (`opencode-go/`) show an orange "Go" badge and Zen models (`opencode/`) show a purple "Zen" badge next to the model name for quick identification.
+- **Tier badges**: Go models (`opencode-go/`) show an orange "Go" badge, Zen models (`opencode/`) show a purple "Zen" badge, and NVIDIA models (`nvidia/`) show a small NVIDIA green logo next to the model name for quick identification.
 - **Expensive model confirmation**: launching tier 4-5 models (including Go `max` tier models) prompts a confirmation dialog to prevent accidental high-cost launches.
 - **Pin favourite models**: press `Ctrl+1` through `Ctrl+0` while hovering a model to pin it to the top. Pinned models appear first and can be launched instantly with `1` through `0`. Press the same shortcut again to unpin.
 - **Drag-to-reorder pinned**: drag the ⠿ handle on pinned models to reorder them.
 - **CLI sync**: pinned models are saved to `settings.json` and sync via OneDrive when enabled. The model list is always fresh from the CLI — pins just give you quick access to your favourites.
 - **Back button**: a `←` button returns to the provider picker if you change your mind about which CLI to use.
+- **Search box**: a text field at the top of the model list filters models live by name (label or id). Clearing the search restores the full pinned/available grouping, and a "no models match" message shows when nothing matches.
 
 ### Settings
 - **Language**: auto-detect (from system locale), English, or Spanish.
+- **Session sound notifications**: toggle the chime that plays when an OpenCode session finishes or asks a question. The same switch is available on the OpenCode sessions board.
 - **OneDrive sync**: `phrases.json` and `launches.json` can be synced via OneDrive. First-enable migrates existing files automatically.
 - **Auto-updates**: automatically checks for new versions on startup and every 4 hours. Downloads and installs updates silently — just restart when prompted. Manual check button also available.
 
@@ -266,7 +287,7 @@ The Gaudy theme is best experienced live. It features:
 
 ### Help Overlay
 - **`?` button in the activity bar**: a pulsing help button sits right below the statistics button so newcomers can find it instantly.
-- **Eye-catching tour banner**: clicking it opens an overlay with a gradient header and a card for each tool — Launches, Phrases, History, Statistics, Help and Settings — each one in its own row.
+- **Eye-catching tour banner**: clicking it opens an overlay with a gradient header and a card for each tool — Launches, Phrases, History, OpenCode sessions, Statistics, Help and Settings — each one in its own row.
 - **Animated arrows pointing back to the activity bar**: every row shows a left-pointing arrow that nudges toward the matching activity-bar button, so the link between the explanation and the button is obvious at a glance.
 - **Folder-first launch explanation**: the Launches description deliberately emphasises that each launch points to the *working folder* where your project lives and that the prompt is fired from there at the CLI.
 - **Always-accessible**: the activity bar stays visible while the overlay is open, so you can click another tool to try it out while reading. Close with `Esc`, the X icon, the "Got it" button, or by clicking the dimmed backdrop.
@@ -279,6 +300,7 @@ Prompt Pad automatically keeps itself up to date:
 - Downloads updates silently in the background
 - Prompts to restart when a new version is ready
 - Manual "Check for updates" button in Settings
+- Resolves the newest version directly from the GitHub releases feed (highest stable `vX.Y.Z` tag), so update checks stay reliable even when GitHub's "latest release" marker is briefly out of sync
 - No need to manually download installers — updates are applied automatically
 
 ---
@@ -289,7 +311,7 @@ Prompt Pad automatically keeps itself up to date:
 |---|---|
 | `Ctrl/⌘ + 1–9, 0` | Insert phrase #1–10 at cursor |
 | `Ctrl/⌘ + Shift + 1–9, 0` | Open provider picker for launch config #1–10 |
-| `1`/`2`/`3`/`4`/`5` (in provider picker) | Launch OpenCode / GitHub Copilot / Claude Code / Codex / Antigravity |
+| `1`/`2`/`3`/`4`/`5`/`6` (in provider picker) | Launch OpenCode / GitHub Copilot / Claude Code / Codex / Antigravity / OpenCode 2 |
 | `↑↓ + Enter` (in provider picker) | Navigate and select provider |
 | `Ctrl/⌘ + S` | Save current tab |
 | `Ctrl/⌘ + Shift + S` | Save current tab as… |
@@ -317,6 +339,17 @@ npm run dist:win     # Windows NSIS installer  (x64)
 npm run dist         # All platforms (Windows + macOS)
 ```
 
+### Tests
+
+```bash
+npm run build
+npm test             # Full Playwright/Electron suite
+npx playwright test tests/opencode-sessions.spec.ts
+npx playwright test tests/session-sound.spec.ts
+```
+
+Tests launch with `PROMPT_PAD_TEST_DIR` in temporary folders. App files and the Electron browser profile are isolated there, and OneDrive sync is bypassed even if enabled in test settings. OpenCode database discovery in test mode only reads `<test-dir>/opencode.db`, never the personal database. Session-board tests use real SQLite fixtures through Electron's native driver to cover streaming, WAL concurrency, completion/expiry, manual hiding/restart/restore, schema recovery, search, tab behavior, language and themes. The 30-minute boundary is verified with a controlled clock. Session-sound tests stub `AudioContext` to count chime notes and verify finish, error and question triggers, silence for pre-existing state, and the board/Settings toggles. No sound is emitted during tests.
+
 ### macOS installer
 The macOS build produces a `.dmg` installer for both Intel (`x64`) and Apple Silicon (`arm64`) Macs. Download the appropriate `.dmg` from GitHub Releases, open it, and drag Prompt Pad to your Applications folder.
 
@@ -333,6 +366,7 @@ All local data lives in `~/.prompt-pad/`:
 | `launches.json` | Launch configurations *(moved to OneDrive when sync is on)* |
 | `launch-history.json` | Launch history *(moved to OneDrive when sync is on)* |
 | `session.json` | Open tabs state (autosaved; ephemeral) |
+| `opencode-sessions-hidden.json` | Locally hidden OpenCode session turns (never synced to OneDrive) |
 | `prompts/` | Explicitly saved prompt files |
 
 ### OneDrive paths (when sync is enabled)

@@ -4,13 +4,15 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { spawn } from 'child_process';
+import { findOpenCodeDb as locateOpenCodeDb, OpenCodeSessionMonitor } from './opencodeSessions';
 
 const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
 const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
+if (TEST_DIR) app.setPath('userData', path.join(TEST_DIR, 'electron-profile'));
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
-const DEFAULT_MODEL = 'claude-sonnet-4.6';
-const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.7';
-const DEFAULT_ANTIGRAVITY_MODEL = 'Gemini 3.5 Flash (Medium)';
+export const DEFAULT_MODEL = 'auto';
+export const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.5-free';
+export const DEFAULT_ANTIGRAVITY_MODEL = 'gemini-3.8-flash-medium';
 
 // Maximum reasoning effort supported by each model
 const MODEL_MAX_EFFORT: Record<string, string> = {
@@ -69,21 +71,24 @@ function getSettingsPath(): string {
   return syncSettingsPath;
 }
 
-function normalizeModel(model: unknown): string {
+export function normalizeModel(model: unknown): string {
   if (typeof model !== 'string') return DEFAULT_MODEL;
   const candidate = model.trim();
   return candidate || DEFAULT_MODEL;
 }
 
-function normalizeOpenCodeModel(model: unknown): string {
+export function normalizeOpenCodeModel(model: unknown): string {
   if (typeof model !== 'string') return DEFAULT_OPENCODE_MODEL;
   const candidate = model.trim();
   return candidate || DEFAULT_OPENCODE_MODEL;
 }
 
-function normalizeAntigravityModel(model: unknown): string {
+export function normalizeAntigravityModel(model: unknown): string {
   if (typeof model !== 'string') return DEFAULT_ANTIGRAVITY_MODEL;
-  const candidate = model.trim();
+  let candidate = model.trim();
+  if (candidate.includes('\t')) {
+    candidate = candidate.split('\t')[0].trim();
+  }
   return candidate || DEFAULT_ANTIGRAVITY_MODEL;
 }
 
@@ -119,22 +124,114 @@ function runCommand(command: string, args: string[], timeout = 15000): Promise<s
   });
 }
 
-function parseOpenCodeModels(raw: string): Array<{ id: string; label: string }> {
-  const unique = new Map<string, { id: string; label: string }>();
-  for (const line of raw.split(/\r?\n/)) {
-    const clean = line.trim();
-    if (!clean.startsWith('opencode/') && !clean.startsWith('opencode-go/')) continue;
-    unique.set(clean, {
-      id: clean,
-      label: clean.replace(/^opencode(-go)?\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    });
+export function parseOpenCodeModels(raw: string): Array<{ id: string; label: string }> {
+  const result: Array<{ id: string; label: string }> = [];
+  const seen = new Set<string>();
+
+  const lines = raw.split(/\r?\n/);
+  let currentId: string | null = null;
+  let jsonBuffer = '';
+
+  const finishBlock = () => {
+    if (!currentId || seen.has(currentId)) return;
+    let label = '';
+    if (jsonBuffer.trim()) {
+      try {
+        const parsed = JSON.parse(jsonBuffer.trim());
+        if (parsed && typeof parsed.name === 'string' && parsed.name.trim()) {
+          label = parsed.name.trim();
+        }
+      } catch {
+        // Not JSON, fallback to formatting currentId
+      }
+    }
+    if (!label) {
+      label = currentId
+        .replace(/^(opencode|opencode-go|nvidia)\//, '')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+    seen.add(currentId);
+    result.push({ id: currentId, label });
+    currentId = null;
+    jsonBuffer = '';
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (/^(opencode|opencode-go|nvidia)\//.test(trimmed)) {
+      finishBlock();
+      currentId = trimmed;
+      jsonBuffer = '';
+      continue;
+    }
+
+    if (currentId) {
+      jsonBuffer += line + '\n';
+    }
   }
-  return [...unique.values()];
+  finishBlock();
+
+  // If no models were found via verbose blocks, fallback to line-by-line model ID list
+  if (result.length === 0) {
+    for (const line of lines) {
+      const clean = line.trim();
+      if (!clean.startsWith('opencode/') && !clean.startsWith('opencode-go/') && !clean.startsWith('nvidia/')) continue;
+      if (seen.has(clean)) continue;
+      seen.add(clean);
+      result.push({
+        id: clean,
+        label: clean.replace(/^(opencode|opencode-go|nvidia)\//, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      });
+    }
+  }
+
+  return result;
 }
 
-function parseAntigravityModels(raw: string): Array<{ id: string; label: string }> {
-  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-  return lines.map(name => ({ id: name, label: name }));
+export function parseAntigravityModels(raw: string): Array<{ id: string; label: string }> {
+  if (!raw || typeof raw !== 'string') return [];
+  const clean = raw.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+  const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const result: Array<{ id: string; label: string }> = [];
+  const seen = new Set<string>();
+
+  for (const line of lines) {
+    if (/^(fetching|loading)\b/i.test(line)) continue;
+    if (/^id\s+(name|label|model)/i.test(line)) continue;
+
+    let id = '';
+    let label = '';
+
+    if (line.includes('\t')) {
+      const parts = line.split(/\t+/).map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        id = parts[0];
+        label = parts.slice(1).join(' ');
+      } else if (parts.length === 1) {
+        id = parts[0];
+        label = parts[0];
+      }
+    } else {
+      const spaceParts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
+      if (spaceParts.length >= 2) {
+        id = spaceParts[0];
+        label = spaceParts.slice(1).join(' ');
+      } else {
+        id = line;
+        label = line;
+      }
+    }
+
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      result.push({ id, label: label || id });
+    }
+  }
+
+  return result;
 }
 
 function parseCopilotModels(raw: string): Array<{ id: string; label: string }> {
@@ -242,6 +339,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Keep the background session poll accurate and let the finish chime play
+      // without requiring a user gesture (the window is often unfocused).
+      backgroundThrottling: false,
+      autoplayPolicy: 'no-user-gesture-required',
     },
   };
   if (icon) {
@@ -351,30 +452,91 @@ ipcMain.handle('session:save', (_e, session: unknown) => {
 // OneDrive detection
 ipcMain.handle('onedrive:detect', () => detectOneDrivePath());
 
+// Remote Pricing & Metadata (models.dev)
+const PRICING_FETCH_TIMEOUT = 5000;
+let modelsDevCache: Record<string, any> | null = null;
+let modelsDevFetchPromise: Promise<Record<string, any> | null> | null = null;
+
+async function fetchModelsDev(): Promise<Record<string, any> | null> {
+  if (modelsDevCache) return modelsDevCache;
+  if (modelsDevFetchPromise) return modelsDevFetchPromise;
+  modelsDevFetchPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PRICING_FETCH_TIMEOUT);
+      const response = await fetch('https://models.dev/api.json', { signal: controller.signal });
+      clearTimeout(timer);
+      modelsDevCache = (await response.json()) as Record<string, any>;
+      return modelsDevCache;
+    } catch {
+      return null;
+    } finally {
+      modelsDevFetchPromise = null;
+    }
+  })();
+  return modelsDevFetchPromise;
+}
+
 // Dynamic model lists (cached in process memory)
 let openCodeModelsCache: { id: string; label: string }[] | null = null;
+let openCode2ModelsCache: { id: string; label: string }[] | null = null;
 let copilotModelsCache: { id: string; label: string }[] | null = null;
 let antigravityModelsCache: { id: string; label: string }[] | null = null;
 
+function mockModelsFor(testFile: string): { id: string; label: string }[] | null {
+  const mockFile = path.join(TEST_DIR!, testFile);
+  if (!fs.existsSync(mockFile)) return null;
+  const raw = fs.readFileSync(mockFile, 'utf-8');
+  const data = JSON.parse(raw);
+  if (data && typeof data === 'object' && 'shouldThrow' in data && data.shouldThrow) {
+    throw new Error(data.message || 'CLI not found');
+  }
+  return data;
+}
+
 ipcMain.handle('models:get-opencode', async () => {
   if (TEST_DIR) {
-    const mockFile = path.join(TEST_DIR, 'mock-opencode-models.json');
-    if (fs.existsSync(mockFile)) {
-      const raw = fs.readFileSync(mockFile, 'utf-8');
-      const data = JSON.parse(raw);
-      if (data && typeof data === 'object' && 'shouldThrow' in data && data.shouldThrow) {
-        throw new Error(data.message || 'CLI not found');
-      }
-      return data;
-    }
+    const mock = mockModelsFor('mock-opencode-models.json');
+    if (mock) return mock;
   }
   if (openCodeModelsCache && openCodeModelsCache.length > 0) return openCodeModelsCache;
-  const output = await runCommand('opencode', ['models']);
+  let output = '';
+  try {
+    output = await runCommand('opencode', ['models', '--verbose']);
+  } catch {
+    output = await runCommand('opencode', ['models']);
+  }
+
   const parsed = parseOpenCodeModels(output);
   if (parsed.length === 0) {
     throw new Error('No models returned from opencode CLI');
   }
   openCodeModelsCache = parsed;
+  return parsed;
+});
+
+ipcMain.handle('models:get-opencode2', async () => {
+  if (TEST_DIR) {
+    const mock = mockModelsFor('mock-opencode2-models.json');
+    if (mock) return mock;
+  }
+  if (openCode2ModelsCache && openCode2ModelsCache.length > 0) return openCode2ModelsCache;
+  let output = '';
+  try {
+    output = await runCommand('opencode2', ['models']);
+  } catch {
+    // Retry without shell resolution quirks (e.g. .cmd shim issues on Windows)
+    const exe = process.platform === 'win32'
+      ? path.join(process.env.APPDATA || '', 'npm', 'node_modules', '@opencode-ai', 'cli', 'bin', 'opencode2.exe')
+      : 'opencode2';
+    output = await runCommand(exe, ['models']);
+  }
+
+  const parsed = parseOpenCodeModels(output);
+  if (parsed.length === 0) {
+    throw new Error('No models returned from opencode2 CLI');
+  }
+  openCode2ModelsCache = parsed;
   return parsed;
 });
 
@@ -390,37 +552,59 @@ ipcMain.handle('models:get-antigravity', async () => {
       return data;
     }
   }
-  if (antigravityModelsCache && antigravityModelsCache.length > 0) return antigravityModelsCache;
+
+  // Always attempt to fetch the latest models from the CLI
   try {
-    const output = await runCommand('agy.exe', ['models'], 8000);
+    const agyCmd = process.platform === 'win32' ? 'agy.exe' : 'agy';
+    const output = await runCommand(agyCmd, ['models'], 15000);
     const parsed = parseAntigravityModels(output);
     if (parsed.length > 0) {
       antigravityModelsCache = parsed;
       return parsed;
     }
   } catch {
-    // CLI failed, fall through to fallback
+    // CLI failed or unavailable, fall through to cache or fallback
   }
-  // Fallback list from agy CLI docs (v1.0.7)
+
+  if (antigravityModelsCache && antigravityModelsCache.length > 0) {
+    return antigravityModelsCache;
+  }
+
   const fallback: Array<{ id: string; label: string }> = [
-    { id: 'Gemini 3.5 Flash (Medium)', label: 'Gemini 3.5 Flash (Medium)' },
-    { id: 'Gemini 3.5 Flash (High)',   label: 'Gemini 3.5 Flash (High)' },
-    { id: 'Gemini 3.5 Flash (Low)',    label: 'Gemini 3.5 Flash (Low)' },
-    { id: 'Gemini 3.1 Pro (Low)',      label: 'Gemini 3.1 Pro (Low)' },
-    { id: 'Gemini 3.1 Pro (High)',     label: 'Gemini 3.1 Pro (High)' },
-    { id: 'Claude Sonnet 4.6 (Thinking)', label: 'Claude Sonnet 4.6 (Thinking)' },
-    { id: 'Claude Opus 4.6 (Thinking)',   label: 'Claude Opus 4.6 (Thinking)' },
-    { id: 'GPT-OSS 120B (Medium)',     label: 'GPT-OSS 120B (Medium)' },
+    { id: 'gemini-3.8-flash-high',        label: 'Gemini 3.8 Flash (High)' },
+    { id: 'gemini-3.8-flash-medium',      label: 'Gemini 3.8 Flash (Medium)' },
+    { id: 'gemini-3.8-flash-low',         label: 'Gemini 3.8 Flash (Low)' },
+    { id: 'gemini-3.7-flash-high',        label: 'Gemini 3.7 Flash (High)' },
+    { id: 'gemini-3.7-flash-medium',      label: 'Gemini 3.7 Flash (Medium)' },
+    { id: 'gemini-3.7-flash-low',         label: 'Gemini 3.7 Flash (Low)' },
+    { id: 'gemini-3.6-flash-high',        label: 'Gemini 3.6 Flash (High)' },
+    { id: 'gemini-3.6-flash-medium',      label: 'Gemini 3.6 Flash (Medium)' },
+    { id: 'gemini-3.6-flash-low',         label: 'Gemini 3.6 Flash (Low)' },
+    { id: 'gemini-3.1-pro-high',         label: 'Gemini 3.1 Pro (High)' },
+    { id: 'gemini-3.1-pro-low',          label: 'Gemini 3.1 Pro (Low)' },
+    { id: 'claude-sonnet-4-6',           label: 'Claude Sonnet 4.6 (Thinking)' },
+    { id: 'claude-opus-4-6-thinking',    label: 'Claude Opus 4.6 (Thinking)' },
+    { id: 'gpt-oss-120b-medium',         label: 'GPT-OSS 120B (Medium)' },
+    { id: 'Gemini 3.5 Flash (Medium)',   label: 'Gemini 3.5 Flash (Medium)' },
+    { id: 'Gemini 3.5 Flash (High)',     label: 'Gemini 3.5 Flash (High)' },
+    { id: 'Gemini 3.5 Flash (Low)',      label: 'Gemini 3.5 Flash (Low)' },
   ];
-  antigravityModelsCache = fallback;
   return fallback;
 });
 
 ipcMain.handle('models:clear-cache', () => {
   openCodeModelsCache = null;
+  openCode2ModelsCache = null;
   copilotModelsCache = null;
   antigravityModelsCache = null;
+  modelsDevCache = null;
 });
+
+ipcMain.handle('models:get-defaults', () => ({
+  copilot: DEFAULT_MODEL,
+  opencode: DEFAULT_OPENCODE_MODEL,
+  antigravity: DEFAULT_ANTIGRAVITY_MODEL,
+}));
 
 ipcMain.handle('models:get-copilot', async () => {
   if (TEST_DIR) {
@@ -536,6 +720,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
   attachedFilePaths?: string[];
 }) => {
   const tool = config.tool === 'opencode' ? 'opencode' :
+               config.tool === 'opencode2' ? 'opencode2' :
                config.tool === 'antigravity' ? 'antigravity' :
                config.tool === 'claude-code' ? 'claude-code' :
                config.tool === 'codex' ? 'codex' :
@@ -544,10 +729,15 @@ ipcMain.handle('launch:execute', async (_e, config: {
   // In test mode we never spawn real terminals. We capture the call so tests can assert on it.
   if (TEST_DIR) {
     try {
+      const normalizedModel =
+        tool === 'opencode' || tool === 'opencode2' ? normalizeOpenCodeModel(config.model) :
+        tool === 'antigravity' ? normalizeAntigravityModel(config.model) :
+        tool === 'copilot' ? normalizeModel(config.model) : config.model;
+
       const id = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
       fs.writeFileSync(
         path.join(APP_DIR, 'launch-call-' + id + '.json'),
-        JSON.stringify({ ...config, tool }, null, 2),
+        JSON.stringify({ ...config, tool, normalizedModel }, null, 2),
         'utf-8'
       );
     } catch {
@@ -557,7 +747,9 @@ ipcMain.handle('launch:execute', async (_e, config: {
   }
 
   if (tool === 'opencode') {
-    return executeLaunchOpenCode(config);
+    return executeLaunchOpenCode(config, 'opencode');
+  } else if (tool === 'opencode2') {
+    return executeLaunchOpenCode(config, 'opencode2');
   } else if (tool === 'antigravity') {
     return executeLaunchAntigravity(config);
   } else if (tool === 'claude-code') {
@@ -573,7 +765,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
 async function executeLaunchOpenCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-}) {
+}, cli: 'opencode' | 'opencode2' = 'opencode') {
   const { folder, yolo, prompt, attachedFilePaths = [] } = config;
   const model = normalizeOpenCodeModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
@@ -611,23 +803,26 @@ async function executeLaunchOpenCode(config: {
     const safeModel = escapeSingleQuotePS(model);
     const safeMsg   = escapeSingleQuotePS(message);
     const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
-    const yoloArg = yolo ? "'--dangerously-skip-permissions'" : '';
+    const yoloArg = yolo ? "'--auto'" : '';
+    const bootstrapRelPath = cli === 'opencode2'
+      ? 'node_modules\\@opencode-ai\\cli\\bin\\opencode2.exe'
+      : 'node_modules\\opencode-ai\\bin\\opencode.exe';
     const script = [
       "Set-Location -LiteralPath '" + safeDir + "'",
-      "$opencodePath = (Get-Command opencode.exe -ErrorAction SilentlyContinue).Source",
+      "$opencodePath = (Get-Command " + cli + ".exe -ErrorAction SilentlyContinue).Source",
       "if (-not $opencodePath) {",
-      "  $opencodeCommand = Get-Command opencode -ErrorAction SilentlyContinue",
+      "  $opencodeCommand = Get-Command " + cli + " -ErrorAction SilentlyContinue",
       "  if ($opencodeCommand -and $opencodeCommand.Source -like '*.cmd') {",
       "    $bootstrapDir = Split-Path $opencodeCommand.Source -Parent",
-      "    $opencodePath = Join-Path $bootstrapDir 'node_modules\\opencode-ai\\bin\\opencode.exe'",
+      "    $opencodePath = Join-Path $bootstrapDir '" + bootstrapRelPath + "'",
       "    if (-not (Test-Path $opencodePath)) {",
       "      $opencodePath = $opencodeCommand.Source",
       "    }",
       "  } else {",
-      "    $opencodePath = 'opencode'",
+      "    $opencodePath = '" + cli + "'",
       "  }",
       "}",
-      "$ocArgs = @('run', '--model', '" + safeModel + "', '--dir', '" + safeDir + "'" + (yoloArg ? ", " + yoloArg : '') + ", '" + safeMsg + "')",
+      "$ocArgs = @('--model', '" + safeModel + "', '--prompt', '" + safeMsg + "'" + (yoloArg ? ", " + yoloArg : '') + ", '" + safeDir + "')",
       "& $opencodePath @ocArgs",
       "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
     ].join('\n');
@@ -645,11 +840,11 @@ async function executeLaunchOpenCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
-    const yoloArg = yolo ? ' --dangerously-skip-permissions' : '';
+    const yoloArg = yolo ? ' --auto' : '';
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'opencode run --model ' + JSON.stringify(model) + ' --dir ' + JSON.stringify(workDir) + yoloArg + ' ' + JSON.stringify(message),
+      cli + ' --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message) + yoloArg + ' ' + JSON.stringify(workDir),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');
@@ -744,7 +939,7 @@ async function executeLaunchAntigravity(config: {
     const script = [
       '#!/bin/bash',
       'cd ' + JSON.stringify(workDir),
-      'agy.exe --model ' + JSON.stringify(model) + yoloArgNix + ' ' + modeFlag + ' ' + JSON.stringify(message),
+      'agy --model ' + JSON.stringify(model) + yoloArgNix + ' ' + modeFlag + ' ' + JSON.stringify(message),
       'rm -rf ' + JSON.stringify(launchTmpDir),
       'rm -f "$0"',
     ].join('\n');
@@ -1193,20 +1388,13 @@ ipcMain.handle('vscode:open', async (_e, folder: string) => {
 // ── OpenCode Statistics ───────────────────────────────────────────────────────
 // Locate opencode.db based on OS defaults
 function findOpenCodeDb(): string | null {
-  const candidates: string[] = [];
-  if (process.platform === 'win32') {
-    // Windows: %APPDATA%/opencode/opencode.db  OR  ~/.local/share/opencode/opencode.db
-    const appData = process.env['APPDATA'];
-    if (appData) candidates.push(path.join(appData, 'opencode', 'opencode.db'));
-    candidates.push(path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db'));
-    candidates.push(path.join(os.homedir(), 'AppData', 'Roaming', 'opencode', 'opencode.db'));
-  } else if (process.platform === 'darwin') {
-    candidates.push(path.join(os.homedir(), 'Library', 'Application Support', 'opencode', 'opencode.db'));
-  } else {
-    candidates.push(path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db'));
-  }
-  return candidates.find(p => fs.existsSync(p)) ?? null;
+  return locateOpenCodeDb(TEST_DIR);
 }
+
+const sessionMonitor = new OpenCodeSessionMonitor(findOpenCodeDb, path.join(APP_DIR, 'opencode-sessions-hidden.json'));
+ipcMain.handle('opencode-sessions:list', () => sessionMonitor.read());
+ipcMain.handle('opencode-sessions:dismiss', (_e, id: string, turnId: string) => sessionMonitor.dismiss(id, turnId));
+ipcMain.handle('opencode-sessions:restore', () => sessionMonitor.restore());
 
 interface DayCostRow {
   date: string;
@@ -1216,16 +1404,10 @@ interface DayCostRow {
   tokensOut: number;
 }
 
-// ── Remote Pricing Data (models.dev) ──────────────────────────────────────────
-const PRICING_FETCH_TIMEOUT = 5000;
-
 ipcMain.handle('pricing:get', async () => {
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PRICING_FETCH_TIMEOUT);
-    const response = await fetch('https://models.dev/api.json', { signal: controller.signal });
-    clearTimeout(timer);
-    const data = await response.json();
+    const data = await fetchModelsDev();
+    if (!data) return null;
     const result: Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> = {};
 
     for (const providerKey of ['opencode', 'opencode-go']) {
@@ -1419,4 +1601,3 @@ ipcMain.handle('prs:stats', async () => {
     return { days: [], total: 0 };
   }
 });
-

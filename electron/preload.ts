@@ -41,8 +41,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     attachedFilePaths?: string[];
   }) => ipcRenderer.invoke('launch:execute', config),
   getOpenCodeModels: () => ipcRenderer.invoke('models:get-opencode'),
+  getOpenCode2Models: () => ipcRenderer.invoke('models:get-opencode2'),
   getCopilotModels: () => ipcRenderer.invoke('models:get-copilot'),
   getAntigravityModels: () => ipcRenderer.invoke('models:get-antigravity'),
+  getDefaultModels: () => ipcRenderer.invoke('models:get-defaults'),
   clearModelCache: () => ipcRenderer.invoke('models:clear-cache'),
 
   // Read native clipboard image (Snipping Tool, PrintScreen)
@@ -75,6 +77,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Statistics
   getOpenCodeStats: () => ipcRenderer.invoke('stats:opencode'),
   getPRStats: () => ipcRenderer.invoke('prs:stats'),
+  getOpenCodeSessions: () => ipcRenderer.invoke('opencode-sessions:list'),
+  dismissOpenCodeSession: (id: string, turnId: string) => ipcRenderer.invoke('opencode-sessions:dismiss', id, turnId),
+  restoreOpenCodeSessions: () => ipcRenderer.invoke('opencode-sessions:restore'),
 
   // Git integration
   getGitStatus: (folder: string) => ipcRenderer.invoke('git:status', folder),
