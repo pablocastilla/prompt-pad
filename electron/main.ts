@@ -810,13 +810,12 @@ ipcMain.handle('launch:execute', async (_e, config: {
   return executeLaunchCopilot(config);
 });
 
-// JSON-escape a model id for embedding inside a config JSON literal
-function escapeJsonPS(s: string): string { return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }
-
 // Build the Windows PowerShell script that launches OpenCode or OpenCode 2.
 // Both launch the interactive TUI. OpenCode 1 supports a top-level `--model`
-// flag; OpenCode 2 (preview) does not, so its model is passed through the
-// OPENCODE_CONFIG_CONTENT environment variable instead.
+// flag. OpenCode 2 (preview) has no top-level `--model` and its beta ignores
+// OPENCODE_CONFIG_CONTENT, so the model is written to a temporary config file
+// pointed at by OPENCODE_CONFIG; --standalone forces a private server that
+// reads that config (the shared background service would ignore it).
 export function buildOpenCodeWinScript(opts: {
   cli: 'opencode' | 'opencode2';
   workDir: string; model: string; message: string;
@@ -834,10 +833,9 @@ export function buildOpenCodeWinScript(opts: {
   let modelConfig = '';
   let ocArgs: string;
   if (cli === 'opencode2') {
-    modelConfig = '{"model":"' + escapeJsonPS(model) + '"}';
-    modelConfig = escapeSingleQuotePS(modelConfig);
-    modelConfig = "$env:OPENCODE_CONFIG_CONTENT = '" + modelConfig + "'";
-    ocArgs = "@('--prompt', '" + safeMsg + "'"
+    const modelFile = path.join(launchTmpDir, 'pp-model.json');
+    modelConfig = "$env:OPENCODE_CONFIG = '" + escapeSingleQuotePS(modelFile) + "'";
+    ocArgs = "@('--standalone', '--prompt', '" + safeMsg + "'"
       + (yolo ? ", '--auto'" : '')
       + ")";
   } else {
@@ -872,18 +870,21 @@ export function buildOpenCodeWinScript(opts: {
 }
 
 // Build the Linux/macOS shell script that launches OpenCode or OpenCode 2.
+// OpenCode 2 uses a temporary config file (OPENCODE_CONFIG) + --standalone
+// because its beta ignores OPENCODE_CONFIG_CONTENT and the shared background
+// service would ignore per-launch model overrides.
 export function buildOpenCodeShScript(opts: {
   cli: 'opencode' | 'opencode2';
   workDir: string; model: string; message: string;
   yolo: boolean; promptPath: string; launchTmpDir: string;
 }): string {
   const { cli, workDir, model, message, yolo, promptPath, launchTmpDir } = opts;
-  const jsonModel = '{"model":"' + model.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"}';
+  const modelFile = path.join(launchTmpDir, 'pp-model.json');
   const modelExport = cli === 'opencode2'
-    ? 'export OPENCODE_CONFIG_CONTENT=' + JSON.stringify(jsonModel)
+    ? 'export OPENCODE_CONFIG=' + JSON.stringify(modelFile)
     : '';
   const launchLine = cli === 'opencode2'
-    ? cli + ' --prompt ' + JSON.stringify(message) + (yolo ? ' --auto' : '')
+    ? cli + ' --standalone --prompt ' + JSON.stringify(message) + (yolo ? ' --auto' : '')
     : cli + ' --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message)
       + (yolo ? ' --auto' : '') + ' ' + JSON.stringify(workDir);
   const lines = [
@@ -914,6 +915,14 @@ async function executeLaunchOpenCode(config: {
   const promptFileName = 'pp-prompt-' + id + '.txt';
   const promptPath = path.join(launchTmpDir, promptFileName);
   fs.writeFileSync(promptPath, prompt, 'utf-8');
+
+  // OpenCode 2 has no top-level --model flag and its beta ignores
+  // OPENCODE_CONFIG_CONTENT, so the selected model goes into a temporary
+  // config file referenced by OPENCODE_CONFIG (see buildOpenCodeWinScript).
+  // The launch script deletes the whole temp dir on exit.
+  if (cli === 'opencode2') {
+    fs.writeFileSync(path.join(launchTmpDir, 'pp-model.json'), JSON.stringify({ model }), 'utf-8');
+  }
 
   const copiedNames = new Set<string>([promptFileName]);
   const attachedFileNames: string[] = [];

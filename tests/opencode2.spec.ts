@@ -176,7 +176,7 @@ test.describe('OpenCode 2 launch option', () => {
     }
   });
 
-  test('opencode2 launch script opens the interactive TUI with the model via OPENCODE_CONFIG_CONTENT', async () => {
+  test('opencode2 launch script opens the interactive TUI with the model via OPENCODE_CONFIG temp file', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -211,12 +211,16 @@ test.describe('OpenCode 2 launch option', () => {
       const script = scripts[0];
 
       // OpenCode 2 must open the interactive TUI (never the one-shot `run` subcommand)
-      expect(script).toContain("$env:OPENCODE_CONFIG_CONTENT = '{\"model\":\"opencode-go/glm-5.3-flash\"}'");
-      expect(script).toContain("$ocArgs = @('--prompt', 'script test'");
+      // and pass the model through a temp config file (OPENCODE_CONFIG) with
+      // --standalone, because the beta ignores OPENCODE_CONFIG_CONTENT and the
+      // shared background service ignores per-launch model overrides.
+      expect(script).toMatch(/\$env:OPENCODE_CONFIG = '[^']+pp-model\.json'/);
+      expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'script test'");
       expect(script).toContain("'--auto')");
       expect(script).toContain("& $opencodePath @ocArgs");
       expect(script).not.toContain("'run'");
       expect(script).not.toContain("@('--model'");
+      expect(script).not.toContain('OPENCODE_CONFIG_CONTENT');
       // No stray empty-string arguments from conditional flags
       expect(script).not.toContain(", ''");
     } finally {

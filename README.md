@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.5.0** — OpenCode 2 now opens the interactive TUI like OpenCode 1 (model passed via `OPENCODE_CONFIG_CONTENT`), and model lists are preloaded at startup so the picker is ready on first open.
+**Version 3.5.1** — OpenCode 2 launches the interactive TUI with the selected model via a temporary `OPENCODE_CONFIG` file and `--standalone` (the 2.0 beta ignores `OPENCODE_CONFIG_CONTENT`), and model lists are preloaded at startup so the picker is ready on first open.
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 
@@ -254,7 +254,7 @@ The Gaudy theme is best experienced live. It features:
 - **One-key launch**: press `1`/`2`/`3`/`4`/`5`/`6` to pick a provider, or use ↑↓ + Enter for keyboard-arrow lovers.
 - **Direct launch for non-model-API providers**: Claude Code and Codex are launched immediately with their default model (CLI handles model selection via login/config).
 - **Hand-off to model picker**: OpenCode, GitHub Copilot, Antigravity and OpenCode 2 open the model picker because they expose multiple models worth choosing from.
-- **OpenCode 2 preview compatibility**: the OpenCode 2.0 preview CLI does not accept `--model` at the top level, so the selected model is passed through the `OPENCODE_CONFIG_CONTENT` environment variable and the prompt through the top-level `--prompt` flag: `opencode2 --prompt <prompt> [--auto]`. This opens the same interactive TUI as OpenCode 1 — with full controls — and the selected model is honored on every launch.
+- **OpenCode 2 preview compatibility**: the OpenCode 2.0 preview CLI does not accept `--model` at the top level and its beta ignores the `OPENCODE_CONFIG_CONTENT` environment variable, so the selected model is written to a temporary config file passed via `OPENCODE_CONFIG` and the CLI is launched with `--standalone` so a private server picks it up: `opencode2 --standalone --prompt <prompt> [--auto]`. This opens the same interactive TUI as OpenCode 1 — with full controls — and the selected model is honored on every launch. The temporary file is deleted automatically when the session ends.
 
 ### Model Picker (OpenCode, GitHub Copilot, Antigravity & OpenCode 2)
 - **Dynamic model lists**: fetches available models from the CLI (`opencode models`, `opencode2 models`, `copilot help config`, or `agy models`) at runtime, including Zen (`opencode/`), Go (`opencode-go/`) and NVIDIA (`nvidia/`) tiers. Antigravity models are always refreshed live directly from the CLI whenever opened so you always have access to the latest models (e.g. Gemini 3.8 Flash).
