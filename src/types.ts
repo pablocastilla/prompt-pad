@@ -352,6 +352,7 @@ export interface ElectronAPI {
     prompt: string;
     mode: string;
     attachedFilePaths?: string[];
+    phraseRanges?: PhraseRange[];
   }) => Promise<boolean>;
   getOpenCodeModels: () => Promise<ModelOption[]>;
   getOpenCode2Models: () => Promise<ModelOption[]>;

@@ -90,6 +90,7 @@ export function LaunchPanel() {
       launch: selectedLaunch,
       prompt: activeTab.content,
       attachedFilePaths: (activeTab.attachedFiles ?? []).map(f => f.path),
+      phraseRanges: activeTab.phraseRanges ?? [],
     });
   };
 
@@ -207,6 +208,7 @@ export function LaunchPanel() {
                     launch,
                     prompt: activeTab.content,
                     attachedFilePaths: (activeTab.attachedFiles ?? []).map(f => f.path),
+                    phraseRanges: activeTab.phraseRanges ?? [],
                   });
                 }
               }}

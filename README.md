@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.8.0** — Launches OpenCode 2 in its full interactive TUI application with support for cancelling, answering forms, and approving prompts. Antigravity sessions on the Sessions board now display full console activity, including user messages, tool executions (`run_command`, `view_file`, etc.), and assistant responses. Task summary generation is now much smarter: leading boilerplate paragraphs (personas, git branch checkout commands, or saved phrase headers) are automatically bypassed so the session title captures the actual task. Session board capacity is increased to 250 conversations, OpenCode v2 session dismissal persistence is fixed so closed sessions stay closed, and stale non-terminal sessions older than 24 hours are cleanly filtered.
+**Version 3.8.1** — The session summary (`Summary of the file content: …`) that names each CLI session now always excludes saved-phrase content: the excerpt is computed after removing the exact spans of every inserted phrase, wherever they appear in the prompt, so session titles describe the actual task even when the prompt starts with a saved phrase. The AI still receives the full prompt file with all phrase content unchanged.
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 
@@ -231,7 +231,7 @@ The Gaudy theme is best experienced live. It features:
 - **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
 - **Open folder in VS Code**: each launch shortcut can also open the launch folder in VS Code using a configurable modifier in Settings (`Ctrl+Shift`, `Ctrl+Alt`, or `Ctrl+Alt+Shift`).
 - **Pin favourite models**: pin OpenCode models in the picker for quick access with number keys.
-- **Prompt-file seed with content summary**: the prompt travels to the CLI as a temp file that the seed message tells the CLI to read, but the seed also embeds a short one-line excerpt of the file content (`Summary of the file content: …`, without quotes so PowerShell argument passing stays safe). That way the session title each CLI records in its own history (and the sessions board) describes the actual prompt instead of a generic "Read the file …" string.
+- **Prompt-file seed with content summary**: the prompt travels to the CLI as a temp file that the seed message tells the CLI to read, but the seed also embeds a short one-line excerpt of the file content (`Summary of the file content: …`, without quotes so PowerShell argument passing stays safe). That way the session title each CLI records in its own history (and the sessions board) describes the actual prompt instead of a generic "Read the file …" string. Saved phrases never leak into that summary: the excerpt is computed after removing the exact spans of every inserted phrase (tracked by the editor), no matter where they appear in the prompt — the AI still receives the full prompt file with all phrase content.
 
 ### Git Changes Panel
 - **Auto-opening panel**: after launching a prompt, a right-side panel opens showing all files modified in the launch folder's git repository.

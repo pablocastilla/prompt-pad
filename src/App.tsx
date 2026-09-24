@@ -240,6 +240,7 @@ export default function App() {
         launch,
         prompt: activeTab.content,
         attachedFilePaths: (activeTab.attachedFiles ?? []).map(f => f.path),
+        phraseRanges: activeTab.phraseRanges ?? [],
       });
     };
 

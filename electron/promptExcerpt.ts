@@ -2,12 +2,42 @@ export interface SavedPhraseLike {
   content?: string;
 }
 
+// Remove the exact spans of the prompt that correspond to inserted saved
+// phrases (as tracked by the editor's phraseRanges) so they never leak into
+// the session summary, no matter where in the prompt they appear.
+export function stripPhraseSpans(prompt: string, ranges?: { start: number; end: number }[]): string {
+  if (!prompt || typeof prompt !== 'string' || !Array.isArray(ranges) || ranges.length === 0) {
+    return prompt;
+  }
+  let result = prompt;
+  const sorted = [...ranges]
+    .filter(r => r && typeof r.start === 'number' && typeof r.end === 'number')
+    .sort((a, b) => b.start - a.start);
+  for (const r of sorted) {
+    const start = Math.max(0, Math.min(r.start, result.length));
+    const end = Math.max(0, Math.min(r.end, result.length));
+    if (end > start) {
+      result = result.slice(0, start) + result.slice(end);
+    }
+  }
+  return result;
+}
+
 // Extract a concise, meaningful task excerpt from a prompt.
 // Prompts frequently begin with boilerplate: persona definitions ("Eres un experto...",
 // "You are a..."), git commands ("Vete a la rama...", "Checkout..."), or headers ("# Contexto").
 // We detect and bypass leading boilerplate paragraphs so the session summary describes
 // the actual task the user wants solved rather than a generic persona.
-export function promptExcerpt(prompt: string, max = 200, phrases?: SavedPhraseLike[]): string {
+export function promptExcerpt(
+  prompt: string,
+  max = 200,
+  phrases?: SavedPhraseLike[],
+  phraseRanges?: { start: number; end: number }[],
+): string {
+  // 0. First drop the exact spans of inserted saved phrases (when the editor
+  // tracked them) so phrase content never appears in the summary.
+  prompt = stripPhraseSpans(prompt, phraseRanges);
+
   if (!prompt || typeof prompt !== 'string') return '';
 
   let cleaned = prompt.replace(/\r\n/g, '\n').replace(/"/g, '').trim();

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { isDashboardTab } from './types';
-import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry } from './types';
+import type { Tab, Phrase, LaunchConfig, Settings, AttachedFile, LaunchHistoryEntry, PhraseRange } from './types';
 
 type ActivePanel = 'launches' | 'phrases' | 'settings' | 'history' | 'statistics' | null;
 
@@ -58,8 +58,8 @@ interface AppState {
   insertionSignal: { tabId: string; text: string; source: 'catalog' | 'shortcut' } | null;
   requestInsertion: (tabId: string, text: string, source?: 'catalog' | 'shortcut') => void;
   clearInsertion: () => void;
-  pendingLaunch: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[] } | null;
-  setPendingLaunch: (data: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[] } | null) => void;
+  pendingLaunch: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[]; phraseRanges: PhraseRange[] } | null;
+  setPendingLaunch: (data: { launch: LaunchConfig; prompt: string; attachedFilePaths: string[]; phraseRanges: PhraseRange[] } | null) => void;
   launchSplash: number;
   triggerLaunchSplash: () => void;
   setTabLaunchFolder: (tabId: string, folder: string | null) => void;

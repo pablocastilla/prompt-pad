@@ -756,7 +756,12 @@ function escapeSingleQuotePS(s: string): string { return s.replace(/'/g, "''"); 
 // them and shows its help instead of running the prompt). The pp-prompt path
 // also doubles as the marker the sessions screen uses to detect
 // Prompt Pad-launched Antigravity conversations.
-function buildPromptFileMessage(promptPath: string, prompt: string, kind: 'my' | 'user' = 'my'): string {
+function buildPromptFileMessage(
+  promptPath: string,
+  prompt: string,
+  kind: 'my' | 'user' = 'my',
+  phraseRanges?: { start: number; end: number }[],
+): string {
   const base = kind === 'my'
     ? `Read the file at ${promptPath} and treat its contents as my prompt.`
     : `Read the file at ${promptPath} and treat its contents as the user's prompt. Follow the file contents exactly.`;
@@ -767,7 +772,10 @@ function buildPromptFileMessage(promptPath: string, prompt: string, kind: 'my' |
     const p = fs.existsSync(primary) ? primary : fallback;
     savedPhrases = readJson<{ content?: string }[]>(p, []);
   } catch {}
-  const excerpt = promptExcerpt(prompt, 200, savedPhrases);
+  // phraseRanges (exact spans of inserted saved phrases tracked by the editor)
+  // take priority; the phrases.json matching stays as a fallback for prompts
+  // without range tracking (e.g. files loaded from disk).
+  const excerpt = promptExcerpt(prompt, 200, savedPhrases, phraseRanges);
   return excerpt ? `${base} Summary of the file content: ${excerpt}` : base;
 }
 
@@ -782,6 +790,7 @@ function writePS1(filePath: string, content: string): void {
 ipcMain.handle('launch:execute', async (_e, config: {
   tool?: string; model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
+  phraseRanges?: { start: number; end: number }[];
 }) => {
   const tool = config.tool === 'opencode' ? 'opencode' :
                config.tool === 'opencode2' ? 'opencode2' :
@@ -812,7 +821,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
           cli: tool,
           workDir: config.folder || 'C:\\tmp',
           model: normalizedModel,
-          message: buildPromptFileMessage(promptPath, config.prompt),
+          message: buildPromptFileMessage(promptPath, config.prompt, 'my', config.phraseRanges),
           yolo: !!config.yolo,
           promptPath,
           launchTmpDir: path.join(os.tmpdir(), tmpId),
@@ -840,6 +849,12 @@ ipcMain.handle('launch:execute', async (_e, config: {
   }
   return executeLaunchCopilot(config);
 });
+
+// Phrase spans (as tracked by the editor) travel with every launch config so
+// the session summary can exclude saved-phrase content from the excerpt.
+interface LaunchPromptExtras {
+  phraseRanges?: { start: number; end: number }[];
+}
 
 // Build the Windows PowerShell script that launches OpenCode or OpenCode 2.
 // Both launch the interactive TUI with interactive form dialogs and cancellation.
@@ -934,7 +949,7 @@ export function buildOpenCodeShScript(opts: {
 async function executeLaunchOpenCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-}, cli: 'opencode' | 'opencode2' = 'opencode') {
+} & LaunchPromptExtras, cli: 'opencode' | 'opencode2' = 'opencode') {
   const { folder, yolo, prompt, attachedFilePaths = [] } = config;
   const model = normalizeOpenCodeModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
@@ -968,7 +983,7 @@ async function executeLaunchOpenCode(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = buildPromptFileMessage(promptPath, prompt);
+  let message = buildPromptFileMessage(promptPath, prompt, 'my', config.phraseRanges);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1015,7 +1030,7 @@ async function executeLaunchOpenCode(config: {
 async function executeLaunchAntigravity(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-}) {
+} & LaunchPromptExtras) {
   const { folder, yolo, prompt, mode, attachedFilePaths = [] } = config;
   const model = normalizeAntigravityModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
@@ -1043,7 +1058,7 @@ async function executeLaunchAntigravity(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = buildPromptFileMessage(promptPath, prompt);
+  let message = buildPromptFileMessage(promptPath, prompt, 'my', config.phraseRanges);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1104,7 +1119,7 @@ async function executeLaunchAntigravity(config: {
 async function executeLaunchClaudeCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-}) {
+} & LaunchPromptExtras) {
   const { folder, prompt, attachedFilePaths = [] } = config;
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
   const id = Date.now().toString();
@@ -1130,7 +1145,7 @@ async function executeLaunchClaudeCode(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = buildPromptFileMessage(promptPath, prompt);
+  let message = buildPromptFileMessage(promptPath, prompt, 'my', config.phraseRanges);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1191,7 +1206,7 @@ async function executeLaunchClaudeCode(config: {
 async function executeLaunchCodex(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-}) {
+} & LaunchPromptExtras) {
   const { folder, prompt, attachedFilePaths = [] } = config;
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
   const id = Date.now().toString();
@@ -1217,7 +1232,7 @@ async function executeLaunchCodex(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = buildPromptFileMessage(promptPath, prompt);
+  let message = buildPromptFileMessage(promptPath, prompt, 'my', config.phraseRanges);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1278,7 +1293,7 @@ async function executeLaunchCodex(config: {
 async function executeLaunchGemini(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-}) {
+} & LaunchPromptExtras) {
   const { folder, prompt, attachedFilePaths = [] } = config;
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
   const id = Date.now().toString();
@@ -1304,7 +1319,7 @@ async function executeLaunchGemini(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = buildPromptFileMessage(promptPath, prompt);
+  let message = buildPromptFileMessage(promptPath, prompt, 'my', config.phraseRanges);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1365,7 +1380,7 @@ async function executeLaunchGemini(config: {
 async function executeLaunchCopilot(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-}) {
+} & LaunchPromptExtras) {
   const { folder, yolo, prompt, mode, attachedFilePaths = [] } = config;
   const model = normalizeModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
@@ -1396,7 +1411,7 @@ async function executeLaunchCopilot(config: {
   }
 
   // Build the seed prompt, explicitly listing any attached files so Copilot CLI is aware of them
-  let promptSeed = buildPromptFileMessage(promptPath, prompt, 'user');
+  let promptSeed = buildPromptFileMessage(promptPath, prompt, 'user', config.phraseRanges);
   if (attachedFileNames.length > 0) {
     promptSeed += ` The user has also attached the following file(s), available in the same directory at ${launchTmpDir}: ${attachedFileNames.join(', ')}.`;
   }

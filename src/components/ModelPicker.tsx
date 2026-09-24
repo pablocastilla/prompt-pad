@@ -367,6 +367,7 @@ export function ModelPicker() {
       prompt: pendingLaunch.prompt,
       mode: 'interactive',
       attachedFilePaths: pendingLaunch.attachedFilePaths,
+      phraseRanges: pendingLaunch.phraseRanges,
     });
     if (folder && tabId) {
       setTabLaunchFolder(tabId, folder);
