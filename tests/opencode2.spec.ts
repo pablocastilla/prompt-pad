@@ -215,7 +215,7 @@ test.describe('OpenCode 2 launch option', () => {
       // --standalone, because the beta ignores OPENCODE_CONFIG_CONTENT and the
       // shared background service ignores per-launch model overrides.
       expect(script).toMatch(/\$env:OPENCODE_CONFIG = '[^']+pp-model\.json'/);
-      expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'script test'");
+      expect(script).toMatch(/--prompt', 'Read the file "[^']+\.txt" and treat its contents as my prompt\. Summary of the file content: "script test"'/);
       expect(script).toContain("'--auto')");
       expect(script).toContain("& $opencodePath @ocArgs");
       expect(script).not.toContain("'run'");
@@ -263,6 +263,116 @@ test.describe('OpenCode 2 launch option', () => {
       const script = scripts[0];
       expect(script).toContain("@('--model', 'opencode/glm-5.3-flash', '--prompt',");
       expect(script).not.toContain("@('run'");
+    } finally {
+      await cleanupTestDir(testDir);
+    }
+  });
+
+  test('opencode launch seed message embeds a single-line excerpt of the prompt file content', async () => {
+    const testDir = getTestDir();
+    try {
+      saveTestSettings(testDir);
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'Excerpt Test', folder: '/tmp' },
+      ]));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+      fs.writeFileSync(path.join(testDir, 'mock-opencode-models.json'), JSON.stringify([
+        { id: 'opencode/glm-5.3-flash', label: 'GLM 5.3 Flash' },
+      ]));
+
+      const longPrompt = [
+        'Fix the login timeout bug in auth service',
+        '',
+        'Steps to reproduce:',
+        '1. Open the app',
+        '2. Wait 30 minutes',
+        '3. The session drops unexpectedly',
+        'Please investigate the token refresh logic and add a regression test.',
+      ].join('\n');
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.activity-btn').first().click();
+      // Playwright's fill() strips newlines on contenteditable, so set the text
+      // through textContent (the same source the real editor reads) and dispatch
+      // an input event so the app updates the tab content.
+      await page.evaluate((text) => {
+        const editor = document.querySelector('.editor-textarea') as HTMLElement;
+        editor.textContent = text;
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+      }, longPrompt);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
+      await page.keyboard.press('1');
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.locator('.model-picker-item').first().click();
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      await page.waitForTimeout(500);
+
+      await app.close();
+
+      const scripts = readLaunchScripts(testDir);
+      expect(scripts).toHaveLength(1);
+      const script = scripts[0];
+
+      // The seed message must include a flattened excerpt of the prompt content
+      // so the CLI session summary in its history describes the prompt, not a
+      // generic "Read the file ..." string.
+      expect(script).toContain('Summary of the file content: "Fix the login timeout bug in auth service');
+      expect(script).toMatch(/Summary of the file content: "[^']*"', '--auto', '\/tmp'\)/);
+      // Newlines must be collapsed to spaces inside the excerpt
+      expect(script).toContain('auth service Steps to reproduce: 1. Open the app 2. Wait 30 minutes');
+      expect(script).not.toMatch(/--prompt', '[^']*Steps to reproduce:\n/);
+    } finally {
+      await cleanupTestDir(testDir);
+    }
+  });
+
+  test('opencode launch seed message truncates very long prompts with an ellipsis', async () => {
+    const testDir = getTestDir();
+    try {
+      saveTestSettings(testDir);
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'Truncate Test', folder: '/tmp' },
+      ]));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+      fs.writeFileSync(path.join(testDir, 'mock-opencode-models.json'), JSON.stringify([
+        { id: 'opencode/glm-5.3-flash', label: 'GLM 5.3 Flash' },
+      ]));
+
+      const longPrompt = 'x'.repeat(500) + ' END-MARKER';
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.editor-textarea').fill(longPrompt);
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
+      await page.keyboard.press('1');
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.locator('.model-picker-item').first().click();
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      await page.waitForTimeout(500);
+
+      await app.close();
+
+      const scripts = readLaunchScripts(testDir);
+      expect(scripts).toHaveLength(1);
+      const script = scripts[0];
+
+      // Excerpt is capped (200 chars) and ends with an ellipsis; the tail of the
+      // prompt must not leak into the seed message.
+      expect(script).toContain('Summary of the file content: "xxx');
+      expect(script).toMatch(/Summary of the file content: "x{199}…"/);
+      expect(script).not.toContain('END-MARKER');
     } finally {
       await cleanupTestDir(testDir);
     }

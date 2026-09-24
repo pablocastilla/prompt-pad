@@ -231,6 +231,7 @@ The Gaudy theme is best experienced live. It features:
 - **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
 - **Open folder in VS Code**: each launch shortcut can also open the launch folder in VS Code using a configurable modifier in Settings (`Ctrl+Shift`, `Ctrl+Alt`, or `Ctrl+Alt+Shift`).
 - **Pin favourite models**: pin OpenCode models in the picker for quick access with number keys.
+- **Prompt-file seed with content summary**: the prompt travels to the CLI as a temp file that the seed message tells the CLI to read, but the seed also embeds a short one-line excerpt of the file content (`Summary of the file content: "…"`). That way the session title each CLI records in its own history (and the OpenCode sessions panel) describes the actual prompt instead of a generic "Read the file …" string.
 
 ### Git Changes Panel
 - **Auto-opening panel**: after launching a prompt, a right-side panel opens showing all files modified in the launch folder's git repository.

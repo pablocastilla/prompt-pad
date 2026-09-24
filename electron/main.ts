@@ -740,6 +740,26 @@ ipcMain.handle('file:save-blob', (_e, bytes: number[], ext: string) => {
 // Helper – sanitize a string for safe use inside single-quoted PS1 strings
 function escapeSingleQuotePS(s: string): string { return s.replace(/'/g, "''"); }
 
+// Collapse whitespace and cap the length so the excerpt fits in a seed message
+// and in the session title the CLI derives from it.
+function promptExcerpt(prompt: string, max = 200): string {
+  const flat = prompt.replace(/\s+/g, ' ').trim();
+  if (!flat) return '';
+  return flat.length > max ? flat.slice(0, max - 1).trimEnd() + '…' : flat;
+}
+
+// Seed message for CLI launches that read the prompt from a temp file. It embeds
+// a short excerpt of the file content so the summary the CLI keeps for the
+// session in its history describes the prompt itself instead of always showing
+// a generic "Read the file ..." string.
+function buildPromptFileMessage(promptPath: string, prompt: string, kind: 'my' | 'user' = 'my'): string {
+  const base = kind === 'my'
+    ? `Read the file "${promptPath}" and treat its contents as my prompt.`
+    : `Read the file "${promptPath}" and treat its contents as the user's prompt. Follow the file contents exactly.`;
+  const excerpt = promptExcerpt(prompt);
+  return excerpt ? `${base} Summary of the file content: "${excerpt}"` : base;
+}
+
 // Write a .ps1 script with a UTF-8 BOM so PowerShell correctly interprets
 // non-ASCII paths (accents, tildes, ñ, etc.) even with powershell.exe which
 // defaults to ANSI/Windows-1252 when no BOM is present.
@@ -781,7 +801,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
           cli: tool,
           workDir: config.folder || 'C:\\tmp',
           model: normalizedModel,
-          message: config.prompt,
+          message: buildPromptFileMessage(promptPath, config.prompt),
           yolo: !!config.yolo,
           promptPath,
           launchTmpDir: path.join(os.tmpdir(), tmpId),
@@ -938,7 +958,7 @@ async function executeLaunchOpenCode(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  let message = buildPromptFileMessage(promptPath, prompt);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1013,7 +1033,7 @@ async function executeLaunchAntigravity(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  let message = buildPromptFileMessage(promptPath, prompt);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1100,7 +1120,7 @@ async function executeLaunchClaudeCode(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  let message = buildPromptFileMessage(promptPath, prompt);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1187,7 +1207,7 @@ async function executeLaunchCodex(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  let message = buildPromptFileMessage(promptPath, prompt);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1274,7 +1294,7 @@ async function executeLaunchGemini(config: {
     fs.copyFileSync(srcPath, path.join(launchTmpDir, destName));
   }
 
-  let message = `Read the file "${promptPath}" and treat its contents as my prompt.`;
+  let message = buildPromptFileMessage(promptPath, prompt);
   if (attachedFileNames.length > 0) {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
@@ -1366,7 +1386,7 @@ async function executeLaunchCopilot(config: {
   }
 
   // Build the seed prompt, explicitly listing any attached files so Copilot CLI is aware of them
-  let promptSeed = `Read the file "${promptPath}" and treat its contents as the user's prompt. Follow the file contents exactly.`;
+  let promptSeed = buildPromptFileMessage(promptPath, prompt, 'user');
   if (attachedFileNames.length > 0) {
     promptSeed += ` The user has also attached the following file(s), available in the same directory ("${launchTmpDir}"): ${attachedFileNames.join(', ')}.`;
   }
