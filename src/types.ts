@@ -373,6 +373,9 @@ export interface ElectronAPI {
   getOpenCodeSessions: () => Promise<OpenCodeSessionsSnapshot>;
   dismissOpenCodeSession: (id: string, turnId: string) => Promise<void>;
   restoreOpenCodeSessions: () => Promise<void>;
+  getAntigravitySessions: () => Promise<OpenCodeSessionsSnapshot>;
+  dismissAntigravitySession: (id: string, turnId: string) => Promise<void>;
+  restoreAntigravitySessions: () => Promise<void>;
   getPRStats: () => Promise<PRStats>;
   getPricingData: () => Promise<Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> | null>;
   getGitStatus: (folder: string) => Promise<GitFile[]>;

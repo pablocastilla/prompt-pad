@@ -176,7 +176,7 @@ test.describe('OpenCode 2 launch option', () => {
     }
   });
 
-  test('opencode2 launch script opens the interactive TUI with the model via OPENCODE_CONFIG temp file', async () => {
+  test('opencode2 launch script runs the message with --model via the run subcommand', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -210,19 +210,16 @@ test.describe('OpenCode 2 launch option', () => {
       expect(scripts).toHaveLength(1);
       const script = scripts[0];
 
-      // OpenCode 2 must open the interactive TUI (never the one-shot `run` subcommand)
-      // and pass the model through a temp config file (OPENCODE_CONFIG) with
-      // --standalone, because the beta ignores OPENCODE_CONFIG_CONTENT and the
-      // shared background service ignores per-launch model overrides.
-      expect(script).toMatch(/\$env:OPENCODE_CONFIG = '[^']+pp-model\.json'/);
-      expect(script).toMatch(/--prompt', 'Read the file "[^']+\.txt" and treat its contents as my prompt\. Summary of the file content: "script test"'/);
-      expect(script).toContain("'--auto')");
+      // The beta TUI pre-fills `--prompt` without submitting it, so launches use
+      // the `run` subcommand, which executes the message and accepts --model.
+      expect(script).toMatch(/\$ocArgs = @\('run', 'Read the file at [^']+\.txt and treat its contents as my prompt\. Summary of the file content: script test', '--model', 'opencode-go\/glm-5\.3-flash', '--auto'\)/);
       expect(script).toContain("& $opencodePath @ocArgs");
-      expect(script).not.toContain("'run'");
-      expect(script).not.toContain("@('--model'");
-      expect(script).not.toContain('OPENCODE_CONFIG_CONTENT');
-      // No stray empty-string arguments from conditional flags
-      expect(script).not.toContain(", ''");
+      expect(script).not.toContain('--standalone');
+      expect(script).not.toContain('OPENCODE_CONFIG');
+      expect(script).not.toContain('pp-model.json');
+      // The seed message must never contain double quotes: PowerShell 5.1 native
+      // argument passing mangles them and the CLI then rejects the arguments.
+      expect(script).not.toMatch(/'[^']*"/);
     } finally {
       await cleanupTestDir(testDir);
     }
@@ -263,6 +260,8 @@ test.describe('OpenCode 2 launch option', () => {
       const script = scripts[0];
       expect(script).toContain("@('--model', 'opencode/glm-5.3-flash', '--prompt',");
       expect(script).not.toContain("@('run'");
+      // The seed message must never contain double quotes (PowerShell 5.1 arg passing)
+      expect(script).not.toMatch(/'[^']*"/);
     } finally {
       await cleanupTestDir(testDir);
     }
@@ -322,8 +321,8 @@ test.describe('OpenCode 2 launch option', () => {
       // The seed message must include a flattened excerpt of the prompt content
       // so the CLI session summary in its history describes the prompt, not a
       // generic "Read the file ..." string.
-      expect(script).toContain('Summary of the file content: "Fix the login timeout bug in auth service');
-      expect(script).toMatch(/Summary of the file content: "[^']*"', '--auto', '\/tmp'\)/);
+      expect(script).toContain('Summary of the file content: Fix the login timeout bug in auth service');
+      expect(script).toMatch(/Summary of the file content: [^']*', '--auto', '\/tmp'\)/);
       // Newlines must be collapsed to spaces inside the excerpt
       expect(script).toContain('auth service Steps to reproduce: 1. Open the app 2. Wait 30 minutes');
       expect(script).not.toMatch(/--prompt', '[^']*Steps to reproduce:\n/);
@@ -370,8 +369,8 @@ test.describe('OpenCode 2 launch option', () => {
 
       // Excerpt is capped (200 chars) and ends with an ellipsis; the tail of the
       // prompt must not leak into the seed message.
-      expect(script).toContain('Summary of the file content: "xxx');
-      expect(script).toMatch(/Summary of the file content: "x{199}…"/);
+      expect(script).toContain('Summary of the file content: xxx');
+      expect(script).toMatch(/Summary of the file content: x{199}…'/);
       expect(script).not.toContain('END-MARKER');
     } finally {
       await cleanupTestDir(testDir);

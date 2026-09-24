@@ -8,13 +8,16 @@ const RETENTION_MS = 30 * 60 * 1000;
 const STALE_MS = 5 * 60 * 1000;
 
 // OpenCode uses XDG data directories on all platforms, including macOS/Windows.
-// Test mode must never fall back to the user's real database.
+// An explicit PROMPT_PAD_OPENCODE_DB override wins in every mode; test mode
+// otherwise uses the test directory and never the user's real database.
 export function findOpenCodeDb(testDir: string | null = null): string | null {
-  const candidates = testDir ? [path.join(testDir, 'opencode.db')] : [
+  const candidates = [
     ...(process.env.PROMPT_PAD_OPENCODE_DB ? [process.env.PROMPT_PAD_OPENCODE_DB] : []),
-    path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share'), 'opencode', 'opencode.db'),
-    ...(process.env.APPDATA ? [path.join(process.env.APPDATA, 'opencode', 'opencode.db')] : []),
-    path.join(os.homedir(), 'Library', 'Application Support', 'opencode', 'opencode.db'),
+    ...(testDir ? [path.join(testDir, 'opencode.db')] : [
+      path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share'), 'opencode', 'opencode.db'),
+      ...(process.env.APPDATA ? [path.join(process.env.APPDATA, 'opencode', 'opencode.db')] : []),
+      path.join(os.homedir(), 'Library', 'Application Support', 'opencode', 'opencode.db'),
+    ]),
   ];
   return candidates.find(p => fs.existsSync(p)) ?? null;
 }
@@ -36,6 +39,26 @@ interface SessionRow {
   message_id: string | null;
   message_updated: number | null;
   data: string | null;
+}
+
+// OpenCode 2 (beta) shares the database but keeps sessions in session_v2 with
+// messages in session_message (data JSON embeds text, model and finish info).
+interface SessionV2Row {
+  id: string;
+  slug: string | null;
+  title: string | null;
+  directory: string | null;
+  parent_id: string | null;
+  time_created: number;
+  time_updated: number;
+  time_idle: number | null;
+  time_archived: number | null;
+}
+
+interface SessionV2MessageRow {
+  id: string;
+  type: string;
+  data: string;
 }
 
 export class OpenCodeSessionMonitor {
@@ -124,13 +147,64 @@ export class OpenCodeSessionMonitor {
           }
           result.sessions.push({ id: row.id, turnId, title: row.title, directory: row.directory,
             parentId: row.parent_id, model, status, updatedAt, completedAt,
-            expiresAt: completedAt === null ? null : completedAt + RETENTION_MS, activity: activity.slice(-80) });
+            expiresAt: completedAt === null ? null : completedAt + RETENTION_MS, activity: activity.slice(-80), source: 'opencode' });
         }
+        this.readV2(db, now, result, hidden);
         // Keep running work at the left; abandoned/inconclusive history must not bury it.
         const priority = { working: 0, waiting: 1, completed: 2, error: 2, unknown: 3 };
         result.sessions.sort((a, b) => priority[a.status] - priority[b.status]);
         return result;
       })();
     } finally { db.close(); }
+  }
+
+  // OpenCode 2 (beta) sessions: same database, session_v2 + session_message
+  // tables. The shared tables carry no tool parts, so activity is text only.
+  private readV2(db: Database.Database, now: number, result: OpenCodeSessionsSnapshot, hidden: Record<string, string>): void {
+    const tables = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map(t => t.name));
+    if (!tables.has('session_v2') || !tables.has('session_message')) return;
+    const rows = db.prepare(`
+      SELECT id, slug, title, directory, parent_id, time_created, time_updated, time_idle, time_archived
+      FROM session_v2
+      ORDER BY time_created DESC, id
+      LIMIT 400
+    `).all() as SessionV2Row[];
+    const messages = db.prepare('SELECT id, type, data FROM session_message WHERE session_id = ? ORDER BY time_created DESC, seq DESC LIMIT 12');
+    for (const row of rows) {
+      if (row.time_archived) continue;
+      if (result.sessions.some(s => s.id === row.id)) continue;
+      const messageRows = (messages.all(row.id) as SessionV2MessageRow[]).reverse();
+      const last = messageRows[messageRows.length - 1];
+      const lastData = last ? object(last.data) : {};
+      // A completed assistant message marks the end of the turn; an idle
+      // timestamp without one means the agent stopped without finishing.
+      const terminal = last?.type === 'assistant' && (lastData.error ||
+        (typeof lastData.time?.completed === 'number' && ['stop', 'length', 'content-filter'].includes(lastData.finish)));
+      const completedAt = terminal ? (lastData.time?.completed ?? lastData.time?.idle ?? row.time_idle ?? row.time_updated) as number : null;
+      if (completedAt !== null && now >= completedAt + RETENTION_MS) continue;
+      const lastUser = [...messageRows].reverse().find(m => m.type === 'user');
+      const turnId = lastUser?.id || row.id;
+      if (hidden[row.id] === turnId) { result.hiddenCount++; continue; }
+      const updatedAt = Math.max(row.time_created, row.time_updated || 0, lastData.time?.completed || 0);
+      const status = terminal ? (lastData.error ? 'error' : 'completed') :
+        now - updatedAt >= STALE_MS ? 'unknown' :
+        last?.type === 'assistant' ? 'working' : 'waiting';
+      const activity: OpenCodeActivity[] = [];
+      let model = '';
+      for (const message of messageRows) {
+        const info = object(message.data);
+        if (info.model?.id) model = [info.model.providerID, info.model.id].filter(Boolean).join('/');
+        const text = message.type === 'user' && typeof info.text === 'string' ? info.text :
+          Array.isArray(info.content) ? info.content
+            .filter((c: { type?: string; text?: string }) => c?.type === 'text' && typeof c.text === 'string')
+            .map((c: { text: string }) => c.text).join('\n') : '';
+        if (text.trim()) activity.push({ id: message.id, role: message.type, type: 'text', text: text.slice(-6000) });
+        if (info.error) activity.push({ id: message.id + '-error', role: 'assistant', type: 'text',
+          text: String(info.error.data?.message || info.error.name || 'Error').slice(0, 1000) });
+      }
+      result.sessions.push({ id: row.id, turnId, title: row.title || row.slug || 'OpenCode 2', directory: row.directory || '',
+        parentId: row.parent_id, model, status, updatedAt, completedAt,
+        expiresAt: completedAt === null ? null : completedAt + RETENTION_MS, activity: activity.slice(-80), source: 'opencode' });
+    }
   }
 }

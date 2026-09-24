@@ -272,7 +272,7 @@ test('Spanish copy and all themes render at narrow width with horizontally scrol
   await page.locator('[data-tour-id="settings"]').click();
   await page.locator('.settings-panel select').first().selectOption('es');
   await page.locator('[data-tour-id="sessions"]').click();
-  await expect(page.locator('.sessions-toolbar h2')).toContainText('Sesiones de OpenCode');
+  await expect(page.locator('.sessions-toolbar h2')).toContainText('Sesiones');
   await expect(column(page, 'one')).toContainText('Trabajando');
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(700, 600));
   for (const theme of ['light', 'dark', 'cyberpunk', 'gaudy']) {
@@ -307,7 +307,9 @@ test('XDG and explicit database paths work; test mode never falls back to person
       delete process.env.PROMPT_PAD_OPENCODE_DB;
       const standard = findOpenCodeDb();
       process.env.PROMPT_PAD_OPENCODE_DB = custom;
-      return [standard, findOpenCodeDb(), findOpenCodeDb(dir)];
+      const explicit = findOpenCodeDb();
+      delete process.env.PROMPT_PAD_OPENCODE_DB;
+      return [standard, explicit, findOpenCodeDb(dir)];
     } finally {
       if (savedXdg === undefined) delete process.env.XDG_DATA_HOME; else process.env.XDG_DATA_HOME = savedXdg;
       if (savedCustom === undefined) delete process.env.PROMPT_PAD_OPENCODE_DB; else process.env.PROMPT_PAD_OPENCODE_DB = savedCustom;

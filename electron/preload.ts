@@ -80,6 +80,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOpenCodeSessions: () => ipcRenderer.invoke('opencode-sessions:list'),
   dismissOpenCodeSession: (id: string, turnId: string) => ipcRenderer.invoke('opencode-sessions:dismiss', id, turnId),
   restoreOpenCodeSessions: () => ipcRenderer.invoke('opencode-sessions:restore'),
+  getAntigravitySessions: () => ipcRenderer.invoke('antigravity-sessions:list'),
+  dismissAntigravitySession: (id: string, turnId: string) => ipcRenderer.invoke('antigravity-sessions:dismiss', id, turnId),
+  restoreAntigravitySessions: () => ipcRenderer.invoke('antigravity-sessions:restore'),
 
   // Git integration
   getGitStatus: (folder: string) => ipcRenderer.invoke('git:status', folder),

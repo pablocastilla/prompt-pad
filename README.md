@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.5.1** — OpenCode 2 launches the interactive TUI with the selected model via a temporary `OPENCODE_CONFIG` file and `--standalone` (the 2.0 beta ignores `OPENCODE_CONFIG_CONTENT`), and model lists are preloaded at startup so the picker is ready on first open.
+**Version 3.7.0** — Fixed the launch regression: seed messages no longer contain double quotes, which PowerShell 5.1 argument passing mangled (OpenCode showed its help instead of running the prompt). OpenCode 2 is launched via its `run` subcommand — the beta TUI only pre-fills `--prompt` without submitting it — so the prompt now executes and the session appears in the sessions board. The sessions board is now **Sessions**: it merges OpenCode 1 + 2 sessions with Antigravity (Google) conversations launched from Prompt Pad, and the test window stays invisible during `npm test`.
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 
@@ -127,19 +127,19 @@ Enter the **Launch History** panel. Every time you fire a prompt, Prompt Pad rem
 
 Your launch history is basically a prompt journal you didn't have to write. Every fire-and-forget prompt is catalogued, searchable, and one double-click away from resurrection.
 
-### OpenCode Sessions — All Your Agents in One Place
+### Sessions — OpenCode and Antigravity in One Place
 
-Click **▥ OpenCode sessions** in the activity bar to open a dashboard tab next to your prompts and statistics. Each local OpenCode session gets its own column, including sessions started directly in a terminal or in other project folders.
+Click **▥ Sessions** in the activity bar to open a dashboard tab next to your prompts and statistics. Each local session gets its own column: OpenCode 1 and OpenCode 2 sessions (including ones started directly in a terminal or in other project folders) plus **Antigravity (Google) conversations launched from Prompt Pad** during the last 24 hours, in both the IDE store (`~/.gemini/antigravity`) and the CLI store (`~/.gemini/antigravity-cli`). Antigravity columns carry a small badge; non-Prompt-Pad conversations never appear.
 
 - **Live view:** refreshes every 3 seconds with the project folder, model, latest messages and tool progress. Active work appears first; scroll horizontally for more sessions and vertically within each column. New output follows automatically unless you scroll up to read.
-- **Sound notifications:** a soft two-note chime plays when a turn finishes or errors, and a distinct chime plays when the agent needs you — an open `question` tool, or a tool stuck waiting for your approval. Notifications work in the background, even while you are in the terminal or on another tab, and are transition-based so sessions already finished at startup stay silent. Toggle them with the **Sound** checkbox on the sessions board or in Settings.
+- **Sound notifications:** a soft two-note chime plays when a turn finishes or errors, and a distinct chime plays when the agent needs you — an open `question` tool, or a tool stuck waiting for your approval. It also fires when a Prompt Pad-launched Antigravity conversation goes quiet after running. Notifications work in the background, even while you are in the terminal or on another tab, and are transition-based so sessions already finished at startup stay silent. Toggle them with the **Sound** checkbox on the sessions board or in Settings.
 - **Automatic cleanup:** a finished or failed turn stays visible for **30 minutes from its recorded completion**, then its column disappears. Intermediate tool-call steps do not start this countdown. A new prompt in the same session brings the column back.
 - **Manual close:** the **×** on a column hides the current turn, including across Prompt Pad restarts. **Restore hidden** brings back unexpired hidden columns. Closing a column does not stop OpenCode, delete a session or alter its database.
 - **Search:** filter by session title, folder or model. English/Spanish and all four themes are supported.
 
-**How status works:** OpenCode keeps its exact `busy`/`idle` status in memory, not SQLite. The board therefore infers **Working**, **Waiting**, **Finished** and **Error / interrupted** from persisted messages and tools. Unfinished sessions with no recorded activity for 5 minutes are marked **Uncertain**, kept open and placed after active/recently finished sessions. They may be waiting for permission, running a long tool, or left over from an interrupted process; SQLite alone cannot distinguish these. Only a recorded final answer/error starts the 30-minute removal timer. Archived sessions are omitted.
+**How status works:** OpenCode keeps its exact `busy`/`idle` status in memory, not SQLite. The board therefore infers **Working**, **Waiting**, **Finished** and **Error / interrupted** from persisted messages and tools. Unfinished sessions with no recorded activity for 5 minutes are marked **Uncertain**, kept open and placed after active/recently finished sessions. They may be waiting for permission, running a long tool, or left over from an interrupted process; SQLite alone cannot distinguish these. Only a recorded final answer/error starts the 30-minute removal timer. Archived sessions are omitted. Antigravity conversations report **Working** while their summary changed within the last 90 seconds and **Finished** afterwards, and they stay on the board until you close them.
 
-The reader opens `opencode.db` **read-only**, using short, consistent SQLite transactions compatible with concurrent WAL writes. It displays the latest 12 messages (up to 80 visible text/tool entries, with long text excerpts bounded to 6,000 characters). Checked against the installed **OpenCode 1.18.30** schema; extra columns are ignored and optional session metadata is not required. Missing databases and incompatible schemas are shown in the panel and retried automatically.
+The reader opens the OpenCode databases **read-only**, using short, consistent SQLite transactions compatible with concurrent WAL writes. OpenCode 1 sessions live in the `session`/`message`/`part` tables, OpenCode 2 beta sessions in `session_v2`/`session_message`; both are merged on the board. It displays the latest 12 messages (up to 80 visible text/tool entries, with long text excerpts bounded to 6,000 characters). Checked against the installed **OpenCode 1.18.30** schema and the **OpenCode 2 beta 18866** schema; extra columns are ignored and optional session metadata is not required. Missing databases and incompatible schemas are shown in the panel and retried automatically. Antigravity detection never writes to its stores either — Prompt Pad-launched conversations are recognised by the `pp-prompt-<id>.txt` marker the seed message embeds.
 
 The default location on Windows, macOS and Linux is `$XDG_DATA_HOME/opencode/opencode.db`, falling back to `~/.local/share/opencode/opencode.db`, with legacy AppData/Application Support locations also detected. For a custom installation, set `PROMPT_PAD_OPENCODE_DB` before starting Prompt Pad. The board reads one local database; it does not aggregate other machines or providers.
 
@@ -208,7 +208,7 @@ The Gaudy theme is best experienced live. It features:
 ## Features
 
 ### Editor
-- **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close. Statistics and OpenCode sessions open as tabs too — close them to return to your editor tabs.
+- **Multi-tab**: unlimited tabs; `Ctrl+T` to create, middle-click or `×` to close. Statistics and Sessions open as tabs too — close them to return to your editor tabs.
 - **Auto-session**: tab state (title, content, path) is saved every 600 ms and restored on the next launch.
 - **Plain-text contenteditable core**: editor now uses a `contenteditable` surface with strict plain-text sync, so launches always send plain text/markdown (no rich-text styles or HTML).
 - **Save/Open**: `Ctrl+S` (save), `Ctrl+Shift+S` (save as), `Ctrl+O` (open).
@@ -231,7 +231,7 @@ The Gaudy theme is best experienced live. It features:
 - **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
 - **Open folder in VS Code**: each launch shortcut can also open the launch folder in VS Code using a configurable modifier in Settings (`Ctrl+Shift`, `Ctrl+Alt`, or `Ctrl+Alt+Shift`).
 - **Pin favourite models**: pin OpenCode models in the picker for quick access with number keys.
-- **Prompt-file seed with content summary**: the prompt travels to the CLI as a temp file that the seed message tells the CLI to read, but the seed also embeds a short one-line excerpt of the file content (`Summary of the file content: "…"`). That way the session title each CLI records in its own history (and the OpenCode sessions panel) describes the actual prompt instead of a generic "Read the file …" string.
+- **Prompt-file seed with content summary**: the prompt travels to the CLI as a temp file that the seed message tells the CLI to read, but the seed also embeds a short one-line excerpt of the file content (`Summary of the file content: …`, without quotes so PowerShell argument passing stays safe). That way the session title each CLI records in its own history (and the sessions board) describes the actual prompt instead of a generic "Read the file …" string.
 
 ### Git Changes Panel
 - **Auto-opening panel**: after launching a prompt, a right-side panel opens showing all files modified in the launch folder's git repository.
@@ -277,7 +277,7 @@ The Gaudy theme is best experienced live. It features:
 
 ### Settings
 - **Language**: auto-detect (from system locale), English, or Spanish.
-- **Session sound notifications**: toggle the chime that plays when an OpenCode session finishes or asks a question. The same switch is available on the OpenCode sessions board.
+- **Session sound notifications**: toggle the chime that plays when a session finishes or asks a question (OpenCode and Prompt Pad-launched Antigravity). The same switch is available on the sessions board.
 - **OneDrive sync**: `phrases.json` and `launches.json` can be synced via OneDrive. First-enable migrates existing files automatically.
 - **Auto-updates**: automatically checks for new versions on startup and every 4 hours. Downloads and installs updates silently — just restart when prompted. Manual check button also available.
 

@@ -145,9 +145,16 @@ export function useSessionSound(enabled: boolean): void {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const snapshot = await window.electronAPI.getOpenCodeSessions();
+        const [opencode, antigravity] = await Promise.allSettled([
+          window.electronAPI.getOpenCodeSessions(),
+          window.electronAPI.getAntigravitySessions(),
+        ]);
         if (disposed) return;
-        const { finished, questions } = detectSessionNotifications(known.current, snapshot.sessions);
+        const sessions = [
+          ...(opencode.status === 'fulfilled' ? opencode.value.sessions : []),
+          ...(antigravity.status === 'fulfilled' ? antigravity.value.sessions : []),
+        ];
+        const { finished, questions } = detectSessionNotifications(known.current, sessions);
         if (enabledRef.current) {
           if (questions.length > 0) playQuestionSound();
           if (finished.length > 0) playSessionSound();

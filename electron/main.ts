@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { spawn } from 'child_process';
 import { findOpenCodeDb as locateOpenCodeDb, OpenCodeSessionMonitor } from './opencodeSessions';
+import { findAntigravityDbs as locateAntigravityDb, AntigravitySessionMonitor } from './antigravitySessions';
 
 const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
 const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
@@ -335,6 +336,9 @@ function createWindow() {
     width: 1200, height: 800, minWidth: 700, minHeight: 500,
     title: '',
     autoHideMenuBar: true,
+    // In test mode the window never paints on screen: Playwright drives the DOM
+    // directly, so nothing flashes during `npm test`.
+    ...(TEST_DIR ? { show: false } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -741,9 +745,11 @@ ipcMain.handle('file:save-blob', (_e, bytes: number[], ext: string) => {
 function escapeSingleQuotePS(s: string): string { return s.replace(/'/g, "''"); }
 
 // Collapse whitespace and cap the length so the excerpt fits in a seed message
-// and in the session title the CLI derives from it.
+// and in the session title the CLI derives from it. Double quotes are stripped
+// because the seed message travels through PowerShell 5.1 native argument
+// passing, which mangles them (see buildPromptFileMessage).
 function promptExcerpt(prompt: string, max = 200): string {
-  const flat = prompt.replace(/\s+/g, ' ').trim();
+  const flat = prompt.replace(/\s+/g, ' ').replace(/"/g, '').trim();
   if (!flat) return '';
   return flat.length > max ? flat.slice(0, max - 1).trimEnd() + '…' : flat;
 }
@@ -752,12 +758,19 @@ function promptExcerpt(prompt: string, max = 200): string {
 // a short excerpt of the file content so the summary the CLI keeps for the
 // session in its history describes the prompt itself instead of always showing
 // a generic "Read the file ..." string.
+//
+// The message must never contain double quotes: the launcher script passes it
+// through PowerShell 5.1 native argument passing, which does not escape embedded
+// quotes and splits the message into several arguments (the CLI then rejects
+// them and shows its help instead of running the prompt). The pp-prompt path
+// also doubles as the marker the sessions screen uses to detect
+// Prompt Pad-launched Antigravity conversations.
 function buildPromptFileMessage(promptPath: string, prompt: string, kind: 'my' | 'user' = 'my'): string {
   const base = kind === 'my'
-    ? `Read the file "${promptPath}" and treat its contents as my prompt.`
-    : `Read the file "${promptPath}" and treat its contents as the user's prompt. Follow the file contents exactly.`;
+    ? `Read the file at ${promptPath} and treat its contents as my prompt.`
+    : `Read the file at ${promptPath} and treat its contents as the user's prompt. Follow the file contents exactly.`;
   const excerpt = promptExcerpt(prompt);
-  return excerpt ? `${base} Summary of the file content: "${excerpt}"` : base;
+  return excerpt ? `${base} Summary of the file content: ${excerpt}` : base;
 }
 
 // Write a .ps1 script with a UTF-8 BOM so PowerShell correctly interprets
@@ -831,11 +844,11 @@ ipcMain.handle('launch:execute', async (_e, config: {
 });
 
 // Build the Windows PowerShell script that launches OpenCode or OpenCode 2.
-// Both launch the interactive TUI. OpenCode 1 supports a top-level `--model`
-// flag. OpenCode 2 (preview) has no top-level `--model` and its beta ignores
-// OPENCODE_CONFIG_CONTENT, so the model is written to a temporary config file
-// pointed at by OPENCODE_CONFIG; --standalone forces a private server that
-// reads that config (the shared background service would ignore it).
+// OpenCode 1 opens the interactive TUI with a top-level `--model` flag.
+// OpenCode 2 (beta) pre-fills `--prompt` in its TUI without ever submitting it,
+// so launches use the `run` subcommand, which executes the message, accepts
+// `--model` directly and records the session in the shared database that the
+// sessions screen reads.
 export function buildOpenCodeWinScript(opts: {
   cli: 'opencode' | 'opencode2';
   workDir: string; model: string; message: string;
@@ -850,12 +863,10 @@ export function buildOpenCodeWinScript(opts: {
     ? 'node_modules\\@opencode-ai\\cli\\bin\\opencode2.exe'
     : 'node_modules\\opencode-ai\\bin\\opencode.exe';
 
-  let modelConfig = '';
   let ocArgs: string;
   if (cli === 'opencode2') {
-    const modelFile = path.join(launchTmpDir, 'pp-model.json');
-    modelConfig = "$env:OPENCODE_CONFIG = '" + escapeSingleQuotePS(modelFile) + "'";
-    ocArgs = "@('--standalone', '--prompt', '" + safeMsg + "'"
+    ocArgs = "@('run', '" + safeMsg + "'"
+      + ", '--model', '" + safeModel + "'"
       + (yolo ? ", '--auto'" : '')
       + ")";
   } else {
@@ -880,7 +891,6 @@ export function buildOpenCodeWinScript(opts: {
     "  }",
     "}",
   ];
-  if (modelConfig) lines.push(modelConfig);
   lines.push(
     "$ocArgs = " + ocArgs,
     "& $opencodePath @ocArgs",
@@ -890,33 +900,25 @@ export function buildOpenCodeWinScript(opts: {
 }
 
 // Build the Linux/macOS shell script that launches OpenCode or OpenCode 2.
-// OpenCode 2 uses a temporary config file (OPENCODE_CONFIG) + --standalone
-// because its beta ignores OPENCODE_CONFIG_CONTENT and the shared background
-// service would ignore per-launch model overrides.
+// OpenCode 2 uses the `run` subcommand (see buildOpenCodeWinScript) because its
+// beta TUI pre-fills `--prompt` without submitting it.
 export function buildOpenCodeShScript(opts: {
   cli: 'opencode' | 'opencode2';
   workDir: string; model: string; message: string;
   yolo: boolean; promptPath: string; launchTmpDir: string;
 }): string {
   const { cli, workDir, model, message, yolo, promptPath, launchTmpDir } = opts;
-  const modelFile = path.join(launchTmpDir, 'pp-model.json');
-  const modelExport = cli === 'opencode2'
-    ? 'export OPENCODE_CONFIG=' + JSON.stringify(modelFile)
-    : '';
   const launchLine = cli === 'opencode2'
-    ? cli + ' --standalone --prompt ' + JSON.stringify(message) + (yolo ? ' --auto' : '')
+    ? cli + ' run ' + JSON.stringify(message) + ' --model ' + JSON.stringify(model) + (yolo ? ' --auto' : '')
     : cli + ' --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message)
       + (yolo ? ' --auto' : '') + ' ' + JSON.stringify(workDir);
   const lines = [
     '#!/bin/bash',
     'cd ' + JSON.stringify(workDir),
-  ];
-  if (modelExport) lines.push(modelExport);
-  lines.push(
     launchLine,
     'rm -rf ' + JSON.stringify(launchTmpDir),
     'rm -f "$0"',
-  );
+  ];
   return lines.join('\n');
 }
 
@@ -936,14 +938,8 @@ async function executeLaunchOpenCode(config: {
   const promptPath = path.join(launchTmpDir, promptFileName);
   fs.writeFileSync(promptPath, prompt, 'utf-8');
 
-  // OpenCode 2 has no top-level --model flag and its beta ignores
-  // OPENCODE_CONFIG_CONTENT, so the selected model goes into a temporary
-  // config file referenced by OPENCODE_CONFIG (see buildOpenCodeWinScript).
-  // The launch script deletes the whole temp dir on exit.
-  if (cli === 'opencode2') {
-    fs.writeFileSync(path.join(launchTmpDir, 'pp-model.json'), JSON.stringify({ model }), 'utf-8');
-  }
-
+  // OpenCode 2 is launched through its `run` subcommand, which takes `--model`
+  // directly; the launch script deletes the whole temp dir on exit.
   const copiedNames = new Set<string>([promptFileName]);
   const attachedFileNames: string[] = [];
   for (const srcPath of attachedFilePaths) {
@@ -1388,7 +1384,7 @@ async function executeLaunchCopilot(config: {
   // Build the seed prompt, explicitly listing any attached files so Copilot CLI is aware of them
   let promptSeed = buildPromptFileMessage(promptPath, prompt, 'user');
   if (attachedFileNames.length > 0) {
-    promptSeed += ` The user has also attached the following file(s), available in the same directory ("${launchTmpDir}"): ${attachedFileNames.join(', ')}.`;
+    promptSeed += ` The user has also attached the following file(s), available in the same directory at ${launchTmpDir}: ${attachedFileNames.join(', ')}.`;
   }
 
   if (process.platform === 'win32') {
@@ -1528,6 +1524,16 @@ const sessionMonitor = new OpenCodeSessionMonitor(findOpenCodeDb, path.join(APP_
 ipcMain.handle('opencode-sessions:list', () => sessionMonitor.read());
 ipcMain.handle('opencode-sessions:dismiss', (_e, id: string, turnId: string) => sessionMonitor.dismiss(id, turnId));
 ipcMain.handle('opencode-sessions:restore', () => sessionMonitor.restore());
+
+// Antigravity (Google) conversations launched from Prompt Pad, in both the IDE
+// and the CLI (agy) stores.
+const antigravityMonitor = new AntigravitySessionMonitor(
+  () => locateAntigravityDb(TEST_DIR),
+  path.join(APP_DIR, 'antigravity-sessions-hidden.json'),
+);
+ipcMain.handle('antigravity-sessions:list', () => antigravityMonitor.read());
+ipcMain.handle('antigravity-sessions:dismiss', (_e, id: string, turnId: string) => antigravityMonitor.dismiss(id, turnId));
+ipcMain.handle('antigravity-sessions:restore', () => antigravityMonitor.restore());
 
 interface DayCostRow {
   date: string;

@@ -21,6 +21,8 @@ export interface OpenCodeSession {
   completedAt: number | null;
   expiresAt: number | null;
   activity: OpenCodeActivity[];
+  // Which product the session belongs to; defaults to OpenCode.
+  source?: 'opencode' | 'antigravity';
 }
 
 export interface OpenCodeSessionsSnapshot {

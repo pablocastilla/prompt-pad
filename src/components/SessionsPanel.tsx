@@ -23,10 +23,11 @@ function SessionColumn({ session, now, closing, onClose }: {
     if (status === 'error') return t('sessionsFailed');
     return t('sessionsWaiting');
   };
-  return <article className="session-column" data-session-id={session.id} data-status={session.status} aria-label={session.title}>
+  return <article className={`session-column session-column-${session.source || 'opencode'}`} data-session-id={session.id} data-status={session.status} aria-label={session.title}>
     <header className="session-column-header">
       <div className="session-heading">
         <h3 title={session.title}>{session.title || session.id}</h3>
+        {session.source === 'antigravity' && <span className="session-source-badge">{t('sessionsAntigravityBadge')}</span>}
         <button className="session-close" onClick={onClose} disabled={closing}
           title={t('sessionsDismissHint')} aria-label={`${t('sessionsDismiss')}: ${session.title}`}>×</button>
       </div>
@@ -55,10 +56,13 @@ function SessionColumn({ session, now, closing, onClose }: {
   </article>;
 }
 
+const statusPriority: Record<OpenCodeSessionStatus, number> = { working: 0, waiting: 1, completed: 2, error: 2, unknown: 3 };
+
 export function SessionsPanel() {
   const settings = useStore(s => s.settings); // Re-render translations when language changes.
   const setSettings = useStore(s => s.setSettings);
-  const [snapshot, setSnapshot] = useState<OpenCodeSessionsSnapshot | null>(null);
+  const [opencode, setOpencode] = useState<OpenCodeSessionsSnapshot | null>(null);
+  const [antigravity, setAntigravity] = useState<OpenCodeSessionsSnapshot | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
@@ -69,10 +73,17 @@ export function SessionsPanel() {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const data = await window.electronAPI.getOpenCodeSessions();
-        if (!disposed) { setSnapshot(data); setError(''); }
-      } catch (err) {
-        if (!disposed) setError(err instanceof Error ? err.message : String(err));
+        const [oc, agy] = await Promise.allSettled([
+          window.electronAPI.getOpenCodeSessions(),
+          window.electronAPI.getAntigravitySessions(),
+        ]);
+        if (disposed) return;
+        const errors: string[] = [];
+        if (oc.status === 'rejected') errors.push(String(oc.reason));
+        else setOpencode(oc.value);
+        if (agy.status === 'rejected') errors.push(String(agy.reason));
+        else setAntigravity(agy.value);
+        setError(errors.join(' · '));
       } finally {
         if (!disposed) { setLoading(false); timer = setTimeout(poll, 3000); }
       }
@@ -85,8 +96,15 @@ export function SessionsPanel() {
   const changeVisibility = async (session?: OpenCodeSession) => {
     setClosing(session?.id || 'restore');
     try {
-      if (session) await window.electronAPI.dismissOpenCodeSession(session.id, session.turnId);
-      else await window.electronAPI.restoreOpenCodeSessions();
+      if (session) {
+        if (session.source === 'antigravity') await window.electronAPI.dismissAntigravitySession(session.id, session.turnId);
+        else await window.electronAPI.dismissOpenCodeSession(session.id, session.turnId);
+      } else {
+        await Promise.all([
+          window.electronAPI.restoreOpenCodeSessions(),
+          window.electronAPI.restoreAntigravitySessions(),
+        ]);
+      }
       setRevision(v => v + 1);
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { setClosing(null); }
@@ -97,7 +115,10 @@ export function SessionsPanel() {
     try { await window.electronAPI.saveSettings(next); } catch { /* keep the UI responsive on save failure */ }
   };
   const query = search.trim().toLocaleLowerCase();
-  const sessions = snapshot?.sessions.filter(s => `${s.title} ${s.directory} ${s.model}`.toLocaleLowerCase().includes(query)) || [];
+  const sessions = [...(opencode?.sessions || []), ...(antigravity?.sessions || [])]
+    .filter(s => `${s.title} ${s.directory} ${s.model}`.toLocaleLowerCase().includes(query))
+    .sort((a, b) => statusPriority[a.status] - statusPriority[b.status] || b.updatedAt - a.updatedAt);
+  const hiddenCount = (opencode?.hiddenCount || 0) + (antigravity?.hiddenCount || 0);
   return <section className="sessions-panel" aria-label={t('sessionsTitle')}>
     <div className="sessions-toolbar">
       <div><h2>▥ {t('sessionsTitle')}</h2><p>{t('sessionsSubtitle')}</p></div>
@@ -111,21 +132,22 @@ export function SessionsPanel() {
         <input type="checkbox" checked={settings.sessionSoundEnabled !== false} onChange={() => void toggleSound()} />
         <span>{t('sessionsSound')}</span>
       </label>
-      {!!snapshot?.hiddenCount && <button className="btn" disabled={closing !== null} onClick={() => void changeVisibility()}>
-        {t('sessionsRestore')} ({snapshot.hiddenCount})
+      {!!hiddenCount && <button className="btn" disabled={closing !== null} onClick={() => void changeVisibility()}>
+        {t('sessionsRestore')} ({hiddenCount})
       </button>}
     </div>
     <p className="sessions-hint">{t('sessionsInferenceHint')}</p>
     {error && <div className="sessions-error" role="alert">{t('sessionsError')} <span>{error}</span></div>}
-    {loading && !snapshot && <p className="sessions-empty" role="status">{t('sessionsLoading')}</p>}
-    {!loading && !error && !snapshot?.dbPath && <p className="sessions-empty">{t('statsDbNotFound')}</p>}
-    {snapshot?.dbPath && sessions.length === 0 && <p className="sessions-empty">{query ? t('sessionsNoMatches') : t('sessionsEmpty')}</p>}
+    {loading && !opencode && !antigravity && <p className="sessions-empty" role="status">{t('sessionsLoading')}</p>}
+    {!loading && !error && !opencode?.dbPath && !antigravity?.dbPath && <p className="sessions-empty">{t('statsDbNotFound')}</p>}
+    {(opencode?.dbPath || antigravity?.dbPath) && sessions.length === 0 && <p className="sessions-empty">{query ? t('sessionsNoMatches') : t('sessionsEmpty')}</p>}
     <div className="sessions-board">
-      {sessions.map(session => <SessionColumn key={session.id} session={session} now={snapshot!.checkedAt}
+      {sessions.map(session => <SessionColumn key={`${session.source || 'opencode'}-${session.id}`} session={session} now={opencode?.checkedAt || antigravity?.checkedAt || Date.now()}
         closing={closing !== null} onClose={() => void changeVisibility(session)} />)}
     </div>
-    {snapshot?.dbPath && <footer className="sessions-source" title={snapshot.dbPath}>
-      SQLite · {snapshot.dbPath} · {t('sessionsLastCheck')} {new Date(snapshot.checkedAt).toLocaleTimeString()}
+    {(opencode?.dbPath || antigravity?.dbPath) && <footer className="sessions-source">
+      {opencode?.dbPath && <div title={opencode.dbPath}>SQLite · {opencode.dbPath} · {t('sessionsLastCheck')} {new Date(opencode.checkedAt).toLocaleTimeString()}</div>}
+      {antigravity?.dbPath && <div title={antigravity.dbPath}>Antigravity · {antigravity.dbPath} · {t('sessionsLastCheck')} {new Date(antigravity.checkedAt).toLocaleTimeString()}</div>}
     </footer>}
   </section>;
 }
