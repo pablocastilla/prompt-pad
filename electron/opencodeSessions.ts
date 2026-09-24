@@ -6,6 +6,7 @@ import type { OpenCodeActivity, OpenCodeSessionsSnapshot } from './sessionTypes'
 
 const RETENTION_MS = 30 * 60 * 1000;
 const STALE_MS = 5 * 60 * 1000;
+const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 // OpenCode uses XDG data directories on all platforms, including macOS/Windows.
 // An explicit PROMPT_PAD_OPENCODE_DB override wins in every mode; test mode
@@ -119,10 +120,11 @@ export class OpenCodeSessionMonitor {
             (typeof data.time?.completed === 'number' && ['stop', 'length', 'content-filter'].includes(data.finish)));
           const completedAt = terminal ? (data.time?.completed ?? row.message_updated ?? row.time_updated) as number : null;
           if (completedAt !== null && now >= completedAt + RETENTION_MS) continue;
-          const turnId = (userQuery.get(row.id) as { id: string } | undefined)?.id || row.id;
-          if (hidden[row.id] === turnId) { result.hiddenCount++; continue; }
           const partTime = row.message_id ? (latestParts.get(row.message_id) as { updated: number | null }).updated : null;
           const updatedAt = Math.max(row.message_updated || row.time_created, partTime || 0);
+          if (completedAt === null && now - updatedAt > MAX_AGE_MS) continue;
+          const turnId = (userQuery.get(row.id) as { id: string } | undefined)?.id || row.id;
+          if (hidden[row.id] === turnId || hidden[row.id] === row.id) { result.hiddenCount++; continue; }
           const status = terminal ? (data.error ? 'error' : 'completed') :
             now - updatedAt >= STALE_MS ? 'unknown' :
             data.role === 'assistant' ? 'working' : data.role === 'user' || !row.message_id ? 'waiting' : 'unknown';
@@ -169,6 +171,7 @@ export class OpenCodeSessionMonitor {
       ORDER BY time_created DESC, id
       LIMIT 400
     `).all() as SessionV2Row[];
+    const userQuery = db.prepare("SELECT id FROM session_message WHERE session_id = ? AND type = 'user' ORDER BY time_created DESC, seq DESC LIMIT 1");
     const messages = db.prepare('SELECT id, type, data FROM session_message WHERE session_id = ? ORDER BY time_created DESC, seq DESC LIMIT 12');
     for (const row of rows) {
       if (row.time_archived) continue;
@@ -182,10 +185,11 @@ export class OpenCodeSessionMonitor {
         (typeof lastData.time?.completed === 'number' && ['stop', 'length', 'content-filter'].includes(lastData.finish)));
       const completedAt = terminal ? (lastData.time?.completed ?? lastData.time?.idle ?? row.time_idle ?? row.time_updated) as number : null;
       if (completedAt !== null && now >= completedAt + RETENTION_MS) continue;
-      const lastUser = [...messageRows].reverse().find(m => m.type === 'user');
-      const turnId = lastUser?.id || row.id;
-      if (hidden[row.id] === turnId) { result.hiddenCount++; continue; }
       const updatedAt = Math.max(row.time_created, row.time_updated || 0, lastData.time?.completed || 0);
+      if (completedAt === null && now - updatedAt > MAX_AGE_MS) continue;
+      const userRow = userQuery.get(row.id) as { id: string } | undefined;
+      const turnId = userRow?.id || row.id;
+      if (hidden[row.id] === turnId || hidden[row.id] === row.id) { result.hiddenCount++; continue; }
       const status = terminal ? (lastData.error ? 'error' : 'completed') :
         now - updatedAt >= STALE_MS ? 'unknown' :
         last?.type === 'assistant' ? 'working' : 'waiting';

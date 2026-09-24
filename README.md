@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.7.0** — Fixed the launch regression: seed messages no longer contain double quotes, which PowerShell 5.1 argument passing mangled (OpenCode showed its help instead of running the prompt). OpenCode 2 is launched via its `run` subcommand — the beta TUI only pre-fills `--prompt` without submitting it — so the prompt now executes and the session appears in the sessions board. The sessions board is now **Sessions**: it merges OpenCode 1 + 2 sessions with Antigravity (Google) conversations launched from Prompt Pad, and the test window stays invisible during `npm test`.
+**Version 3.8.0** — Launches OpenCode 2 in its full interactive TUI application with support for cancelling, answering forms, and approving prompts. Antigravity sessions on the Sessions board now display full console activity, including user messages, tool executions (`run_command`, `view_file`, etc.), and assistant responses. Task summary generation is now much smarter: leading boilerplate paragraphs (personas, git branch checkout commands, or saved phrase headers) are automatically bypassed so the session title captures the actual task. Session board capacity is increased to 250 conversations, OpenCode v2 session dismissal persistence is fixed so closed sessions stay closed, and stale non-terminal sessions older than 24 hours are cleanly filtered.
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 

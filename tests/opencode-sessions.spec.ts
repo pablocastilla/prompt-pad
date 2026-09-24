@@ -338,3 +338,80 @@ test('fresh tool activity keeps old messages active; scrolling up is respected w
   await expect(activity).toContainText('Following again', { timeout: 8000 });
   await expect.poll(() => activity.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(40);
 });
+
+test('opencode v2 dismissal stays hidden even when more than 12 assistant messages follow the user prompt', async ({ sandbox }) => {
+  const { app, dir } = sandbox;
+  await schema(app, dir);
+  const result = await app.evaluate(({}, { modulePath, dir }) => {
+    const require = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json');
+    const Database = require('better-sqlite3');
+    const { OpenCodeSessionMonitor } = require(modulePath);
+    const dbPath = require('path').join(dir, 'opencode.db');
+    const statePath = require('path').join(dir, 'hidden-v2.json');
+    const db = new Database(dbPath);
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_v2 (id TEXT PRIMARY KEY, slug TEXT, title TEXT, directory TEXT, parent_id TEXT, time_created INTEGER, time_updated INTEGER, time_idle INTEGER, time_archived INTEGER);
+        CREATE TABLE IF NOT EXISTS session_message (id TEXT PRIMARY KEY, session_id TEXT, seq INTEGER, type TEXT, time_created INTEGER, time_updated INTEGER, data TEXT);
+      `);
+      const now = Date.now();
+      db.prepare('INSERT INTO session_v2 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run('ses-v2-long', 'v2-long', 'Long V2 Session', 'C:\\work', null, now - 5000, now, null, null);
+      db.prepare('INSERT INTO session_message VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run('msg-user-root', 'ses-v2-long', 1, 'user', now - 4000, now - 4000, JSON.stringify({ text: 'User prompt' }));
+      for (let i = 2; i <= 18; i++) {
+        db.prepare('INSERT INTO session_message VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(`msg-asst-${i}`, 'ses-v2-long', i, 'assistant', now - 3000 + i * 100, now - 3000 + i * 100, JSON.stringify({ content: [{ type: 'text', text: `Step ${i}` }] }));
+      }
+    } finally { db.close(); }
+
+    const monitor = new OpenCodeSessionMonitor(() => dbPath, statePath);
+    const before = monitor.read();
+    monitor.dismiss('ses-v2-long', 'msg-user-root');
+    const after = monitor.read();
+    return {
+      beforeCount: before.sessions.length,
+      beforeTurnId: before.sessions[0]?.turnId,
+      afterCount: after.sessions.length,
+      afterHiddenCount: after.hiddenCount,
+    };
+  }, { modulePath: MONITOR_JS, dir });
+
+  expect(result.beforeCount).toBe(1);
+  expect(result.beforeTurnId).toBe('msg-user-root');
+  expect(result.afterCount).toBe(0);
+  expect(result.afterHiddenCount).toBe(1);
+});
+
+test('stale non-terminal sessions older than 24 hours are excluded from the board', async ({ sandbox }) => {
+  const { app, dir } = sandbox;
+  const result = await app.evaluate(({}, { modulePath, dir }) => {
+    const require = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json');
+    const Database = require('better-sqlite3');
+    const { OpenCodeSessionMonitor } = require(modulePath);
+    const dbPath = require('path').join(dir, 'opencode.db');
+    const statePath = require('path').join(dir, 'hidden-stale.json');
+    const db = new Database(dbPath);
+    const now = Date.now();
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session (id TEXT PRIMARY KEY, title TEXT, directory TEXT, parent_id TEXT, time_created INTEGER, time_updated INTEGER, time_archived INTEGER);
+        CREATE TABLE IF NOT EXISTS message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT);
+        CREATE TABLE IF NOT EXISTS part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT);
+      `);
+      // 25 hours ago, non-terminal
+      const ancientTime = now - 25 * 60 * 60 * 1000;
+      db.prepare('INSERT INTO session VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run('ses-ancient', 'Ancient session', 'C:\\old', null, ancientTime, ancientTime, null);
+      db.prepare('INSERT INTO message VALUES (?, ?, ?, ?, ?)')
+        .run('msg-ancient', 'ses-ancient', ancientTime, ancientTime, JSON.stringify({ role: 'user' }));
+    } finally { db.close(); }
+
+    const monitor = new OpenCodeSessionMonitor(() => dbPath, statePath);
+    const snapshot = monitor.read(now);
+    return snapshot.sessions.some(s => s.id === 'ses-ancient');
+  }, { modulePath: MONITOR_JS, dir });
+
+  expect(result).toBe(false);
+});
+

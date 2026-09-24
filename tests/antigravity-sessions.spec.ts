@@ -126,3 +126,39 @@ test('spanish board title is Sesiones', async ({ sandbox }) => {
   await open(page);
   await expect(page.locator('.sessions-toolbar h2')).toContainText('Sesiones');
 });
+
+test('antigravity columns display console activity and tool events from transcript', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  await seedAntigravity(app, dir, [{ id: 'agy-live', title: 'Activity session', ageMinutes: 5, marked: true }]);
+
+  const logDir = path.join(dir, 'brain', 'agy-live', '.system_generated', 'logs');
+  fs.mkdirSync(logDir, { recursive: true });
+  const transcriptLines = [
+    JSON.stringify({ step_index: 0, type: 'USER_INPUT', content: 'Fix the session activity display' }),
+    JSON.stringify({
+      step_index: 1,
+      type: 'PLANNER_RESPONSE',
+      content: '',
+      tool_calls: [{ name: 'run_command', args: { CommandLine: 'git status', toolAction: 'Checking git status' } }],
+    }),
+    JSON.stringify({
+      step_index: 2,
+      type: 'PLANNER_RESPONSE',
+      content: 'Antigravity has finished analyzing the codebase.',
+      tool_calls: [],
+    }),
+  ];
+  fs.writeFileSync(path.join(logDir, 'transcript.jsonl'), transcriptLines.join('\n'), 'utf8');
+
+  await open(page);
+  await expect(column(page, 'agy-live')).toBeVisible({ timeout: 8000 });
+
+  await expect(column(page, 'agy-live')).toContainText('Fix the session activity display');
+  await expect(column(page, 'agy-live')).toContainText('run_command');
+  await expect(column(page, 'agy-live')).toContainText('git status');
+  await expect(column(page, 'agy-live')).toContainText('Antigravity has finished analyzing the codebase.');
+  await expect(column(page, 'agy-live').locator('.session-event-label').nth(0)).toContainText('You');
+  await expect(column(page, 'agy-live').locator('.session-event-label').nth(1)).toContainText('run_command');
+  await expect(column(page, 'agy-live').locator('.session-event-label').nth(2)).toContainText('Antigravity');
+});
+

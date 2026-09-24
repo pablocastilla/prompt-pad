@@ -176,7 +176,7 @@ test.describe('OpenCode 2 launch option', () => {
     }
   });
 
-  test('opencode2 launch script runs the message with --model via the run subcommand', async () => {
+  test('opencode2 launch script opens the interactive TUI with the model via OPENCODE_CONFIG temp file', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -210,13 +210,15 @@ test.describe('OpenCode 2 launch option', () => {
       expect(scripts).toHaveLength(1);
       const script = scripts[0];
 
-      // The beta TUI pre-fills `--prompt` without submitting it, so launches use
-      // the `run` subcommand, which executes the message and accepts --model.
-      expect(script).toMatch(/\$ocArgs = @\('run', 'Read the file at [^']+\.txt and treat its contents as my prompt\. Summary of the file content: script test', '--model', 'opencode-go\/glm-5\.3-flash', '--auto'\)/);
+      // OpenCode 2 opens the interactive TUI with interactive form dialogs and cancellation
+      // and passes the model through a temp config file (OPENCODE_CONFIG) with --standalone
+      expect(script).toMatch(/\$env:OPENCODE_CONFIG = '[^']+pp-model\.json'/);
+      expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'Read the file at");
+      expect(script).toContain("Summary of the file content: script test'");
+      expect(script).toContain("'--auto')");
       expect(script).toContain("& $opencodePath @ocArgs");
-      expect(script).not.toContain('--standalone');
-      expect(script).not.toContain('OPENCODE_CONFIG');
-      expect(script).not.toContain('pp-model.json');
+      expect(script).not.toContain("'run'");
+      expect(script).not.toContain("@('--model'");
       // The seed message must never contain double quotes: PowerShell 5.1 native
       // argument passing mangles them and the CLI then rejects the arguments.
       expect(script).not.toMatch(/'[^']*"/);

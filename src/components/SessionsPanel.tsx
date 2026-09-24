@@ -49,7 +49,7 @@ function SessionColumn({ session, now, closing, onClose }: {
       {session.activity.length === 0 && <p className="session-meta">{t('sessionsNoActivity')}</p>}
       {session.activity.map(item => <div key={item.id} className={`session-event session-event-${item.type}`}>
         <div className="session-event-label">{item.type === 'tool' ? `${item.tool} · ${toolStatus(item.status)}` :
-          item.role === 'user' ? t('sessionsYou') : 'OpenCode'}</div>
+          item.role === 'user' ? t('sessionsYou') : (session.source === 'antigravity' ? 'Antigravity' : 'OpenCode')}</div>
         {item.text && <p>{item.text}</p>}
       </div>)}
     </div>
@@ -95,6 +95,21 @@ export function SessionsPanel() {
 
   const changeVisibility = async (session?: OpenCodeSession) => {
     setClosing(session?.id || 'restore');
+    if (session) {
+      if (session.source === 'antigravity') {
+        setAntigravity(prev => prev ? {
+          ...prev,
+          sessions: prev.sessions.filter(s => s.id !== session.id),
+          hiddenCount: prev.hiddenCount + 1,
+        } : null);
+      } else {
+        setOpencode(prev => prev ? {
+          ...prev,
+          sessions: prev.sessions.filter(s => s.id !== session.id),
+          hiddenCount: prev.hiddenCount + 1,
+        } : null);
+      }
+    }
     try {
       if (session) {
         if (session.source === 'antigravity') await window.electronAPI.dismissAntigravitySession(session.id, session.turnId);
