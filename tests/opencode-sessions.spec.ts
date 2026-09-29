@@ -105,11 +105,32 @@ test('real SQLite sessions appear as independent columns with tools and accurate
   await expect(column(page, 'active')).toContainText('Please check active');
   await expect(column(page, 'aborted')).toContainText('Cancelled by user');
   await expect(column(page, 'done')).toContainText('Closes in 30 min');
-  await expect(page.locator('.session-column').first()).toHaveAttribute('data-status', 'working');
   const boxes = await page.locator('.session-column').evaluateAll(nodes => nodes.map(n => ({ x: n.getBoundingClientRect().x, y: n.getBoundingClientRect().y })));
   expect(boxes.every(b => b.y === boxes[0].y)).toBe(true);
   expect(boxes[1].x).toBeGreaterThan(boxes[0].x);
   await expect(page.locator('[data-tour-id="sessions"]')).toHaveClass(/active/);
+});
+
+test('columns keep a stable position while sessions change status and activity', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  await schema(app, dir);
+  await seed(app, dir, 'older', { age: 3 * MINUTE });
+  await seed(app, dir, 'newer', { age: 1 * MINUTE });
+  await open(page);
+  const order = () => page.locator('.session-column').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-session-id')));
+  await expect.poll(order).toEqual(['newer', 'older']); // Newest column on the left, then frozen.
+  // The older session becomes the busiest one; it must not jump to the front.
+  await sql(app, dir, 'UPDATE part SET data = ?, time_updated = ? WHERE id = ?',
+    [JSON.stringify({ type: 'text', text: 'Old session just streamed' }), Date.now() + 1000, 'older-text']);
+  await expect(column(page, 'older')).toContainText('Old session just streamed', { timeout: 8000 });
+  await expect.poll(order).toEqual(['newer', 'older']);
+  // Finishing the newest session must not shove its column to the end either.
+  await sql(app, dir, 'UPDATE message SET data = ?, time_updated = ? WHERE id = ?', [JSON.stringify({
+    role: 'assistant', finish: 'stop', time: { created: Date.now() - 1000, completed: Date.now() },
+    modelID: 'test-model', providerID: 'opencode',
+  }), Date.now(), 'newer-assistant']);
+  await expect(column(page, 'newer')).toHaveAttribute('data-status', 'completed', { timeout: 8000 });
+  await expect.poll(order).toEqual(['newer', 'older']);
 });
 
 test('polling streams new activity, detects finalization and removes exactly at the 30-minute boundary', async ({ sandbox }) => {

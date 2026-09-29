@@ -174,6 +174,9 @@ export class AntigravitySessionMonitor {
           parentId: row.parent_conversation_id || (row.nesting_depth > 0 ? 'nested' : null),
           model: row.agent_name || '',
           status: working ? 'working' : 'completed',
+          // Antigravity's summary exposes only a last-modified timestamp; use it
+          // as the creation key so the board still has a deterministic order.
+          createdAt: updatedAt,
           updatedAt,
           completedAt: working ? null : updatedAt,
           expiresAt: null,

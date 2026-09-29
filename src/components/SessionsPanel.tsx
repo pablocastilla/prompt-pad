@@ -56,8 +56,6 @@ function SessionColumn({ session, now, closing, onClose }: {
   </article>;
 }
 
-const statusPriority: Record<OpenCodeSessionStatus, number> = { working: 0, waiting: 1, completed: 2, error: 2, unknown: 3 };
-
 export function SessionsPanel() {
   const settings = useStore(s => s.settings); // Re-render translations when language changes.
   const setSettings = useStore(s => s.setSettings);
@@ -68,6 +66,7 @@ export function SessionsPanel() {
   const [revision, setRevision] = useState(0);
   const [closing, setClosing] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const orderKeys = useRef<string[]>([]);
   useEffect(() => {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -130,9 +129,20 @@ export function SessionsPanel() {
     try { await window.electronAPI.saveSettings(next); } catch { /* keep the UI responsive on save failure */ }
   };
   const query = search.trim().toLocaleLowerCase();
-  const sessions = [...(opencode?.sessions || []), ...(antigravity?.sessions || [])]
+  const keyOf = (session: OpenCodeSession) => `${session.source || 'opencode'}-${session.id}`;
+  const allSessions = [...(opencode?.sessions || []), ...(antigravity?.sessions || [])]
+    .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
+  const live = new Set(allSessions.map(keyOf));
+  const kept = orderKeys.current.filter(key => live.has(key));
+  const placed = new Set(kept);
+  // New columns join at the left; once placed, a column never moves again even
+  // though its status and activity keep changing on every poll.
+  const added = allSessions.filter(session => !placed.has(keyOf(session))).map(keyOf);
+  orderKeys.current = [...added, ...kept];
+  const position = new Map(orderKeys.current.map((key, index) => [key, index]));
+  const sessions = allSessions
     .filter(s => `${s.title} ${s.directory} ${s.model}`.toLocaleLowerCase().includes(query))
-    .sort((a, b) => statusPriority[a.status] - statusPriority[b.status] || b.updatedAt - a.updatedAt);
+    .sort((a, b) => (position.get(keyOf(a)) ?? 0) - (position.get(keyOf(b)) ?? 0));
   const hiddenCount = (opencode?.hiddenCount || 0) + (antigravity?.hiddenCount || 0);
   return <section className="sessions-panel" aria-label={t('sessionsTitle')}>
     <div className="sessions-toolbar">

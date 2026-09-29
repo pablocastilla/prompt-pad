@@ -17,6 +17,7 @@ export interface OpenCodeSession {
   parentId: string | null;
   model: string;
   status: OpenCodeSessionStatus;
+  createdAt: number;
   updatedAt: number;
   completedAt: number | null;
   expiresAt: number | null;

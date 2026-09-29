@@ -148,13 +148,13 @@ export class OpenCodeSessionMonitor {
               text: String(info.error.data?.message || info.error.name || 'Error').slice(0, 1000) });
           }
           result.sessions.push({ id: row.id, turnId, title: row.title, directory: row.directory,
-            parentId: row.parent_id, model, status, updatedAt, completedAt,
+            parentId: row.parent_id, model, status, createdAt: row.time_created, updatedAt, completedAt,
             expiresAt: completedAt === null ? null : completedAt + RETENTION_MS, activity: activity.slice(-80), source: 'opencode' });
         }
         this.readV2(db, now, result, hidden);
-        // Keep running work at the left; abandoned/inconclusive history must not bury it.
-        const priority = { working: 0, waiting: 1, completed: 2, error: 2, unknown: 3 };
-        result.sessions.sort((a, b) => priority[a.status] - priority[b.status]);
+        // Order by creation, not by live status/activity, so columns keep a stable
+        // position while a session alternates between working, waiting and finished.
+        result.sessions.sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
         return result;
       })();
     } finally { db.close(); }
@@ -207,7 +207,7 @@ export class OpenCodeSessionMonitor {
           text: String(info.error.data?.message || info.error.name || 'Error').slice(0, 1000) });
       }
       result.sessions.push({ id: row.id, turnId, title: row.title || row.slug || 'OpenCode 2', directory: row.directory || '',
-        parentId: row.parent_id, model, status, updatedAt, completedAt,
+        parentId: row.parent_id, model, status, createdAt: row.time_created, updatedAt, completedAt,
         expiresAt: completedAt === null ? null : completedAt + RETENTION_MS, activity: activity.slice(-80), source: 'opencode' });
     }
   }
