@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.9.0** — Session columns now keep a stable position on the Sessions board. The board no longer sorts by live status and last-update time, which made the busiest column jump to the front on every refresh; columns are placed by creation time and new ones join at the left, then stay put while their status and activity keep changing.
+**Version 3.10.0** — The Sessions board gets Gaudy-only kitsch: holographic borders that breathe on working sessions, carnival light strips on every column header, a golden shine sweep on finished turns, a dramatic shake on errors, and extra toasts announcing the grand finale (light, dark and cyberpunk keep their sober board). Session columns also keep a stable position on the board: placed by creation time and new ones join at the left, then stay put while their status and activity keep changing.
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 
@@ -198,6 +198,8 @@ The Gaudy theme is best experienced live. It features:
 - **Typing glow effect** — your text pulses with energy
 - **Pulsing fire button** — the launch button breathes with intensity
 - **Themed toast notifications** — even your toasts are extra
+- **Sessions board kitsch** — working sessions breathe inside a neon frame with a disco marquee header and a blinking halo dot, finished sessions get a golden VIP shine sweeping their header, errors trigger a brief dramatic shake under a red neon ring, every column header wears a carnival light strip, and the board title rolls a rainbow gradient. Gaudy toasts also announce the finale: when a watched turn finishes (`🎬 THAT'S A WRAP!`) or explodes (`💥 AGENT MELTDOWN!`) while you are on the board
+- **Reduced-motion aware** — every sessions-board animation shuts down when the OS asks for less movement
 
 ![Gaudy theme](docs/screenshots/07-gaudy.png)
 
@@ -348,10 +350,11 @@ npm run dist         # All platforms (Windows + macOS)
 npm run build
 npm test             # Full Playwright/Electron suite
 npx playwright test tests/opencode-sessions.spec.ts
+npx playwright test tests/sessions-gaudy.spec.ts
 npx playwright test tests/session-sound.spec.ts
 ```
 
-Tests launch with `PROMPT_PAD_TEST_DIR` in temporary folders. App files and the Electron browser profile are isolated there, and OneDrive sync is bypassed even if enabled in test settings. OpenCode database discovery in test mode only reads `<test-dir>/opencode.db`, never the personal database. Session-board tests use real SQLite fixtures through Electron's native driver to cover streaming, WAL concurrency, completion/expiry, manual hiding/restart/restore, schema recovery, search, tab behavior, language and themes. The 30-minute boundary is verified with a controlled clock. Session-sound tests stub `AudioContext` to count chime notes and verify finish, error and question triggers, silence for pre-existing state, and the board/Settings toggles. No sound is emitted during tests.
+Tests launch with `PROMPT_PAD_TEST_DIR` in temporary folders. App files and the Electron browser profile are isolated there, and OneDrive sync is bypassed even if enabled in test settings. OpenCode database discovery in test mode only reads `<test-dir>/opencode.db`, never the personal database. Session-board tests use real SQLite fixtures through Electron's native driver to cover streaming, WAL concurrency, completion/expiry, manual hiding/restart/restore, schema recovery, search, tab behavior, language and themes. The 30-minute boundary is verified with a controlled clock. Session-sound tests stub `AudioContext` to count chime notes and verify finish, error and question triggers, silence for pre-existing state, and the board/Settings toggles. No sound is emitted during tests. Gaudy-session tests assert the kitsch board animations exist only in the gaudy theme (dark/cyberpunk/light stay sober), that gaudy toasts fire exactly once when a watched turn finishes or errors, and stay silent in other themes.
 
 ### macOS installer
 The macOS build produces a `.dmg` installer for both Intel (`x64`) and Apple Silicon (`arm64`) Macs. Download the appropriate `.dmg` from GitHub Releases, open it, and drag Prompt Pad to your Applications folder.

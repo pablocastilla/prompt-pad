@@ -59,6 +59,7 @@ function SessionColumn({ session, now, closing, onClose }: {
 export function SessionsPanel() {
   const settings = useStore(s => s.settings); // Re-render translations when language changes.
   const setSettings = useStore(s => s.setSettings);
+  const addToast = useStore(s => s.addToast);
   const [opencode, setOpencode] = useState<OpenCodeSessionsSnapshot | null>(null);
   const [antigravity, setAntigravity] = useState<OpenCodeSessionsSnapshot | null>(null);
   const [error, setError] = useState('');
@@ -67,6 +68,9 @@ export function SessionsPanel() {
   const [closing, setClosing] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const orderKeys = useRef<string[]>([]);
+  const statusMemory = useRef(new Map<string, OpenCodeSessionStatus>());
+  const gaudyRef = useRef(settings.theme === 'gaudy');
+  gaudyRef.current = settings.theme === 'gaudy';
   useEffect(() => {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -83,6 +87,27 @@ export function SessionsPanel() {
         if (agy.status === 'rejected') errors.push(String(agy.reason));
         else setAntigravity(agy.value);
         setError(errors.join(' · '));
+        // Gaudy flair: kitschy toasts when a watched turn reaches a final state.
+        if (gaudyRef.current) {
+          const seen = new Set<string>();
+          const messages: string[] = [];
+          for (const snapshot of [oc, agy]) {
+            if (snapshot.status !== 'fulfilled') continue;
+            for (const session of snapshot.value.sessions) {
+              const key = `${session.source || 'opencode'}:${session.id}`;
+              seen.add(key);
+              const previous = statusMemory.current.get(key);
+              statusMemory.current.set(key, session.status);
+              if (!previous) continue;
+              if (session.status === 'completed' && previous !== 'completed') messages.push(t('gaudySessionDone'));
+              else if (session.status === 'error' && previous !== 'error') messages.push(t('gaudySessionBoom'));
+            }
+          }
+          for (const key of [...statusMemory.current.keys()]) {
+            if (!seen.has(key)) statusMemory.current.delete(key);
+          }
+          for (const message of messages) addToast(message);
+        }
       } finally {
         if (!disposed) { setLoading(false); timer = setTimeout(poll, 3000); }
       }

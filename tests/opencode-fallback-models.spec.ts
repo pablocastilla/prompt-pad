@@ -2,7 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { selectOpenCodeProvider } from './helpers';
+import { selectOpenCodeProvider, removeTestDir } from './helpers';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -67,7 +67,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -118,7 +118,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -170,7 +170,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -218,7 +218,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -277,7 +277,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -289,20 +289,22 @@ test.describe('OpenCode fallback models with Go filter', () => {
         { id: 'l1', name: 'Qwen Max Test', folder: process.cwd(), shortcut: '1' },
       ], null, 2));
       fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+      // Main-process mock so the live CLI catalog (which changes over time and
+      // preloads at startup) can never override the fixtures of this test.
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify([
+          { id: 'opencode-go/qwen3.7-max', label: 'Qwen3.7 Max' },
+          { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
+          { id: 'opencode-go/qwen3.5-plus', label: 'Qwen3.5 Plus' },
+        ], null, 2),
+        'utf-8',
+      );
 
       const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
-
-      await page.evaluate(() => {
-        const api = (window as any).electronAPI;
-        api.getOpenCodeModels = async () => [
-          { id: 'opencode-go/qwen3.7-max', label: 'Qwen3.7 Max' },
-          { id: 'opencode-go/qwen3.6-plus', label: 'Qwen3.6 Plus' },
-          { id: 'opencode-go/qwen3.5-plus', label: 'Qwen3.5 Plus' },
-        ];
-      });
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -325,7 +327,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -369,7 +371,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -405,7 +407,7 @@ test.describe('OpenCode fallback models with Go filter', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 });

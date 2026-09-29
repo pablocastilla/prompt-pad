@@ -40,3 +40,127 @@
 .sessions-error span { display: block; font-size: 11px; margin-top: 5px; }
 .sessions-source { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 @media (max-width: 800px) { .sessions-panel { padding: 12px; } .session-column { flex-basis: 310px; } }
+
+/* ── GAUDY-ONLY SESSIONS EXTRAVAGANZA ──────────────── */
+/* Kitsch effects live only under the gaudy theme; light, dark and cyberpunk keep their sober board. */
+
+[data-theme="gaudy"] .sessions-toolbar h2 {
+  background: linear-gradient(90deg, #ff78c8, #ffe28a 45%, #8cf5ea, #ff78c8);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 120, 200, .28));
+  animation: gaudy-sessions-rollback 6s linear infinite;
+}
+
+[data-theme="gaudy"] .session-column {
+  border-color: rgba(255, 196, 228, .22);
+  box-shadow: 0 0 14px rgba(255, 120, 200, .1);
+  animation: gaudy-session-pop .38s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+[data-theme="gaudy"] .session-column-header {
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="gaudy"] .session-column-header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ff78c8 0 14px, #ffe28a 14px 28px, #8cf5ea 28px 42px, #ff78c8 42px 56px);
+  background-size: 56px 100%;
+  opacity: .55;
+  animation: gaudy-sessions-rollback 1.6s linear infinite;
+}
+
+/* Working: disco marquee header + neon breathing frame */
+[data-theme="gaudy"] .session-column[data-status="working"] {
+  border-color: rgba(255, 226, 138, .45);
+  box-shadow: 0 0 14px rgba(255, 120, 200, .2), 0 0 26px rgba(255, 226, 138, .08);
+  animation: gaudy-session-breathe 2.4s ease-in-out infinite;
+}
+[data-theme="gaudy"] .session-column[data-status="working"] .session-column-header {
+  background: linear-gradient(90deg, rgba(255, 120, 200, .16), rgba(255, 226, 138, .16), rgba(103, 245, 230, .16), rgba(255, 120, 200, .16));
+  background-size: 300% 100%;
+  animation: gaudy-sessions-rollback 5s linear infinite;
+}
+[data-theme="gaudy"] .session-column[data-status="working"] .session-status-working::after {
+  content: '';
+  display: inline-block;
+  width: 7px; height: 7px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #ffe28a;
+  box-shadow: 0 0 8px #ffe28a;
+  vertical-align: 1px;
+  animation: gaudy-session-blink 1.2s steps(2, start) infinite;
+}
+
+/* Finished: golden VIP shine sweeping the header */
+[data-theme="gaudy"] .session-column[data-status="completed"] {
+  border-color: rgba(255, 226, 138, .34);
+  box-shadow: 0 0 16px rgba(255, 226, 138, .12);
+}
+[data-theme="gaudy"] .session-column[data-status="completed"] .session-column-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 236, 180, .22) 50%, transparent 58%);
+  transform: translateX(-120%);
+  pointer-events: none;
+  animation: gaudy-session-shine 5.5s ease-in-out infinite;
+}
+[data-theme="gaudy"] .session-column[data-status="completed"] .session-status-completed {
+  text-shadow: 0 0 8px rgba(255, 226, 138, .4);
+}
+
+/* Error: brief kitschy dramatic shake with a red neon ring */
+[data-theme="gaudy"] .session-column[data-status="error"] {
+  border-color: rgba(255, 89, 125, .45);
+  box-shadow: 0 0 16px rgba(255, 89, 125, .16);
+  animation: gaudy-session-drama 6s ease-in-out infinite;
+}
+[data-theme="gaudy"] .session-column[data-status="error"] .session-status-error {
+  text-shadow: 0 0 8px rgba(255, 89, 125, .5);
+}
+
+@keyframes gaudy-sessions-rollback {
+  from { background-position: 0% 0; }
+  to { background-position: 300% 0; }
+}
+@keyframes gaudy-session-pop {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes gaudy-session-breathe {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 120, 200, .16), 0 0 20px rgba(255, 226, 138, .07); }
+  50% { box-shadow: 0 0 18px rgba(255, 120, 200, .26), 0 0 32px rgba(255, 226, 138, .12); }
+}
+@keyframes gaudy-session-blink {
+  50% { opacity: .2; }
+}
+@keyframes gaudy-session-shine {
+  0%, 45% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(120%); }
+}
+@keyframes gaudy-session-drama {
+  0%, 90%, 100% { transform: none; }
+  92% { transform: translateX(-2px) rotate(-.3deg); }
+  95% { transform: translateX(2px) rotate(.3deg); }
+  98% { transform: translateX(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="gaudy"] .session-column,
+  [data-theme="gaudy"] .session-column[data-status="working"],
+  [data-theme="gaudy"] .session-column[data-status="error"],
+  [data-theme="gaudy"] .session-column-header,
+  [data-theme="gaudy"] .session-column-header::before,
+  [data-theme="gaudy"] .session-column-header::after,
+  [data-theme="gaudy"] .sessions-toolbar h2 {
+    animation: none !important;
+  }
+}
