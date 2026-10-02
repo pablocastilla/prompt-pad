@@ -818,15 +818,31 @@ ipcMain.handle('launch:execute', async (_e, config: {
       // Also capture the exact launch script so tests can assert on the CLI args
       if (tool === 'opencode' || tool === 'opencode2') {
         const tmpId = 'pp-launch-' + id;
-        const promptPath = path.join(os.tmpdir(), tmpId, 'pp-prompt-' + id + '.txt');
+        const tmpDir = path.join(os.tmpdir(), tmpId);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const promptPath = path.join(tmpDir, 'pp-prompt-' + id + '.txt');
+        const message = buildPromptFileMessage(promptPath, config.prompt, 'my', config.phraseRanges);
+        const title = sessionTitle(config.prompt, config.phraseRanges);
+        const createPath = path.join(tmpDir, 'pp-create-' + id + '.json');
+        const sendPath = path.join(tmpDir, 'pp-send-' + id + '.json');
+        fs.writeFileSync(createPath, JSON.stringify({ title }), 'utf-8');
+        const model = normalizeOpenCodeModel(config.model);
+        const providerId = model.includes('/') ? model.slice(0, model.indexOf('/')) : '';
+        const sendPayload: Record<string, unknown> = { parts: [{ type: 'text', text: message }] };
+        if (providerId && model.length > providerId.length + 1) sendPayload.model = { providerID: providerId, modelID: model.slice(providerId.length + 1) };
+        fs.writeFileSync(sendPath, JSON.stringify(sendPayload), 'utf-8');
         const script = buildOpenCodeWinScript({
           cli: tool,
           workDir: config.folder || 'C:\\tmp',
-          model: normalizedModel,
-          message: buildPromptFileMessage(promptPath, config.prompt, 'my', config.phraseRanges),
+          model,
+          message,
           yolo: !!config.yolo,
           promptPath,
-          launchTmpDir: path.join(os.tmpdir(), tmpId),
+          launchTmpDir: tmpDir,
+          serveAuthPath: SERVE_AUTH_PATH,
+          createPath,
+          sendPath,
+          title,
         });
         fs.writeFileSync(path.join(APP_DIR, 'launch-script-' + id + '.ps1'), script, 'utf-8');
       }
@@ -858,19 +874,41 @@ interface LaunchPromptExtras {
   phraseRanges?: { start: number; end: number }[];
 }
 
+// ── Shared OpenCode server ────────────────────────────────────────────────────
+// Launches and the mobile sessions page converge on ONE headless `opencode
+// serve` so prompts sent from the phone appear live in the attached TUIs.
+// Credentials for that shared server live in APP_DIR/opencode-serve-auth.json.
+export const SERVE_AUTH_PATH = path.join(APP_DIR, 'opencode-serve-auth.json');
+const SERVE_PORT = 4097;
+
+// Session title for API-created sessions: the same smart excerpt the CLI-based
+// flow records (personas, git setup and saved phrases excluded).
+function sessionTitle(prompt: string, phraseRanges?: { start: number; end: number }[]): string {
+  let savedPhrases: { content?: string }[] = [];
+  try {
+    const primary = path.join(getSyncDir(), 'phrases.json');
+    const fallback = path.join(APP_DIR, 'phrases.json');
+    const p = fs.existsSync(primary) ? primary : fallback;
+    savedPhrases = readJson<{ content?: string }[]>(p, []);
+  } catch {}
+  return promptExcerpt(prompt, 80, savedPhrases, phraseRanges) || 'Prompt';
+}
+
 // Build the Windows PowerShell script that launches OpenCode or OpenCode 2.
-// Both launch the interactive TUI with interactive form dialogs and cancellation.
-// OpenCode 1 supports a top-level `--model` flag. OpenCode 2 (preview) has no
-// top-level `--model` and its beta ignores OPENCODE_CONFIG_CONTENT, so the
-// model is written to a temporary config file pointed at by OPENCODE_CONFIG;
-// --standalone forces a private server that reads that config (the shared
-// background service would ignore it).
+// OpenCode 1 now starts (or reuses) the shared headless server, delivers the
+// prompt through its HTTP API and opens the TUI attached to that same session —
+// so prompts fired from the phone continue the exact session the user watches.
+// OpenCode 2 (preview) keeps its own flow: no top-level `--model` and its beta
+// ignores OPENCODE_CONFIG_CONTENT, so the model is written to a temporary
+// config file pointed at by OPENCODE_CONFIG; --standalone forces a private
+// server that reads that config (the shared background service would ignore it).
 export function buildOpenCodeWinScript(opts: {
   cli: 'opencode' | 'opencode2';
   workDir: string; model: string; message: string;
   yolo: boolean; promptPath: string; launchTmpDir: string;
+  serveAuthPath: string; createPath: string; sendPath: string; title: string;
 }): string {
-  const { cli, workDir, model, message, yolo, promptPath, launchTmpDir } = opts;
+  const { cli, workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath, createPath, sendPath, title } = opts;
   const safeDir    = escapeSingleQuotePS(workDir);
   const safeModel  = escapeSingleQuotePS(model);
   const safeMsg    = escapeSingleQuotePS(message);
@@ -879,21 +917,38 @@ export function buildOpenCodeWinScript(opts: {
     ? 'node_modules\\@opencode-ai\\cli\\bin\\opencode2.exe'
     : 'node_modules\\opencode-ai\\bin\\opencode.exe';
 
-  let modelConfig = '';
-  let ocArgs: string;
   if (cli === 'opencode2') {
     const modelFile = path.join(launchTmpDir, 'pp-model.json');
-    modelConfig = "$env:OPENCODE_CONFIG = '" + escapeSingleQuotePS(modelFile) + "'";
-    ocArgs = "@('--standalone', '--prompt', '" + safeMsg + "'"
+    const modelConfig = "$env:OPENCODE_CONFIG = '" + escapeSingleQuotePS(modelFile) + "'";
+    const ocArgs = "@('--standalone', '--prompt', '" + safeMsg + "'"
       + (yolo ? ", '--auto'" : '')
       + ")";
-  } else {
-    ocArgs = "@('--model', '" + safeModel + "', '--prompt', '" + safeMsg + "'"
-      + (yolo ? ", '--auto'" : '')
-      + ", '" + safeDir + "')";
+    return [
+      "Set-Location -LiteralPath '" + safeDir + "'",
+      "$opencodePath = (Get-Command " + cli + ".exe -ErrorAction SilentlyContinue).Source",
+      "if (-not $opencodePath) {",
+      "  $opencodeCommand = Get-Command " + cli + " -ErrorAction SilentlyContinue",
+      "  if ($opencodeCommand -and $opencodeCommand.Source -like '*.cmd') {",
+      "    $bootstrapDir = Split-Path $opencodeCommand.Source -Parent",
+      "    $opencodePath = Join-Path $bootstrapDir '" + bootstrapRelPath + "'",
+      "    if (-not (Test-Path $opencodePath)) {",
+      "      $opencodePath = $opencodeCommand.Source",
+      "    }",
+      "  } else {",
+      "    $opencodePath = '" + cli + "'",
+      "  }",
+      "}",
+      modelConfig,
+      "$ocArgs = " + ocArgs,
+      "& $opencodePath @ocArgs",
+      "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
+    ].join('\n');
   }
 
-  const lines = [
+  const safeAuth   = escapeSingleQuotePS(serveAuthPath);
+  const safeCreate = escapeSingleQuotePS(createPath);
+  const safeSend   = escapeSingleQuotePS(sendPath);
+  return [
     "Set-Location -LiteralPath '" + safeDir + "'",
     "$opencodePath = (Get-Command " + cli + ".exe -ErrorAction SilentlyContinue).Source",
     "if (-not $opencodePath) {",
@@ -908,44 +963,128 @@ export function buildOpenCodeWinScript(opts: {
     "    $opencodePath = '" + cli + "'",
     "  }",
     "}",
-  ];
-  if (modelConfig) lines.push(modelConfig);
-  lines.push(
-    "$ocArgs = " + ocArgs,
-    "& $opencodePath @ocArgs",
+    "$authFile = '" + safeAuth + "'",
+    "$port = 0",
+    "$pw = ''",
+    "if (Test-Path -LiteralPath $authFile) {",
+    "  try {",
+    "    $auth = Get-Content -LiteralPath $authFile -Raw | ConvertFrom-Json",
+    "    $bytes = [Text.Encoding]::UTF8.GetBytes('opencode:' + $auth.password)",
+    "    $basic = 'Basic ' + [Convert]::ToBase64String($bytes)",
+    "    $r = Invoke-WebRequest -Uri ('http://127.0.0.1:' + $auth.port + '/session') -Headers @{ Authorization = $basic } -UseBasicParsing -TimeoutSec 3",
+    "    if ($r.StatusCode -eq 200) { $port = $auth.port; $pw = $auth.password }",
+    "  } catch {}",
+    "}",
+    "if ($port -eq 0) {",
+    "  try {",
+    "    $r = Invoke-WebRequest -Uri 'http://127.0.0.1:4096/session' -UseBasicParsing -TimeoutSec 2",
+    "    if ($r.StatusCode -eq 200) { $port = 4096; $pw = '' }",
+    "  } catch {}",
+    "}",
+    "if ($port -eq 0) {",
+    "  $pw = [guid]::NewGuid().ToString('n')",
+    "  $port = " + SERVE_PORT,
+    "  $env:OPENCODE_SERVER_PASSWORD = $pw",
+    "  Start-Process -FilePath $opencodePath -ArgumentList @('serve', '--port', '" + SERVE_PORT + "', '--hostname', '127.0.0.1') -WindowStyle Hidden",
+    "  $bytes = [Text.Encoding]::UTF8.GetBytes('opencode:' + $pw)",
+    "  $basic = 'Basic ' + [Convert]::ToBase64String($bytes)",
+    "  $up = $false",
+    "  for ($i = 0; $i -lt 40; $i++) {",
+    "    try {",
+    "      $r = Invoke-WebRequest -Uri ('http://127.0.0.1:' + $port + '/session') -Headers @{ Authorization = $basic } -UseBasicParsing -TimeoutSec 2",
+    "      if ($r.StatusCode -eq 200) { $up = $true; break }",
+    "    } catch { Start-Sleep -Milliseconds 500 }",
+    "  }",
+    "  if (-not $up) { throw 'OpenCode server did not start' }",
+    "  (@{ port = $port; username = 'opencode'; password = $pw } | ConvertTo-Json) | Set-Content -LiteralPath $authFile",
+    "}",
+    "$env:OPENCODE_SERVER_PASSWORD = $pw",
+    "$hdr = @{}",
+    "if ($pw) { $hdr.Authorization = $basic }",
+    "$dirEnc = [uri]::EscapeDataString((Get-Location).Path)",
+    "$createResp = Invoke-WebRequest -Method Post -Uri ('http://127.0.0.1:' + $port + '/session?directory=' + $dirEnc) -Headers $hdr -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes((Get-Content -LiteralPath '" + safeCreate + "' -Raw))) -UseBasicParsing",
+    "$sid = ($createResp.Content | ConvertFrom-Json).id",
+    "if (-not $sid) { throw 'OpenCode session creation failed' }",
+    "$partsBody = Get-Content -LiteralPath '" + safeSend + "' -Raw",
+    "Invoke-WebRequest -Method Post -Uri ('http://127.0.0.1:' + $port + '/session/' + $sid + '/prompt_async?directory=' + $dirEnc) -Headers $hdr -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes($partsBody)) -UseBasicParsing | Out-Null",
+    "$attachArgs = @('attach', ('http://127.0.0.1:' + $port), '-s', $sid, '--auto')",
+    "if ($pw) { $attachArgs += @('-p', $pw) }",
+    "& $opencodePath @attachArgs",
     "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
-  );
-  return lines.join('\n');
+  ].join('\n');
 }
 
 // Build the Linux/macOS shell script that launches OpenCode or OpenCode 2.
-// OpenCode 2 uses a temporary config file (OPENCODE_CONFIG) + --standalone
-// to open the full interactive TUI application with the chosen model.
+// OpenCode 1 uses the shared headless server + attached TUI (same flow as the
+// Windows script); OpenCode 2 keeps the temporary config file + --standalone.
 export function buildOpenCodeShScript(opts: {
   cli: 'opencode' | 'opencode2';
   workDir: string; model: string; message: string;
   yolo: boolean; promptPath: string; launchTmpDir: string;
+  serveAuthPath: string; createPath: string; sendPath: string;
 }): string {
-  const { cli, workDir, model, message, yolo, promptPath, launchTmpDir } = opts;
-  const modelFile = path.join(launchTmpDir, 'pp-model.json');
-  const modelExport = cli === 'opencode2'
-    ? 'export OPENCODE_CONFIG=' + JSON.stringify(modelFile)
-    : '';
-  const launchLine = cli === 'opencode2'
-    ? cli + ' --standalone --prompt ' + JSON.stringify(message) + (yolo ? ' --auto' : '')
-    : cli + ' --model ' + JSON.stringify(model) + ' --prompt ' + JSON.stringify(message)
-      + (yolo ? ' --auto' : '') + ' ' + JSON.stringify(workDir);
-  const lines = [
+  const { cli, workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath, createPath, sendPath } = opts;
+  if (cli === 'opencode2') {
+    const modelFile = path.join(launchTmpDir, 'pp-model.json');
+    const modelExport = 'export OPENCODE_CONFIG=' + JSON.stringify(modelFile);
+    const launchLine = cli + ' --standalone --prompt ' + JSON.stringify(message) + (yolo ? ' --auto' : '');
+    return [
+      '#!/bin/bash',
+      'cd ' + JSON.stringify(workDir),
+      modelExport,
+      launchLine,
+      'rm -rf ' + JSON.stringify(launchTmpDir),
+      'rm -f "$0"',
+    ].join('\n');
+  }
+  return [
     '#!/bin/bash',
     'cd ' + JSON.stringify(workDir),
-  ];
-  if (modelExport) lines.push(modelExport);
-  lines.push(
-    launchLine,
+    'AUTH_FILE=' + JSON.stringify(serveAuthPath),
+    'PORT=0',
+    'PW=""',
+    'if [ -f "$AUTH_FILE" ]; then',
+    '  PW=$(sed -n \'s/.*"password": "\\([^"]*\\)".*/\\1/p\' "$AUTH_FILE" | head -n 1)',
+    '  PORT=$(sed -n \'s/.*"port": \\([0-9]*\\).*/\\1/p\' "$AUTH_FILE" | head -n 1)',
+    '  if [ -n "$PW" ] && [ -n "$PORT" ]; then',
+    '    CODE=$(curl -s -o /dev/null -w \'%{http_code}\' -u "opencode:$PW" --max-time 3 "http://127.0.0.1:$PORT/session" 2>/dev/null)',
+    '    if [ "$CODE" != "200" ]; then PORT=0; PW=""; fi',
+    '  else',
+    '    PORT=0',
+    '    PW=""',
+    '  fi',
+    'fi',
+    'if [ "$PORT" = "0" ]; then',
+    '  CODE=$(curl -s -o /dev/null -w \'%{http_code}\' --max-time 2 http://127.0.0.1:4096/session 2>/dev/null)',
+    '  if [ "$CODE" = "200" ]; then PORT=4096; fi',
+    'fi',
+    'if [ "$PORT" = "0" ]; then',
+    '  PW=$(od -An -N16 -tx1 /dev/urandom | tr -d " \\n")',
+    '  PORT=' + SERVE_PORT,
+    '  OPENCODE_SERVER_PASSWORD=$PW nohup ' + cli + ' serve --port ' + SERVE_PORT + ' --hostname 127.0.0.1 >/dev/null 2>&1 &',
+    '  UP=0',
+    '  for i in $(seq 1 40); do',
+    '    CODE=$(curl -s -o /dev/null -w \'%{http_code}\' -u "opencode:$PW" --max-time 2 "http://127.0.0.1:$PORT/session" 2>/dev/null)',
+    '    if [ "$CODE" = "200" ]; then UP=1; break; fi',
+    '    sleep 0.5',
+    '  done',
+    '  if [ "$UP" != "1" ]; then echo "OpenCode server did not start" >&2; exit 1; fi',
+    '  printf \'{\\n  "port": %s,\\n  "username": "opencode",\\n  "password": "%s"\\n}\\n\' "$PORT" "$PW" > "$AUTH_FILE"',
+    'fi',
+    'export OPENCODE_SERVER_PASSWORD=$PW',
+    'DIRENC=${PWD// /%20}',
+    'CREATE=$(curl -s -u "opencode:$PW" -X POST -H \'Content-Type: application/json\' --data-binary @' + JSON.stringify(createPath) + ' "http://127.0.0.1:$PORT/session?directory=$DIRENC")',
+    'SID=$(printf \'%s\' "$CREATE" | sed -n \'s/.*"id":"\\([^"]*\\)".*/\\1/p\' | head -n 1)',
+    'if [ -z "$SID" ]; then echo "OpenCode session creation failed" >&2; exit 1; fi',
+    'curl -s -o /dev/null -u "opencode:$PW" -X POST -H \'Content-Type: application/json\' --data-binary @' + JSON.stringify(sendPath) + ' "http://127.0.0.1:$PORT/session/$SID/prompt_async?directory=$DIRENC"',
+    'if [ -n "$PW" ]; then',
+    '  ' + cli + ' attach "http://127.0.0.1:$PORT" -s "$SID" -p "$PW" --auto',
+    'else',
+    '  ' + cli + ' attach "http://127.0.0.1:$PORT" -s "$SID" --auto',
+    'fi',
     'rm -rf ' + JSON.stringify(launchTmpDir),
     'rm -f "$0"',
-  );
-  return lines.join('\n');
+  ].join('\n');
 }
 
 async function executeLaunchOpenCode(config: {
@@ -971,6 +1110,9 @@ async function executeLaunchOpenCode(config: {
   if (cli === 'opencode2') {
     fs.writeFileSync(path.join(launchTmpDir, 'pp-model.json'), JSON.stringify({ model }), 'utf-8');
   }
+  // Payloads for the shared-server flow (OpenCode 1): the session-create body
+  // and the prompt body are generated here so the launcher scripts never deal
+  // with JSON escaping.
   const copiedNames = new Set<string>([promptFileName]);
   const attachedFileNames: string[] = [];
   for (const srcPath of attachedFilePaths) {
@@ -990,9 +1132,20 @@ async function executeLaunchOpenCode(config: {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
 
+  const title = sessionTitle(prompt, config.phraseRanges);
+  const createPath = path.join(launchTmpDir, 'pp-create-' + id + '.json');
+  const sendPath = path.join(launchTmpDir, 'pp-send-' + id + '.json');
+  const providerId = model.includes('/') ? model.slice(0, model.indexOf('/')) : '';
+  const modelField = providerId && model.length > providerId.length + 1
+    ? { providerID: providerId, modelID: model.slice(providerId.length + 1) } : null;
+  const sendPayload: Record<string, unknown> = { parts: [{ type: 'text', text: message }] };
+  if (modelField) sendPayload.model = modelField;
+  fs.writeFileSync(createPath, JSON.stringify({ title }), 'utf-8');
+  fs.writeFileSync(sendPath, JSON.stringify(sendPayload), 'utf-8');
+
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.ps1');
-    const script = buildOpenCodeWinScript({ cli, workDir, model, message, yolo, promptPath, launchTmpDir });
+    const script = buildOpenCodeWinScript({ cli, workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath: SERVE_AUTH_PATH, createPath, sendPath, title });
     writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
@@ -1007,7 +1160,7 @@ async function executeLaunchOpenCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
-    const script = buildOpenCodeShScript({ cli, workDir, model, message, yolo, promptPath, launchTmpDir });
+    const script = buildOpenCodeShScript({ cli, workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath: SERVE_AUTH_PATH, createPath, sendPath });
     fs.writeFileSync(shPath, script, { mode: 0o755 });
     if (process.platform === 'darwin') {
       const appleScript = [
@@ -1575,7 +1728,7 @@ let remoteServer: RemoteSessionsServer | null = null;
 
 async function startRemoteServer(): Promise<{ port: number; key: string }> {
   if (!remoteServer) {
-    remoteServer = new RemoteSessionsServer(sessionMonitor, path.join(APP_DIR, 'opencode-serve-auth.json'));
+    remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
   }
   let port = REMOTE_PORT;
   try {

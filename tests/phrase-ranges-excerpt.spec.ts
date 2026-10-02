@@ -39,6 +39,27 @@ function readLaunchScripts(testDir: string): string[] {
   return files.map(f => fs.readFileSync(path.join(testDir, f), 'utf-8'));
 }
 
+// The seed message travels in the payload file the script posts to the shared
+// OpenCode server (pp-send-<id>.json inside the launch temp dir).
+function readLatestSendPayload(): { parts: { text: string }[]; model?: { providerID: string; modelID: string } } {
+  const dirs = fs.readdirSync(os.tmpdir()).filter(f => f.startsWith('pp-launch-')).map(f => path.join(os.tmpdir(), f));
+  const payloads = dirs
+    .map(d => fs.readdirSync(d).filter(f => f.startsWith('pp-send-') && f.endsWith('.json')).map(f => path.join(d, f)))
+    .flat();
+  const latest = payloads.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+  return JSON.parse(fs.readFileSync(latest, 'utf-8'));
+}
+
+// The API-created session name travels in pp-create-<id>.json.
+function readLatestCreatePayload(): { title: string } {
+  const dirs = fs.readdirSync(os.tmpdir()).filter(f => f.startsWith('pp-launch-')).map(f => path.join(os.tmpdir(), f));
+  const payloads = dirs
+    .map(d => fs.readdirSync(d).filter(f => f.startsWith('pp-create-') && f.endsWith('.json')).map(f => path.join(d, f)))
+    .flat();
+  const latest = payloads.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+  return JSON.parse(fs.readFileSync(latest, 'utf-8'));
+}
+
 // Electron can keep file handles briefly after app.close(); retry so a slow
 // handle release never fails the test.
 async function cleanupTestDir(testDir: string) {
@@ -109,14 +130,21 @@ test.describe('Session summary excludes saved phrases', () => {
       expect(ranges).toHaveLength(1);
       expect(ranges[0]).toEqual({ start: 0, end: PHRASE_TEXT.length });
 
-      // The launch happens in test mode: the exact PS1 seed script is captured.
-      // The summary must describe the task, never the phrase content.
+      // The launch happens in test mode: the exact PS1 script is captured, and
+      // the seed message travels in the pp-send payload file. The summary must
+      // describe the task, never the phrase content.
       const scripts = readLaunchScripts(testDir);
       expect(scripts).toHaveLength(1);
       const script = scripts[0];
-      expect(script).toContain(`Summary of the file content: ${TASK_TEXT}`);
-      expect(script).not.toContain('Eres un experto en QA automatizado');
-      expect(script).not.toContain('Reglas del proyecto');
+      const payload = readLatestSendPayload();
+      const text = payload.parts[0].text;
+      expect(text).toContain(`Summary of the file content: ${TASK_TEXT}`);
+      expect(text).not.toContain('Eres un experto en QA automatizado');
+      expect(text).not.toContain('Reglas del proyecto');
+      // The API-created session name (pp-create payload) also skips phrase content
+      const create = readLatestCreatePayload();
+      expect(create.title).toContain(TASK_TEXT);
+      expect(create.title).not.toContain('Eres un experto en QA automatizado');
     } finally {
       await cleanupTestDir(testDir);
     }

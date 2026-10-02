@@ -227,7 +227,7 @@ test.describe('OpenCode 2 launch option', () => {
     }
   });
 
-  test('opencode (v1) launch script keeps top-level --model and --prompt flags', async () => {
+  test('opencode (v1) launch script starts the shared server, sends through its API and attaches the TUI', async ({}, testInfo) => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -260,10 +260,22 @@ test.describe('OpenCode 2 launch option', () => {
       const scripts = readLaunchScripts(testDir);
       expect(scripts).toHaveLength(1);
       const script = scripts[0];
-      expect(script).toContain("@('--model', 'opencode/glm-5.3-flash', '--prompt',");
-      expect(script).not.toContain("@('run'");
-      // The seed message must never contain double quotes (PowerShell 5.1 arg passing)
-      expect(script).not.toMatch(/'[^']*"/);
+      // Shared headless server management: reuse from the auth file, fall back
+      // to an unsecured 4096, otherwise spawn + wait + persist credentials.
+      expect(script).toContain("$authFile = '");
+      expect(script).toContain("Invoke-WebRequest -Uri ('http://127.0.0.1:' + $auth.port + '/session')");
+      expect(script).toContain("Invoke-WebRequest -Uri 'http://127.0.0.1:4096/session'");
+      expect(script).toContain("@('serve', '--port', '4097', '--hostname', '127.0.0.1')");
+      // The prompt is delivered through the shared server's HTTP API...
+      expect(script).toContain('/prompt_async?directory=');
+      expect(script).toContain('/session?directory=');
+      // ...and the TUI attaches to that same session so phone prompts continue it live.
+      expect(script).toContain("@('attach', ('http://127.0.0.1:' + $port), '-s', $sid, '--auto')");
+      expect(script).toContain("if ($pw) { $attachArgs += @('-p', $pw) }");
+      // The message travels in a payload file, never inline in the script.
+      expect(script).toMatch(/pp-send-[\w-]+\.json'/);
+      expect(script).not.toContain('@(\'--model\'');
+      expect(script).not.toContain("'run'");
     } finally {
       await cleanupTestDir(testDir);
     }
@@ -316,18 +328,24 @@ test.describe('OpenCode 2 launch option', () => {
 
       await app.close();
 
-      const scripts = readLaunchScripts(testDir);
-      expect(scripts).toHaveLength(1);
-      const script = scripts[0];
+      // The seed message lives in the payload file the script posts to the
+      // shared server (pp-send-<id>.json inside the launch temp dir).
+      const payloads = fs.readdirSync(os.tmpdir())
+        .filter(f => f.startsWith('pp-launch-'))
+        .map(f => path.join(os.tmpdir(), f))
+        .map(d => fs.readdirSync(d).filter(f => f.startsWith('pp-send-') && f.endsWith('.json')).map(f => path.join(d, f)))
+        .flat();
+      expect(payloads.length).toBeGreaterThan(0);
+      const payload = JSON.parse(fs.readFileSync(payloads.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0], 'utf-8'));
+      const text = payload.parts[0].text;
 
       // The seed message must include a flattened excerpt of the prompt content
       // so the CLI session summary in its history describes the prompt, not a
       // generic "Read the file ..." string.
-      expect(script).toContain('Summary of the file content: Fix the login timeout bug in auth service');
-      expect(script).toMatch(/Summary of the file content: [^']*', '--auto', '\/tmp'\)/);
+      expect(text).toContain('Summary of the file content: Fix the login timeout bug in auth service');
       // Newlines must be collapsed to spaces inside the excerpt
-      expect(script).toContain('auth service Steps to reproduce: 1. Open the app 2. Wait 30 minutes');
-      expect(script).not.toMatch(/--prompt', '[^']*Steps to reproduce:\n/);
+      expect(text).toContain('auth service Steps to reproduce: 1. Open the app 2. Wait 30 minutes');
+      expect(text).not.toMatch(/Steps to reproduce:\n/);
     } finally {
       await cleanupTestDir(testDir);
     }
@@ -365,15 +383,21 @@ test.describe('OpenCode 2 launch option', () => {
 
       await app.close();
 
-      const scripts = readLaunchScripts(testDir);
-      expect(scripts).toHaveLength(1);
-      const script = scripts[0];
-
       // Excerpt is capped (200 chars) and ends with an ellipsis; the tail of the
       // prompt must not leak into the seed message.
-      expect(script).toContain('Summary of the file content: xxx');
-      expect(script).toMatch(/Summary of the file content: x{199}…'/);
-      expect(script).not.toContain('END-MARKER');
+      const payloads = fs.readdirSync(os.tmpdir())
+        .filter(f => f.startsWith('pp-launch-'))
+        .map(f => path.join(os.tmpdir(), f))
+        .map(d => fs.readdirSync(d).filter(f => f.startsWith('pp-send-') && f.endsWith('.json')).map(f => path.join(d, f)))
+        .flat();
+      expect(payloads.length).toBeGreaterThan(0);
+      const payload = JSON.parse(fs.readFileSync(payloads.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0], 'utf-8'));
+      const text = payload.parts[0].text;
+      expect(text).toContain('Summary of the file content: xxx');
+      expect(text).toMatch(/Summary of the file content: x{199}…/);
+      expect(text).not.toContain('END-MARKER');
+      // The model travels with the prompt too
+      expect(payload.model).toEqual({ providerID: 'opencode', modelID: 'glm-5.3-flash' });
     } finally {
       await cleanupTestDir(testDir);
     }
