@@ -107,6 +107,10 @@ const translations = {
     sessionsNoModel: 'Model pending', sessionsChild: 'Sub-session', sessionsYou: 'You', sessionsLastCheck: 'Last checked',
     sessionsSound: 'Sound', sessionsSoundHint: 'Play a soft chime when a session finishes or asks a question',
     sessionsAntigravityBadge: 'Antigravity',
+    sessionsRemote: 'View on mobile',
+    sessionsRemoteShow: 'Mobile access',
+    sessionsRemoteCopy: 'Copy URL',
+    sessionsRemoteHint: 'Scan the QR with your phone (same Wi-Fi). The key changes on every app restart.',
     helpSessionsTitle: 'Sessions',
     helpSessionsText: 'All local OpenCode sessions in live columns, including sessions launched outside Prompt Pad, plus Antigravity (Google) conversations launched from Prompt Pad during the last 24 hours. Read recent messages and tool progress, close columns yourself, or let finished OpenCode turns disappear after 30 minutes.',
     // Statistics panel
@@ -253,6 +257,10 @@ const translations = {
     sessionsNoModel: 'Modelo pendiente', sessionsChild: 'Subsesión', sessionsYou: 'Tú', sessionsLastCheck: 'Última consulta',
     sessionsSound: 'Sonido', sessionsSoundHint: 'Reproducir un tono suave al finalizar una sesión o cuando haga una pregunta',
     sessionsAntigravityBadge: 'Antigravity',
+    sessionsRemote: 'Ver en el móvil',
+    sessionsRemoteShow: 'Acceso móvil',
+    sessionsRemoteCopy: 'Copiar URL',
+    sessionsRemoteHint: 'Escanea el QR con tu teléfono (misma Wi-Fi). La clave cambia en cada reinicio de la app.',
     helpSessionsTitle: 'Sesiones',
     helpSessionsText: 'Todas las sesiones locales de OpenCode en columnas en vivo, incluidas las iniciadas fuera de Prompt Pad, además de las conversaciones de Antigravity (Google) lanzadas desde Prompt Pad en las últimas 24 horas. Lee mensajes y progreso de herramientas, cierra columnas manualmente o deja que los turnos de OpenCode finalizados desaparezcan tras 30 minutos.',
     // Panel de estadísticas

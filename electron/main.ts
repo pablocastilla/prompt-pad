@@ -6,6 +6,7 @@ import * as os from 'os';
 import { spawn } from 'child_process';
 import { findOpenCodeDb as locateOpenCodeDb, OpenCodeSessionMonitor } from './opencodeSessions';
 import { findAntigravityDbs as locateAntigravityDb, AntigravitySessionMonitor } from './antigravitySessions';
+import { RemoteSessionsServer, qrSvg } from './remoteServer';
 import { promptExcerpt } from './promptExcerpt';
 
 const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
@@ -412,6 +413,7 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('will-quit', () => remoteServer?.stop());
 
 // Settings
 ipcMain.handle('settings:load', () => {
@@ -1563,6 +1565,48 @@ const antigravityMonitor = new AntigravitySessionMonitor(
 ipcMain.handle('antigravity-sessions:list', () => antigravityMonitor.read());
 ipcMain.handle('antigravity-sessions:dismiss', (_e, id: string, turnId: string) => antigravityMonitor.dismiss(id, turnId));
 ipcMain.handle('antigravity-sessions:restore', () => antigravityMonitor.restore());
+
+// ── Mobile sessions (remote server) ──────────────────────────────────────────
+// Serves a read-only mobile-friendly sessions page over HTTP plus a send box
+// for OpenCode. Token-gated; the URL (with key) is surfaced as a QR in the UI.
+// Disabled entirely in test mode so Playwright runs never open ports.
+const REMOTE_PORT = 4127;
+let remoteServer: RemoteSessionsServer | null = null;
+
+async function startRemoteServer(): Promise<{ port: number; key: string }> {
+  if (!remoteServer) {
+    remoteServer = new RemoteSessionsServer(sessionMonitor);
+  }
+  let port = REMOTE_PORT;
+  try {
+    port = await remoteServer.start(REMOTE_PORT, '0.0.0.0');
+  } catch {
+    // Port busy: fall back to a random one (0 = ephemeral).
+    port = await remoteServer.start(0, '0.0.0.0');
+  }
+  return { port, key: remoteServer.accessToken };
+}
+
+ipcMain.handle('remote-sessions:start', () => startRemoteServer());
+
+ipcMain.handle('remote-sessions:qr', async () => {
+  const { port, key } = await startRemoteServer();
+  const interfaces = os.networkInterfaces();
+  let localIpv4: string | null = null;
+  for (const list of Object.values(interfaces)) {
+    for (const entry of list || []) {
+      // Only private ranges: never expose a public or loopback address.
+      if (entry.family === 'IPv4' && !entry.internal &&
+        (entry.address.startsWith('192.168.') || entry.address.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(entry.address))) {
+        localIpv4 = entry.address;
+        break;
+      }
+    }
+    if (localIpv4) break;
+  }
+  const host = localIpv4 || '127.0.0.1';
+  return { url: `http://${host}:${port}/?key=${key}`, qr: qrSvg(`http://${host}:${port}/?key=${key}`) };
+});
 
 interface DayCostRow {
   date: string;

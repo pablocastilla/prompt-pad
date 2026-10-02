@@ -84,6 +84,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dismissAntigravitySession: (id: string, turnId: string) => ipcRenderer.invoke('antigravity-sessions:dismiss', id, turnId),
   restoreAntigravitySessions: () => ipcRenderer.invoke('antigravity-sessions:restore'),
 
+  // Mobile sessions (remote server + QR)
+  startRemoteSessions: () => ipcRenderer.invoke('remote-sessions:start'),
+  getRemoteSessionsQr: () => ipcRenderer.invoke('remote-sessions:qr'),
+
   // Git integration
   getGitStatus: (folder: string) => ipcRenderer.invoke('git:status', folder),
   getGitDiff: (folder: string, filePath: string, status?: string) => ipcRenderer.invoke('git:diff', folder, filePath, status),

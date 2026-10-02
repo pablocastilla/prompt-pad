@@ -67,6 +67,8 @@ export function SessionsPanel() {
   const [revision, setRevision] = useState(0);
   const [closing, setClosing] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [remote, setRemote] = useState<{ url: string; qr: string } | null>(null);
+  const [remoteBusy, setRemoteBusy] = useState(false);
   const orderKeys = useRef<string[]>([]);
   const statusMemory = useRef(new Map<string, OpenCodeSessionStatus>());
   const gaudyRef = useRef(settings.theme === 'gaudy');
@@ -153,6 +155,14 @@ export function SessionsPanel() {
     setSettings(next);
     try { await window.electronAPI.saveSettings(next); } catch { /* keep the UI responsive on save failure */ }
   };
+  const showRemoteQr = async () => {
+    setRemoteBusy(true);
+    try {
+      const info = await window.electronAPI.getRemoteSessionsQr();
+      setRemote(info);
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setRemoteBusy(false); }
+  };
   const query = search.trim().toLocaleLowerCase();
   const keyOf = (session: OpenCodeSession) => `${session.source || 'opencode'}-${session.id}`;
   const allSessions = [...(opencode?.sessions || []), ...(antigravity?.sessions || [])]
@@ -187,6 +197,21 @@ export function SessionsPanel() {
       </button>}
     </div>
     <p className="sessions-hint">{t('sessionsInferenceHint')}</p>
+    <div className="sessions-remote">
+      <button className="btn" onClick={() => void showRemoteQr()} disabled={remoteBusy}>
+        {remote ? t('sessionsRemoteShow') : t('sessionsRemote')}
+      </button>
+      {remote && <div className="sessions-remote-card">
+        <div className="sessions-remote-qr" dangerouslySetInnerHTML={{ __html: remote.qr }} />
+        <div className="sessions-remote-info">
+          <code title={remote.url}>{remote.url}</code>
+          <div className="sessions-remote-actions">
+            <button className="btn" onClick={() => void navigator.clipboard?.writeText(remote.url)}>{t('sessionsRemoteCopy')}</button>
+            <span>{t('sessionsRemoteHint')}</span>
+          </div>
+        </div>
+      </div>}
+    </div>
     {error && <div className="sessions-error" role="alert">{t('sessionsError')} <span>{error}</span></div>}
     {loading && !opencode && !antigravity && <p className="sessions-empty" role="status">{t('sessionsLoading')}</p>}
     {!loading && !error && !opencode?.dbPath && !antigravity?.dbPath && <p className="sessions-empty">{t('statsDbNotFound')}</p>}
