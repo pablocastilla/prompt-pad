@@ -1605,7 +1605,8 @@ ipcMain.handle('remote-sessions:qr', async () => {
     if (localIpv4) break;
   }
   const host = localIpv4 || '127.0.0.1';
-  return { url: `http://${host}:${port}/?key=${key}`, qr: qrSvg(`http://${host}:${port}/?key=${key}`) };
+  const qr = await qrSvg(`http://${host}:${port}/?key=${key}`);
+  return { url: `http://${host}:${port}/?key=${key}`, qr };
 });
 
 interface DayCostRow {
