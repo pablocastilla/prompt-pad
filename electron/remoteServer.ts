@@ -57,6 +57,15 @@ const INDEX_HTML = `<!DOCTYPE html>
   .composer-note { font-size: 11px; color: var(--text2); margin-top: 6px; min-height: 14px; }
   .composer-note.error { color: var(--danger); }
   .composer-note.ok { color: var(--ok); }
+  .mini-compose { display: flex; gap: 8px; margin-top: 12px; }
+  .mini-compose input[type=text] { flex: 1; min-width: 0; padding: 10px 12px; background: var(--bg);
+    color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 16px; }
+  .mini-compose button { padding: 10px 14px; border: none; border-radius: 8px; background: var(--accent);
+    color: #10221d; font-weight: 600; cursor: pointer; font-size: 14px; }
+  .mini-compose button:disabled { opacity: .5; cursor: default; }
+  .mini-note { font-size: 11px; margin-top: 6px; color: var(--text2); }
+  .mini-note.ok { color: var(--ok); }
+  .mini-note.error { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -77,19 +86,36 @@ const INDEX_HTML = `<!DOCTYPE html>
 const $ = id => document.getElementById(id);
 const KEY = new URLSearchParams(location.search).get('key') || '';
 const withKey = path => path + (path.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(KEY);
-const state = { sessions: [], open: new Set(JSON.parse(sessionStorage.getItem('pp-open') || '[]')), filter: '' };
+const state = { sessions: [], open: new Set(JSON.parse(sessionStorage.getItem('pp-open') || '[]')), filter: '',
+  notes: {}, sendEnabled: false };
 const pill = s => '<span class="status-pill status-' + s + '">' + s + '</span>';
 function esc(text) { const d = document.createElement('div'); d.textContent = text == null ? '' : String(text); return d.innerHTML; }
+function noteLine(id) {
+  const n = state.notes[id];
+  if (!n) return '';
+  if (Date.now() - n.at > 15000) { delete state.notes[id]; return ''; }
+  return '<div class="mini-note ' + n.cls + '">' + esc(n.text) + '</div>';
+}
 function render() {
   const q = state.filter.toLowerCase();
   const shown = state.sessions.filter(s => (s.title + ' ' + s.directory + ' ' + s.model).toLowerCase().includes(q));
-  $('empty').hidden = shown.length > 0;
+  // Preserve whatever is being typed across the 5-second re-render.
+  const typing = new Map();
+  let focused = null;
+  document.querySelectorAll('.mini-compose form').forEach(f => {
+    const wrap = f.closest('.mini-compose');
+    typing.set(wrap.getAttribute('data-for'), f.querySelector('input').value);
+    if (document.activeElement === f.querySelector('input')) focused = wrap.getAttribute('data-for');
+  });
   $('sessions').innerHTML = shown.map(s => {
     const isOpen = state.open.has(s.id);
     const events = (s.activity || []).map(a =>
       '<div class="event ' + (a.type === 'tool' ? 'event-tool' : '') + '"><div class="event-label">' +
       esc(a.type === 'tool' ? (a.tool || 'tool') : (a.role === 'user' ? 'You' : 'OpenCode')) + '</div>' +
       (a.text ? '<p>' + esc(a.text) + '</p>' : '') + '</div>').join('');
+    const composer = state.sendEnabled && s.source === 'opencode' ?
+      '<form class="mini-compose" data-for="' + esc(s.id) + '"><input type="text" placeholder="Message this session…" autocomplete="off">' +
+      '<button type="submit">Send</button></form>' + noteLine(s.id) : '';
     return '<article class="session' + (isOpen ? ' open' : '') + '" data-id="' + esc(s.id) + '">' +
       '<div class="session-header" onclick="toggle(this.parentElement)"><div class="session-title"><h3>' +
       esc(s.title || s.id) + '</h3><span class="chevron">▼</span></div>' +
@@ -97,8 +123,15 @@ function render() {
       '<div class="session-meta session-model">' + esc(s.model || 'no model') + '</div>' +
       '<div class="status-row">' + pill(s.status) +
       '<span class="session-meta">' + new Date(s.updatedAt).toLocaleTimeString() + '</span></div></div>' +
-      '<div class="activity">' + (events || '<div class="event"><p>No activity</p></div>') + '</div></article>';
+      '<div class="activity">' + (events || '<div class="event"><p>No activity</p></div>') + composer + '</div></article>';
   }).join('');
+  // Restore in-progress text and focus.
+  document.querySelectorAll('.mini-compose').forEach(wrap => {
+    const id = wrap.getAttribute('data-for');
+    const input = wrap.querySelector('input');
+    if (typing.has(id)) input.value = typing.get(id);
+    if (id === focused) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  });
   $('status').textContent = shown.length + ' session' + (shown.length === 1 ? '' : 's') + ' · updated ' + new Date().toLocaleTimeString();
 }
 function toggle(el) {
@@ -114,23 +147,40 @@ async function poll() {
     const data = await res.json();
     state.sessions = data.sessions || [];
     $('error').hidden = true;
-    const enabled = data.sendEnabled !== false;
-    $('composer').hidden = !enabled;
+    state.sendEnabled = data.sendEnabled !== false;
+    $('composer').hidden = !state.sendEnabled;
   } catch (err) {
     $('error').textContent = 'Error fetching sessions: ' + err.message;
     $('error').hidden = false;
   }
   render();
 }
-function renderDirs() {
-  const select = $('dirSelect');
-  const previous = select.value;
-  select.innerHTML = (state.launchDirs || []).map(d =>
-    '<option value="' + esc(d) + '"' + (d === previous ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
-  if (!state.launchDirs || !state.launchDirs.length) { select.hidden = true; return; }
-  select.hidden = false;
-}
 $('search').addEventListener('input', e => { state.filter = e.target.value; render(); });
+document.addEventListener('submit', async e => {
+  const form = e.target.closest('.mini-compose form');
+  if (!form) return;
+  e.preventDefault();
+  const sessionId = form.closest('.mini-compose').getAttribute('data-for');
+  const input = form.querySelector('input');
+  const button = form.querySelector('button');
+  const text = input.value.trim();
+  if (!text) return;
+  button.disabled = true;
+  try {
+    const res = await fetch(withKey('/api/send'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, sessionId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+    state.notes[sessionId] = { cls: 'ok', text: 'Sent to ' + (data.title || sessionId), at: Date.now() };
+    input.value = '';
+    poll();
+  } catch (err) {
+    state.notes[sessionId] = { cls: 'error', text: 'Send failed: ' + err.message, at: Date.now() };
+    render();
+  } finally { button.disabled = false; }
+});
 $('promptForm').addEventListener('submit', async e => {
   e.preventDefault();
   const input = $('promptInput');
@@ -240,7 +290,7 @@ export class RemoteSessionsServer {
         const snapshot = this.monitor.read();
         const body = JSON.stringify({ ...snapshot, sessions: snapshot.sessions.map(s => ({
           id: s.id, title: s.title, directory: s.directory, model: s.model, status: s.status,
-          updatedAt: s.updatedAt, createdAt: s.createdAt, activity: s.activity,
+          updatedAt: s.updatedAt, createdAt: s.createdAt, activity: s.activity, source: s.source,
         })), sendEnabled: true });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(body);
@@ -258,7 +308,10 @@ export class RemoteSessionsServer {
         const text = typeof payload.text === 'string' ? payload.text.trim() : '';
         if (!text) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Empty message' })); return; }
         if (text.length > 20_000) { res.writeHead(413, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Message too long' })); return; }
-        const result = await this.sendToOpenCode(text);
+        // With a sessionId the message continues that live session; otherwise a
+        // fresh OpenCode session is created for it.
+        const sessionId = typeof payload.sessionId === 'string' && payload.sessionId.length <= 256 ? payload.sessionId.trim() : '';
+        const result = sessionId ? await this.sendToSession(sessionId, text) : await this.sendToOpenCode(text);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
         return;
@@ -282,6 +335,16 @@ export class RemoteSessionsServer {
       parts: [{ type: 'text', text }],
     });
     return { id: sessionId, title: created.title || 'Prompt Pad (mobile)', created: true };
+  }
+
+  /** Send a prompt into an already-running OpenCode session (fire and forget). */
+  private async sendToSession(sessionId: string, text: string): Promise<{ id: string; title: string; created: boolean }> {
+    const base = await this.ensureOpenCodeServer();
+    await this.requestOpenCode(base, 'POST', `/session/${encodeURIComponent(sessionId)}/prompt_async`, {
+      parts: [{ type: 'text', text }],
+    });
+    const live = this.monitor.read().sessions.find(s => s.id === sessionId);
+    return { id: sessionId, title: live?.title || sessionId, created: false };
   }
 
   /** Find or spawn `opencode serve` on a known port, polling the port until it answers. */
