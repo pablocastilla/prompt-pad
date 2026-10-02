@@ -1592,18 +1592,20 @@ ipcMain.handle('remote-sessions:start', () => startRemoteServer());
 ipcMain.handle('remote-sessions:qr', async () => {
   const { port, key } = await startRemoteServer();
   const interfaces = os.networkInterfaces();
-  let localIpv4: string | null = null;
+  const candidates: string[] = [];
   for (const list of Object.values(interfaces)) {
     for (const entry of list || []) {
       // Only private ranges: never expose a public or loopback address.
       if (entry.family === 'IPv4' && !entry.internal &&
         (entry.address.startsWith('192.168.') || entry.address.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(entry.address))) {
-        localIpv4 = entry.address;
-        break;
+        candidates.push(entry.address);
       }
     }
-    if (localIpv4) break;
   }
+  // 172.16-31.x.x includes virtual adapters (WSL, Docker, Hyper-V) the phone
+  // cannot reach, so real LAN ranges win; 192.168 is the typical home Wi-Fi.
+  const localIpv4 = candidates.find(a => a.startsWith('192.168.')) ??
+    candidates.find(a => a.startsWith('10.')) ?? candidates[0] ?? null;
   const host = localIpv4 || '127.0.0.1';
   const qr = await qrSvg(`http://${host}:${port}/?key=${key}`);
   return { url: `http://${host}:${port}/?key=${key}`, qr };

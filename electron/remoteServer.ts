@@ -74,6 +74,8 @@ const INDEX_HTML = `<!DOCTYPE html>
 </div>
 <script>
 const $ = id => document.getElementById(id);
+const KEY = new URLSearchParams(location.search).get('key') || '';
+const withKey = path => path + (path.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(KEY);
 const state = { sessions: [], open: new Set(JSON.parse(sessionStorage.getItem('pp-open') || '[]')), filter: '' };
 const pill = s => '<span class="status-pill status-' + s + '">' + s + '</span>';
 function esc(text) { const d = document.createElement('div'); d.textContent = text == null ? '' : String(text); return d.innerHTML; }
@@ -106,7 +108,7 @@ function toggle(el) {
 }
 async function poll() {
   try {
-    const res = await fetch('/api/sessions');
+    const res = await fetch(withKey('/api/sessions'));
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     state.sessions = data.sessions || [];
@@ -139,7 +141,7 @@ $('promptForm').addEventListener('submit', async e => {
   note.className = 'composer-note';
   note.textContent = 'Sending…';
   try {
-    const res = await fetch('/api/send', {
+    const res = await fetch(withKey('/api/send'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
