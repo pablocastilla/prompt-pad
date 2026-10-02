@@ -265,7 +265,7 @@ test.describe('OpenCode 2 launch option', () => {
       expect(script).toContain("$authFile = '");
       expect(script).toContain("Invoke-WebRequest -Uri ('http://127.0.0.1:' + $auth.port + '/session')");
       expect(script).toContain("Invoke-WebRequest -Uri 'http://127.0.0.1:4096/session'");
-      expect(script).toContain("@('serve', '--port', '4097', '--hostname', '127.0.0.1')");
+      expect(script).toContain("@('serve', '--port', '0', '--hostname', '127.0.0.1')");
       // The prompt is delivered through the shared server's HTTP API...
       expect(script).toContain('/prompt_async?directory=');
       expect(script).toContain('/session?directory=');

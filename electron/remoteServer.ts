@@ -390,28 +390,31 @@ export class RemoteSessionsServer {
         return base;
       }
     }
-    // No server running: spawn one headless, protected with basic auth.
+    // No server running: spawn one headless in the background, protected with
+    // basic auth. Port 0 lets the OS assign a free one (4097 may be taken); the
+    // real port is read from the server's own "listening on" banner.
     const { spawn } = await import('child_process');
-    const port = 4097;
     const password = crypto.randomBytes(16).toString('hex');
-    const auth = { port, username: 'opencode', password };
-    const child = spawn('opencode', ['serve', '--port', String(port), '--hostname', '127.0.0.1'], {
-      detached: true, stdio: 'ignore', windowsHide: true, shell: process.platform === 'win32',
+    const auth = { username: 'opencode', password };
+    const child = spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
+      detached: true, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true,
+      shell: process.platform === 'win32',
       env: { ...process.env, OPENCODE_SERVER_PASSWORD: password },
     });
-    child.on('error', () => { /* handled by ping timeout below */ });
+    let serveLog = '';
+    child.stdout?.on('data', (chunk: Buffer) => { serveLog += chunk.toString(); });
     child.unref();
-    this.activeServeAuth = auth;
-    const base = `http://127.0.0.1:${port}`;
-    const deadline = Date.now() + SEND_TIMEOUT_MS;
+    // Cold boot (plugins, LSP) can take well over 20 s; wait up to a minute.
+    const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
-      if (await this.pingOpenCode(base, auth)) {
-        this.writeServeAuth(auth);
-        return base;
+      const match = serveLog.match(/listening on http:\/\/127\.0\.0\.1:(\d+)/);
+      if (match) {
+        this.activeServeAuth = auth;
+        this.writeServeAuth({ port: Number(match[1]), username: auth.username, password });
+        return `http://127.0.0.1:${match[1]}`;
       }
       await new Promise(r => setTimeout(r, 400));
     }
-    this.activeServeAuth = null;
     throw new Error('OpenCode server did not start (is opencode on PATH?)');
   }
 
