@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { t } from '../i18n';
 import { useStore } from '../store';
 import type { OpenCodeSession, OpenCodeSessionStatus, OpenCodeSessionsSnapshot } from '../types';
+import { renderMarkdown } from '../../electron/markdown';
 import './SessionsPanel.css';
 
 const statusKeys = {
@@ -9,19 +10,36 @@ const statusKeys = {
   error: 'sessionsFailed', unknown: 'sessionsUnknown',
 } as const satisfies Record<OpenCodeSessionStatus, Parameters<typeof t>[0]>;
 
-function SessionColumn({ session, now, closing, onClose }: {
-  session: OpenCodeSession; now: number; closing: boolean; onClose: () => void;
+function SessionColumn({ session, now, closing, onClose, onSend }: {
+  session: OpenCodeSession; now: number; closing: boolean; onClose: () => void; onSend: (id: string, text: string) => Promise<string>;
 }) {
   const body = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
+  const [draft, setDraft] = useState('');
+  const [note, setNote] = useState<{ cls: string; text: string; at: number } | null>(null);
   useLayoutEffect(() => {
     if (follow.current && body.current) body.current.scrollTop = body.current.scrollHeight;
   }, [session.activity]);
+  useEffect(() => {
+    if (note && Date.now() - note.at > 15000) setNote(null);
+  }, [note, now]);
   const toolStatus = (status?: string) => {
     if (status === 'running') return t('sessionsWorking');
     if (status === 'completed') return t('sessionsCompleted');
     if (status === 'error') return t('sessionsFailed');
     return t('sessionsWaiting');
+  };
+  const send = async () => {
+    const text = draft.trim();
+    if (!text) return;
+    setNote({ cls: '', text: t('sessionsSending'), at: Date.now() });
+    try {
+      const title = await onSend(session.id, text);
+      setNote({ cls: 'ok', text: t('sessionsSentTo') + ' ' + title, at: Date.now() });
+      setDraft('');
+    } catch (err) {
+      setNote({ cls: 'error', text: t('sessionsSendFailed') + ' ' + (err instanceof Error ? err.message : String(err)), at: Date.now() });
+    }
   };
   return <article className={`session-column session-column-${session.source || 'opencode'}`} data-session-id={session.id} data-status={session.status} aria-label={session.title}>
     <header className="session-column-header">
@@ -50,9 +68,18 @@ function SessionColumn({ session, now, closing, onClose }: {
       {session.activity.map(item => <div key={item.id} className={`session-event session-event-${item.type}`}>
         <div className="session-event-label">{item.type === 'tool' ? `${item.tool} · ${toolStatus(item.status)}` :
           item.role === 'user' ? t('sessionsYou') : (session.source === 'antigravity' ? 'Antigravity' : 'OpenCode')}</div>
-        {item.text && <p>{item.text}</p>}
+        {item.text && (item.type === 'tool'
+          ? <p>{item.text}</p>
+          : <div className="session-event-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }} />)}
       </div>)}
     </div>
+    {session.source === 'opencode' && <form className="session-compose" onSubmit={e => { e.preventDefault(); void send(); }}>
+      <textarea value={draft} rows={2} onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
+        placeholder={t('sessionsComposePlaceholder')} aria-label={t('sessionsComposeAria')} />
+      <button type="submit" disabled={!draft.trim()} title={t('sessionsComposeSend')}>{t('sessionsComposeSend')}</button>
+      {note && <div className={`session-compose-note ${note.cls}`}>{note.text}</div>}
+    </form>}
   </article>;
 }
 
@@ -163,6 +190,10 @@ export function SessionsPanel() {
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { setRemoteBusy(false); }
   };
+  const sendToSession = async (sessionId: string, text: string): Promise<string> => {
+    const result = await window.electronAPI.sendOpenCodeMessage(sessionId, text);
+    return result.title || sessionId;
+  };
   const query = search.trim().toLocaleLowerCase();
   const keyOf = (session: OpenCodeSession) => `${session.source || 'opencode'}-${session.id}`;
   const allSessions = [...(opencode?.sessions || []), ...(antigravity?.sessions || [])]
@@ -218,7 +249,7 @@ export function SessionsPanel() {
     {(opencode?.dbPath || antigravity?.dbPath) && sessions.length === 0 && <p className="sessions-empty">{query ? t('sessionsNoMatches') : t('sessionsEmpty')}</p>}
     <div className="sessions-board">
       {sessions.map(session => <SessionColumn key={`${session.source || 'opencode'}-${session.id}`} session={session} now={opencode?.checkedAt || antigravity?.checkedAt || Date.now()}
-        closing={closing !== null} onClose={() => void changeVisibility(session)} />)}
+        closing={closing !== null} onClose={() => void changeVisibility(session)} onSend={sendToSession} />)}
     </div>
     {(opencode?.dbPath || antigravity?.dbPath) && <footer className="sessions-source">
       {opencode?.dbPath && <div title={opencode.dbPath}>SQLite · {opencode.dbPath} · {t('sessionsLastCheck')} {new Date(opencode.checkedAt).toLocaleTimeString()}</div>}

@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { renderMarkdown } from './markdown';
 import type { OpenCodeSessionMonitor } from './opencodeSessions';
 
 const INDEX_HTML = `<!DOCTYPE html>
@@ -49,6 +50,20 @@ const INDEX_HTML = `<!DOCTYPE html>
   .event p { white-space: pre-wrap; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
   .event-tool { padding: 8px; border-left: 2px solid var(--border); background: var(--bg); border-radius: 4px; }
   .event-tool p { color: var(--text2); }
+  .event-text { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+  .event-text p { margin: 0; }
+  .event-text p + p { margin-top: 8px; }
+  .event-text h1, .event-text h2, .event-text h3, .event-text h4, .event-text h5, .event-text h6 { margin: 10px 0 6px; font-size: 13px; }
+  .event-text h1 { font-size: 15px; }
+  .event-text h2 { font-size: 14px; }
+  .event-text ul, .event-text ol { margin: 6px 0; padding-left: 22px; }
+  .event-text li { margin: 3px 0; }
+  .event-text blockquote { margin: 6px 0; padding: 2px 10px; border-left: 3px solid var(--border); color: var(--text2); }
+  .event-text hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+  .event-text code { font-family: ui-monospace, monospace; font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+  .event-text pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 11px; overflow-x: auto; margin: 8px 0; }
+  .event-text pre code { padding: 0; border: none; background: transparent; white-space: pre; font-size: 11px; line-height: 1.6; }
+  .event-text a { color: var(--accent); text-decoration: underline; }
   .composer { position: sticky; bottom: 0; padding: 10px 0 2px; background: var(--bg); }
   .composer form { display: flex; gap: 8px; }
   .composer input[type=text] { flex: 1; padding: 12px; background: var(--panel); color: var(--text);
@@ -113,7 +128,8 @@ function render() {
     const events = (s.activity || []).map(a =>
       '<div class="event ' + (a.type === 'tool' ? 'event-tool' : '') + '"><div class="event-label">' +
       esc(a.type === 'tool' ? (a.tool || 'tool') : (a.role === 'user' ? 'You' : 'OpenCode')) + '</div>' +
-      (a.text ? '<p>' + esc(a.text) + '</p>' : '') + '</div>').join('');
+      (a.type === 'text' && a.html ? '<div class="event-text">' + a.html + '</div>' :
+        (a.text ? '<p>' + esc(a.text) + '</p>' : '')) + '</div>').join('');
     const composer = state.sendEnabled && s.source === 'opencode' ?
       '<form class="mini-compose" data-for="' + esc(s.id) + '"><input type="text" placeholder="Message this session…" autocomplete="off">' +
       '<button type="submit">Send</button></form>' + noteLine(s.id) : '';
@@ -314,7 +330,8 @@ export class RemoteSessionsServer {
         const snapshot = this.monitor.read();
         const body = JSON.stringify({ ...snapshot, sessions: snapshot.sessions.map(s => ({
           id: s.id, title: s.title, directory: s.directory, model: s.model, status: s.status,
-          updatedAt: s.updatedAt, createdAt: s.createdAt, activity: s.activity, source: s.source,
+          updatedAt: s.updatedAt, createdAt: s.createdAt, source: s.source,
+          activity: s.activity.map(a => ({ ...a, html: a.type === 'text' ? renderMarkdown(a.text) : '' })),
         })), sendEnabled: true });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(body);
@@ -369,6 +386,11 @@ export class RemoteSessionsServer {
     });
     const live = this.monitor.read().sessions.find(s => s.id === sessionId);
     return { id: sessionId, title: live?.title || sessionId, created: false };
+  }
+
+  /** Entry point for the desktop board IPC; same flow as the mobile mini-composer. */
+  async sendToSessionForIpc(sessionId: string, text: string): Promise<{ id: string; title: string; created: boolean }> {
+    return this.sendToSession(sessionId, text);
   }
 
   /** Find or spawn `opencode serve` on a known port, polling the port until it answers. */

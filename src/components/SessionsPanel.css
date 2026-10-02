@@ -8,7 +8,7 @@
 .sessions-sound { display: flex; align-items: center; gap: 6px; color: var(--text2); font-size: 12px; cursor: pointer; user-select: none; }
 .sessions-controls .sessions-sound input[type="checkbox"] { flex: none; min-width: 0; width: 15px; height: 15px; padding: 0; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .sessions-board { display: flex; flex: 1; min-height: 0; overflow-x: auto; gap: 14px; padding-bottom: 8px; }
-.session-column { flex: 0 0 350px; max-width: 100%; display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-bg); overflow: hidden; }
+.session-column { flex: 0 0 700px; max-width: 100%; display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-bg); overflow: hidden; }
 .session-column-header { padding: 14px; border-bottom: 1px solid var(--border); }
 .session-heading { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 .session-heading h3 { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
@@ -33,13 +33,37 @@
 .session-event { margin-bottom: 14px; }
 .session-event-label { font-size: 11px; color: var(--accent); font-weight: 600; margin-bottom: 5px; }
 .session-event p { white-space: pre-wrap; font-size: 12px; line-height: 1.65; }
-.session-event-tool { padding: 9px; border-left: 2px solid var(--border); background: var(--bg); border-radius: 4px; }
 .session-event-tool p { color: var(--text2); }
+.session-event-text { font-size: 12px; line-height: 1.65; }
+.session-event-text p { white-space: pre-wrap; font-size: 12px; line-height: 1.65; margin: 0; }
+.session-event-text p + p { margin-top: 8px; }
+.session-event-text h1, .session-event-text h2, .session-event-text h3,
+.session-event-text h4, .session-event-text h5, .session-event-text h6 { margin: 10px 0 6px; font-size: 13px; line-height: 1.5; }
+.session-event-text h1 { font-size: 15px; }
+.session-event-text h2 { font-size: 14px; }
+.session-event-text ul, .session-event-text ol { margin: 6px 0; padding-left: 22px; }
+.session-event-text li { margin: 3px 0; }
+.session-event-text blockquote { margin: 6px 0; padding: 2px 10px; border-left: 3px solid var(--border); color: var(--text2); }
+.session-event-text hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+.session-event-text code { font-family: var(--mono, monospace); font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+.session-event-text pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 11px; overflow-x: auto; margin: 8px 0; }
+.session-event-text pre code { padding: 0; border: none; background: transparent; white-space: pre; font-size: 11px; line-height: 1.6; }
+.session-event-text a { color: var(--accent); text-decoration: underline; }
+.session-compose { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 12px 14px; border-top: 1px solid var(--border); background: var(--bg); }
+.session-compose textarea { flex: 1; min-width: 0; resize: none; padding: 9px 11px; background: var(--panel-bg); color: var(--text);
+  border: 1px solid var(--input-bd, var(--border)); border-radius: 8px; font-size: 12px; font-family: inherit; line-height: 1.5; }
+.session-compose textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.session-compose button { padding: 9px 14px; border: none; border-radius: 8px; background: var(--accent); color: #10221d;
+  font-weight: 600; cursor: pointer; font-size: 12px; flex-shrink: 0; }
+.session-compose button:disabled { opacity: .5; cursor: default; }
+.session-compose-note { flex-basis: 100%; font-size: 11px; color: var(--text2); min-height: 13px; }
+.session-compose-note.ok { color: var(--phrase-color, #8ce99a); }
+.session-compose-note.error { color: var(--danger); }
 .sessions-empty { text-align: center; padding: 30px 10px; color: var(--text2); }
 .sessions-error { padding: 12px; color: var(--danger); border: 1px solid var(--danger); border-radius: 6px; overflow-wrap: anywhere; }
 .sessions-error span { display: block; font-size: 11px; margin-top: 5px; }
 .sessions-source { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
-@media (max-width: 800px) { .sessions-panel { padding: 12px; } .session-column { flex-basis: 310px; } }
+@media (max-width: 800px) { .sessions-panel { padding: 12px; } .session-column { flex-basis: 620px; } }
 
 /* ── Mobile access (remote server + QR) ── */
 .sessions-remote { display: flex; flex-direction: column; gap: 10px; }

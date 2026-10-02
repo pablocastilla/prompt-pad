@@ -1708,6 +1708,18 @@ const sessionMonitor = new OpenCodeSessionMonitor(findOpenCodeDb, path.join(APP_
 ipcMain.handle('opencode-sessions:list', () => sessionMonitor.read());
 ipcMain.handle('opencode-sessions:dismiss', (_e, id: string, turnId: string) => sessionMonitor.dismiss(id, turnId));
 ipcMain.handle('opencode-sessions:restore', () => sessionMonitor.restore());
+// Send a message into a live OpenCode session from the sessions board, reusing
+// the same headless `opencode serve` the mobile page and launcher rely on. In
+// test mode there is no server and the call fails loudly instead of spawning.
+ipcMain.handle('opencode-sessions:send', async (_e, sessionId: unknown, text: unknown) => {
+  if (TEST_DIR) throw new Error('Sessions sending is disabled in test mode');
+  if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 256 ||
+      typeof text !== 'string' || !text.trim() || text.length > 20_000) {
+    throw new Error('Invalid message');
+  }
+  if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
+  return remoteServer.sendToSessionForIpc(sessionId.trim(), text.trim());
+});
 
 // Antigravity (Google) conversations launched from Prompt Pad, in both the IDE
 // and the CLI (agy) stores.
