@@ -270,7 +270,8 @@ test.describe('OpenCode 2 launch option', () => {
       expect(script).toContain('/prompt_async?directory=');
       expect(script).toContain('/session?directory=');
       // ...and the TUI attaches to that same session so phone prompts continue it live.
-      expect(script).toContain("@('attach', ('http://127.0.0.1:' + $port), '-s', $sid, '--auto')");
+      // (attach has no --auto flag — unknown options make yargs print its help and abort)
+      expect(script).toContain("@('attach', ('http://127.0.0.1:' + $port), '-s', $sid)");
       expect(script).toContain("if ($pw) { $attachArgs += @('-p', $pw) }");
       // The message travels in a payload file, never inline in the script.
       expect(script).toMatch(/pp-send-[\w-]+\.json'/);
