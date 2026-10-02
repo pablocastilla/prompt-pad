@@ -1,6 +1,8 @@
 import * as http from 'http';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import type { OpenCodeSessionMonitor } from './opencodeSessions';
 
 const INDEX_HTML = `<!DOCTYPE html>
@@ -102,10 +104,9 @@ function render() {
   // Preserve whatever is being typed across the 5-second re-render.
   const typing = new Map();
   let focused = null;
-  document.querySelectorAll('.mini-compose form').forEach(f => {
-    const wrap = f.closest('.mini-compose');
-    typing.set(wrap.getAttribute('data-for'), f.querySelector('input').value);
-    if (document.activeElement === f.querySelector('input')) focused = wrap.getAttribute('data-for');
+  document.querySelectorAll('form.mini-compose').forEach(f => {
+    typing.set(f.getAttribute('data-for'), f.querySelector('input').value);
+    if (document.activeElement === f.querySelector('input')) focused = f.getAttribute('data-for');
   });
   $('sessions').innerHTML = shown.map(s => {
     const isOpen = state.open.has(s.id);
@@ -126,7 +127,7 @@ function render() {
       '<div class="activity">' + (events || '<div class="event"><p>No activity</p></div>') + composer + '</div></article>';
   }).join('');
   // Restore in-progress text and focus.
-  document.querySelectorAll('.mini-compose').forEach(wrap => {
+  document.querySelectorAll('form.mini-compose').forEach(wrap => {
     const id = wrap.getAttribute('data-for');
     const input = wrap.querySelector('input');
     if (typing.has(id)) input.value = typing.get(id);
@@ -157,10 +158,10 @@ async function poll() {
 }
 $('search').addEventListener('input', e => { state.filter = e.target.value; render(); });
 document.addEventListener('submit', async e => {
-  const form = e.target.closest('.mini-compose form');
+  const form = e.target.closest('form.mini-compose');
   if (!form) return;
   e.preventDefault();
-  const sessionId = form.closest('.mini-compose').getAttribute('data-for');
+  const sessionId = form.getAttribute('data-for');
   const input = form.querySelector('input');
   const button = form.querySelector('button');
   const text = input.value.trim();
@@ -239,6 +240,29 @@ export class RemoteSessionsServer {
         return { port: parsed.port, username: typeof parsed.username === 'string' && parsed.username ? parsed.username : 'opencode', password: parsed.password };
       }
     } catch { /* missing or corrupt: fall through */ }
+    return null;
+  }
+
+  /**
+   * OpenCode's own service mode persists its server password in
+   * `~/.config/opencode/service.json`; servers already running on this machine
+   * use it. Reading it lets us reuse those servers instead of failing with 401.
+   */
+  private readOpenCodeServiceAuth(): { username: string; password: string } | null {
+    try {
+      const configHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+      const candidates = [path.join(configHome, 'opencode', 'service.json'),
+        ...(process.env.APPDATA ? [path.join(process.env.APPDATA, 'opencode', 'service.json')] : [])];
+      for (const file of candidates) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+          if (typeof parsed?.password === 'string' && parsed.password) {
+            const username = typeof parsed.username === 'string' && parsed.username ? parsed.username : 'opencode';
+            return { username, password: parsed.password };
+          }
+        } catch { /* next candidate */ }
+      }
+    } catch { /* fall through */ }
     return null;
   }
 
@@ -354,9 +378,15 @@ export class RemoteSessionsServer {
       const base = `http://127.0.0.1:${port}`;
       const existing = await this.pingOpenCode(base);
       if (existing) return base;
-      // A server that answers 401 requires basic auth: ours, from a previous run.
+      // A server that answers 401 requires basic auth: try ours (from a previous
+      // run) first, then OpenCode's own persisted service password.
       if (persisted && persisted.port === port && await this.pingOpenCode(base, persisted)) {
         this.activeServeAuth = persisted;
+        return base;
+      }
+      const serviceAuth = this.readOpenCodeServiceAuth();
+      if (await this.pingOpenCode(base, serviceAuth)) {
+        this.activeServeAuth = serviceAuth;
         return base;
       }
     }
@@ -385,7 +415,7 @@ export class RemoteSessionsServer {
     throw new Error('OpenCode server did not start (is opencode on PATH?)');
   }
 
-  private activeServeAuth: { port: number; username: string; password: string } | null = null;
+  private activeServeAuth: { username: string; password: string } | null = null;
 
   private async pingOpenCode(base: string, auth?: { username: string; password: string } | null): Promise<boolean> {
     try {
