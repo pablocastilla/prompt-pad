@@ -1,5 +1,6 @@
 import * as http from 'http';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import type { OpenCodeSessionMonitor } from './opencodeSessions';
 
 const INDEX_HTML = `<!DOCTYPE html>
@@ -173,8 +174,31 @@ export class RemoteSessionsServer {
   private server: http.Server | null = null;
   // 8 hex chars (4 bytes) keeps the QR URL within version 2-L (32 data bytes).
   private token = crypto.randomBytes(4).toString('hex');
+  // Basic-auth credentials for the headless OpenCode server we spawn, persisted
+  // so later app runs can authenticate against the still-running server.
+  private serveAuthPath: string | null = null;
 
-  constructor(private readonly monitor: OpenCodeSessionMonitor) {}
+  constructor(private readonly monitor: OpenCodeSessionMonitor, serveAuthPath?: string) {
+    this.serveAuthPath = serveAuthPath ?? null;
+  }
+
+  private readServeAuth(): { port: number; username: string; password: string } | null {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(this.serveAuthPath!, 'utf8'));
+      if (typeof parsed?.password === 'string' && parsed.password && typeof parsed?.port === 'number') {
+        return { port: parsed.port, username: typeof parsed.username === 'string' && parsed.username ? parsed.username : 'opencode', password: parsed.password };
+      }
+    } catch { /* missing or corrupt: fall through */ }
+    return null;
+  }
+
+  private writeServeAuth(auth: { port: number; username: string; password: string } | null): void {
+    if (!this.serveAuthPath) return;
+    try {
+      if (auth) fs.writeFileSync(this.serveAuthPath, JSON.stringify(auth, null, 2));
+      else fs.rmSync(this.serveAuthPath, { force: true });
+    } catch { /* best effort */ }
+  }
 
   /** The access token to append to the QR/URL. Regenerated on every app start. */
   get accessToken(): string { return this.token; }
@@ -262,45 +286,68 @@ export class RemoteSessionsServer {
 
   /** Find or spawn `opencode serve` on a known port, polling the port until it answers. */
   private async ensureOpenCodeServer(): Promise<string> {
+    const persisted = this.readServeAuth();
     for (const port of [4096, 4097]) {
       const base = `http://127.0.0.1:${port}`;
       const existing = await this.pingOpenCode(base);
       if (existing) return base;
+      // A server that answers 401 requires basic auth: ours, from a previous run.
+      if (persisted && persisted.port === port && await this.pingOpenCode(base, persisted)) {
+        this.activeServeAuth = persisted;
+        return base;
+      }
     }
-    // No server running: spawn one headless in the background.
+    // No server running: spawn one headless, protected with basic auth.
     const { spawn } = await import('child_process');
     const port = 4097;
+    const password = crypto.randomBytes(16).toString('hex');
+    const auth = { port, username: 'opencode', password };
     const child = spawn('opencode', ['serve', '--port', String(port), '--hostname', '127.0.0.1'], {
-      detached: true, stdio: 'ignore', shell: process.platform === 'win32',
+      detached: true, stdio: 'ignore', windowsHide: true, shell: process.platform === 'win32',
+      env: { ...process.env, OPENCODE_SERVER_PASSWORD: password },
     });
     child.on('error', () => { /* handled by ping timeout below */ });
     child.unref();
+    this.activeServeAuth = auth;
     const base = `http://127.0.0.1:${port}`;
     const deadline = Date.now() + SEND_TIMEOUT_MS;
     while (Date.now() < deadline) {
-      if (await this.pingOpenCode(base)) return base;
+      if (await this.pingOpenCode(base, auth)) {
+        this.writeServeAuth(auth);
+        return base;
+      }
       await new Promise(r => setTimeout(r, 400));
     }
+    this.activeServeAuth = null;
     throw new Error('OpenCode server did not start (is opencode on PATH?)');
   }
 
-  private async pingOpenCode(base: string): Promise<boolean> {
+  private activeServeAuth: { port: number; username: string; password: string } | null = null;
+
+  private async pingOpenCode(base: string, auth?: { username: string; password: string } | null): Promise<boolean> {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 2000);
-      const res = await fetch(`${base}/session`, { signal: controller.signal });
+      const res = await fetch(`${base}/session`, {
+        signal: controller.signal,
+        ...(auth ? { headers: { Authorization: `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString('base64')}` } } : {}),
+      });
       clearTimeout(timer);
       return res.ok;
     } catch { return false; }
   }
 
   private async requestOpenCode<T>(base: string, method: string, apiPath: string, body: unknown): Promise<T> {
+    const auth = this.activeServeAuth;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
     try {
       const res = await fetch(base + apiPath, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(auth ? { Authorization: `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString('base64')}` } : {}),
+        },
         body: JSON.stringify(body),
         signal: controller.signal,
       });

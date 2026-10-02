@@ -1575,7 +1575,7 @@ let remoteServer: RemoteSessionsServer | null = null;
 
 async function startRemoteServer(): Promise<{ port: number; key: string }> {
   if (!remoteServer) {
-    remoteServer = new RemoteSessionsServer(sessionMonitor);
+    remoteServer = new RemoteSessionsServer(sessionMonitor, path.join(APP_DIR, 'opencode-serve-auth.json'));
   }
   let port = REMOTE_PORT;
   try {
