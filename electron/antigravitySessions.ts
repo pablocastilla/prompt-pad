@@ -6,8 +6,10 @@ import type { OpenCodeActivity, OpenCodeSession, OpenCodeSessionsSnapshot } from
 
 // Show Prompt Pad-launched Antigravity conversations updated within the last day.
 const RECENT_MS = 24 * 60 * 60 * 1000;
-// A conversation whose summary changed within this window is still running.
+// A conversation whose summary changed within this window is still running (legacy fallback).
 const ACTIVE_MS = 90 * 1000;
+// An Antigravity conversation marked running in SQLite stays active unless no activity occurred for 30 minutes.
+const STALE_RUNNING_MS = 30 * 60 * 1000;
 const MAX_CONVERSATIONS = 250;
 
 // Prompt Pad seeds Antigravity with a message pointing at a unique temp prompt
@@ -68,6 +70,9 @@ interface SummaryRow {
   agent_name: string;
   parent_conversation_id: string;
   nesting_depth: number;
+  status?: string;
+  not_fully_idle?: number | boolean;
+  killed?: number | boolean;
 }
 
 export class AntigravitySessionMonitor {
@@ -96,15 +101,50 @@ export class AntigravitySessionMonitor {
   restore(): void { this.saveHidden({}); }
 
   // A conversation counts as Prompt Pad-launched when any stored blob embeds
-  // the pp-prompt marker from the seed message. Results are memoised per
-  // (file, mtime) so unchanged conversations are not re-read every poll.
+  // the pp-prompt marker from the seed message. Confirmed results are cached
+  // by conversationId so confirmed sessions never require re-reading.
   private markerCache = new Map<string, { mtime: number; marked: boolean }>();
 
-  private isPromptPadLaunched(conversationDb: string): boolean {
+  private isPromptPadLaunched(dbPath: string, conversationId: string, conversationDb: string): boolean {
+    const cached = this.markerCache.get(conversationId);
+    if (cached?.marked) return true;
+
+    // Check transcript first if available (fastest for live sessions as step 0 is written here immediately)
+    const rootDir = path.dirname(dbPath);
+    const transcriptPath = path.join(rootDir, 'brain', conversationId, '.system_generated', 'logs', 'transcript.jsonl');
+    if (fs.existsSync(transcriptPath)) {
+      try {
+        const fd = fs.openSync(transcriptPath, 'r');
+        try {
+          const buf = Buffer.alloc(4096);
+          const bytesRead = fs.readSync(fd, buf, 0, 4096, 0);
+          if (bytesRead > 0 && buf.subarray(0, bytesRead).includes(MARKER)) {
+            this.markerCache.set(conversationId, { mtime: 0, marked: true });
+            return true;
+          }
+        } finally {
+          fs.closeSync(fd);
+        }
+      } catch {
+        // Fall through to database check
+      }
+    }
+
+    if (!fs.existsSync(conversationDb)) return false;
+
     let mtime = 0;
-    try { mtime = fs.statSync(conversationDb).mtimeMs; } catch { return false; }
-    const cached = this.markerCache.get(conversationDb);
+    try {
+      mtime = fs.statSync(conversationDb).mtimeMs;
+      const walPath = conversationDb + '-wal';
+      if (fs.existsSync(walPath)) {
+        mtime = Math.max(mtime, fs.statSync(walPath).mtimeMs);
+      }
+    } catch {
+      return false;
+    }
+
     if (cached && cached.mtime === mtime) return cached.marked;
+
     let marked = false;
     try {
       const db = new Database(conversationDb, { readonly: true, fileMustExist: true, timeout: 1000 });
@@ -114,15 +154,21 @@ export class AntigravitySessionMonitor {
           if (row.data && Buffer.from(row.data).includes(needle)) { marked = true; break; }
         }
         if (!marked) {
-          for (const row of db.prepare('SELECT metadata FROM steps ORDER BY idx LIMIT 200').all() as { metadata: Buffer | null }[]) {
+          const stepCols = new Set((db.prepare("PRAGMA table_info(steps)").all() as { name: string }[]).map(c => c.name));
+          const hasPayload = stepCols.has('step_payload');
+          const sql = hasPayload
+            ? 'SELECT metadata, step_payload FROM steps ORDER BY idx LIMIT 200'
+            : 'SELECT metadata FROM steps ORDER BY idx LIMIT 200';
+          for (const row of db.prepare(sql).all() as { metadata?: Buffer | null; step_payload?: Buffer | null }[]) {
             if (row.metadata && Buffer.from(row.metadata).includes(needle)) { marked = true; break; }
+            if (row.step_payload && Buffer.from(row.step_payload).includes(needle)) { marked = true; break; }
           }
         }
       } finally { db.close(); }
     } catch {
       marked = false;
     }
-    this.markerCache.set(conversationDb, { mtime, marked });
+    this.markerCache.set(conversationId, { mtime, marked });
     return marked;
   }
 
@@ -145,9 +191,19 @@ export class AntigravitySessionMonitor {
   private readRoot(dbPath: string, now: number, result: OpenCodeSessionsSnapshot, hidden: Record<string, string>): void {
     const db = new Database(dbPath, { readonly: true, fileMustExist: true, timeout: 1000 });
     try {
+      const tableCols = new Set(
+        (db.prepare("PRAGMA table_info(conversation_summaries)").all() as { name: string }[]).map(c => c.name)
+      );
+      const selectCols = [
+        'conversation_id', 'title', 'preview', 'last_modified_time', 'workspace_uris',
+        'agent_name', 'parent_conversation_id', 'nesting_depth',
+      ];
+      if (tableCols.has('status')) selectCols.push('status');
+      if (tableCols.has('not_fully_idle')) selectCols.push('not_fully_idle');
+      if (tableCols.has('killed')) selectCols.push('killed');
+
       const rows = db.prepare(`
-        SELECT conversation_id, title, preview, last_modified_time, workspace_uris,
-          agent_name, parent_conversation_id, nesting_depth
+        SELECT ${selectCols.join(', ')}
         FROM conversation_summaries
         ORDER BY last_modified_time DESC
         LIMIT 500
@@ -157,26 +213,51 @@ export class AntigravitySessionMonitor {
       // maps conversation ids to the working directory instead.
       const historyDirs = this.historyDirs(path.join(path.dirname(dbPath), 'history.jsonl'));
       for (const row of rows) {
-        const updatedAt = parseAntigravityTime(row.last_modified_time);
-        if (!updatedAt || now - updatedAt > RECENT_MS) continue;
+        const createdAt = parseAntigravityTime(row.last_modified_time);
+        if (!createdAt || now - createdAt > RECENT_MS) continue;
         if (result.sessions.length >= MAX_CONVERSATIONS) break;
         if (result.sessions.some(s => s.id === row.conversation_id)) continue;
-        if (!this.isPromptPadLaunched(path.join(conversationsDir, `${row.conversation_id}.db`))) continue;
+        const convDbPath = path.join(conversationsDir, `${row.conversation_id}.db`);
+        if (!this.isPromptPadLaunched(dbPath, row.conversation_id, convDbPath)) continue;
         const turnId = row.conversation_id;
         if (hidden[turnId] === turnId) { result.hiddenCount++; continue; }
-        const working = now - updatedAt < ACTIVE_MS;
-        const activity = this.readActivity(dbPath, row.conversation_id, working);
+
+        const { activity, latestActivityTime } = this.readActivity(dbPath, row.conversation_id);
+        const updatedAt = Math.max(createdAt, latestActivityTime);
+
+        const isKilled = Boolean(row.killed);
+        const hasExplicitRunning = (row.status === 'CASCADE_RUN_STATUS_RUNNING') || Boolean(row.not_fully_idle);
+        const hasExplicitIdle = (row.status === 'CASCADE_RUN_STATUS_IDLE') && !row.not_fully_idle;
+
+        let working = false;
+        if (isKilled) {
+          working = false;
+        } else if (hasExplicitRunning) {
+          working = (now - updatedAt < STALE_RUNNING_MS);
+        } else if (hasExplicitIdle) {
+          working = false;
+        } else {
+          working = (now - updatedAt < ACTIVE_MS);
+        }
+
+        if (working && activity.length > 0) {
+          for (let i = activity.length - 1; i >= 0; i--) {
+            if (activity[i].type === 'tool') {
+              activity[i].status = 'running';
+              break;
+            }
+          }
+        }
+
         result.sessions.push({
           id: row.conversation_id,
           turnId,
-          title: row.title || row.preview || 'Antigravity',
+          title: row.title || row.preview || (activity.find(a => a.role === 'user')?.text?.slice(0, 80)) || 'Antigravity',
           directory: decodeWorkspaceDir(row.workspace_uris) || historyDirs.get(row.conversation_id) || '',
           parentId: row.parent_conversation_id || (row.nesting_depth > 0 ? 'nested' : null),
           model: row.agent_name || '',
           status: working ? 'working' : 'completed',
-          // Antigravity's summary exposes only a last-modified timestamp; use it
-          // as the creation key so the board still has a deterministic order.
-          createdAt: updatedAt,
+          createdAt,
           updatedAt,
           completedAt: working ? null : updatedAt,
           expiresAt: null,
@@ -187,13 +268,16 @@ export class AntigravitySessionMonitor {
     } finally { db.close(); }
   }
 
-  private readActivity(dbPath: string, conversationId: string, working: boolean): OpenCodeActivity[] {
+  private readActivity(dbPath: string, conversationId: string): { activity: OpenCodeActivity[]; latestActivityTime: number } {
     const activity: OpenCodeActivity[] = [];
+    let latestActivityTime = 0;
     const rootDir = path.dirname(dbPath);
     const transcriptPath = path.join(rootDir, 'brain', conversationId, '.system_generated', 'logs', 'transcript.jsonl');
 
     if (fs.existsSync(transcriptPath)) {
       try {
+        const stat = fs.statSync(transcriptPath);
+        if (stat.mtimeMs > latestActivityTime) latestActivityTime = stat.mtimeMs;
         const content = fs.readFileSync(transcriptPath, 'utf8');
         const lines = content.split(/\r?\n/).filter(line => line.trim());
         const recentLines = lines.slice(-80);
@@ -201,6 +285,10 @@ export class AntigravitySessionMonitor {
           try {
             const entry = JSON.parse(recentLines[i]);
             const stepIdx = entry.step_index ?? i;
+            if (entry.created_at) {
+              const entryTime = parseAntigravityTime(entry.created_at);
+              if (entryTime > latestActivityTime) latestActivityTime = entryTime;
+            }
             if (entry.type === 'USER_INPUT' && typeof entry.content === 'string') {
               let text = entry.content.replace(/<\/?USER_REQUEST>/g, '').trim();
               const seedMatch = text.match(/Summary of the file content:\s*"?([^"]+)"?/);
@@ -256,6 +344,8 @@ export class AntigravitySessionMonitor {
       const convDbPath = path.join(conversationsDirFor(dbPath), `${conversationId}.db`);
       if (fs.existsSync(convDbPath)) {
         try {
+          const stat = fs.statSync(convDbPath);
+          if (stat.mtimeMs > latestActivityTime) latestActivityTime = stat.mtimeMs;
           const convDb = new Database(convDbPath, { readonly: true, fileMustExist: true, timeout: 500 });
           try {
             const hasSteps = convDb.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'steps'").get();
@@ -285,14 +375,7 @@ export class AntigravitySessionMonitor {
       }
     }
 
-    if (working && activity.length > 0) {
-      const last = activity[activity.length - 1];
-      if (last.type === 'tool') {
-        last.status = 'running';
-      }
-    }
-
-    return activity.slice(-80);
+    return { activity: activity.slice(-80), latestActivityTime };
   }
 
   private historyDirs(historyPath: string): Map<string, string> {

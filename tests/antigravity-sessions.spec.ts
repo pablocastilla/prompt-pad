@@ -8,7 +8,7 @@ const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 const test = base.extend<{ sandbox: { app: ElectronApplication; page: Page; dir: string } }>({
   sandbox: async ({}, use) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pp-agy-'));
-    fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ language: 'en', theme: 'dark', useOneDrive: true }));
+    fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ language: 'en', theme: 'dark', useOneDrive: false }));
     fs.writeFileSync(path.join(dir, 'phrases.json'), '[]');
     fs.writeFileSync(path.join(dir, 'launches.json'), '[]');
     const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: dir } });
@@ -25,9 +25,10 @@ const test = base.extend<{ sandbox: { app: ElectronApplication; page: Page; dir:
 
 // Antigravity keeps a global summary database plus one SQLite database per
 // conversation; Prompt Pad-launched conversations embed the pp-prompt marker
-// in the tool steps. Fixtures are written through Electron's own better-sqlite3.
+// in the tool steps or prompt payload. Fixtures are written through Electron's own better-sqlite3.
 async function seedAntigravity(app: ElectronApplication, dir: string, conversations: Array<{
-  id: string; title: string; ageMinutes: number; marked?: boolean;
+  id: string; title: string; ageMinutes: number; marked?: boolean; status?: string;
+  payloadMarker?: boolean;
 }>) {
   await app.evaluate(({}, { dir, conversations }) => {
     const require = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json');
@@ -37,12 +38,13 @@ async function seedAntigravity(app: ElectronApplication, dir: string, conversati
     const db = new Database(path.join(dir, 'conversation_summaries.db'));
     try {
       db.exec(`
-        CREATE TABLE conversation_summaries (
+        CREATE TABLE IF NOT EXISTS conversation_summaries (
           conversation_id text, title text NOT NULL DEFAULT "", preview text NOT NULL DEFAULT "",
           step_count integer NOT NULL DEFAULT 0, last_modified_time datetime NOT NULL,
           workspace_uris text NOT NULL, status text NOT NULL DEFAULT "", source text NOT NULL DEFAULT "",
           project_id text NOT NULL DEFAULT "", agent_name text NOT NULL DEFAULT "",
-          parent_conversation_id text NOT NULL DEFAULT "", nesting_depth integer NOT NULL DEFAULT 0);
+          parent_conversation_id text NOT NULL DEFAULT "", nesting_depth integer NOT NULL DEFAULT 0,
+          not_fully_idle numeric NOT NULL DEFAULT false, killed numeric NOT NULL DEFAULT false);
       `);
       const convDir = path.join(dir, 'conversations');
       fs.mkdirSync(convDir, { recursive: true });
@@ -50,11 +52,13 @@ async function seedAntigravity(app: ElectronApplication, dir: string, conversati
         // 7-digit fraction exactly like Antigravity writes it
         const stamp = new Date(Date.now() - conversation.ageMinutes * 60000).toISOString()
           .replace('T', ' ').replace(/(\.\d{3})Z/, '$1000+00:00');
+        const status = conversation.status ?? (conversation.ageMinutes === 0 ? 'CASCADE_RUN_STATUS_RUNNING' : 'CASCADE_RUN_STATUS_IDLE');
+        const notFullyIdle = status === 'CASCADE_RUN_STATUS_RUNNING' ? 1 : 0;
         db.prepare(`INSERT INTO conversation_summaries
-          (conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, source, agent_name)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          (conversation_id, title, preview, step_count, last_modified_time, workspace_uris, status, source, agent_name, not_fully_idle, killed)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .run(conversation.id, conversation.title, conversation.title, 3, stamp,
-            JSON.stringify(['file:///c%3A/projects/demo']), 'CASCADE_RUN_STATUS_IDLE', '', '');
+            JSON.stringify(['file:///c%3A/projects/demo']), status, '', '', notFullyIdle, 0);
         const conv = new Database(path.join(convDir, `${conversation.id}.db`));
         try {
           conv.exec(`
@@ -70,6 +74,9 @@ async function seedAntigravity(app: ElectronApplication, dir: string, conversati
               toolAction: 'Reading prompt file',
             });
             conv.prepare('INSERT INTO steps (idx, metadata) VALUES (?, ?)').run(2, Buffer.from(marker, 'utf8'));
+          } else if (conversation.payloadMarker) {
+            const promptPayload = Buffer.from('Read the file at C:\\tmp\\pp-launch-2\\pp-prompt-2.txt as prompt', 'utf8');
+            conv.prepare('INSERT INTO steps (idx, step_payload) VALUES (?, ?)').run(0, promptPayload);
           }
         } finally { conv.close(); }
       }
@@ -161,4 +168,29 @@ test('antigravity columns display console activity and tool events from transcri
   await expect(column(page, 'agy-live').locator('.session-event-label').nth(1)).toContainText('run_command');
   await expect(column(page, 'agy-live').locator('.session-event-label').nth(2)).toContainText('Antigravity');
 });
+
+test('antigravity session actively running stays in working status beyond 90 seconds', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  // ageMinutes: 10 is well beyond the old 90s cutoff; with status CASCADE_RUN_STATUS_RUNNING it must remain working
+  await seedAntigravity(app, dir, [
+    { id: 'agy-long-run', title: 'Active long refactoring', ageMinutes: 10, marked: true, status: 'CASCADE_RUN_STATUS_RUNNING' },
+    { id: 'agy-done-run', title: 'Quick finished task', ageMinutes: 1, marked: true, status: 'CASCADE_RUN_STATUS_IDLE' },
+  ]);
+  await open(page);
+  await expect(column(page, 'agy-long-run')).toBeVisible({ timeout: 8000 });
+  await expect(column(page, 'agy-long-run')).toHaveAttribute('data-status', 'working');
+  await expect(column(page, 'agy-done-run')).toHaveAttribute('data-status', 'completed');
+});
+
+test('antigravity session detects prompt pad launch from step_payload at step 0', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  // Conversation only has step_payload in step 0, no metadata marker in step 2
+  await seedAntigravity(app, dir, [
+    { id: 'agy-step0', title: 'Early session', ageMinutes: 0, marked: false, payloadMarker: true, status: 'CASCADE_RUN_STATUS_RUNNING' },
+  ]);
+  await open(page);
+  await expect(column(page, 'agy-step0')).toBeVisible({ timeout: 8000 });
+  await expect(column(page, 'agy-step0')).toHaveAttribute('data-status', 'working');
+});
+
 
