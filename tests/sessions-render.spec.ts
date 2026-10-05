@@ -95,6 +95,24 @@ test('assistant messages render as markdown while tool titles stay plain text', 
   await expect(column(page, 'md').locator('.session-event-tool p')).toHaveText('Fix **module** readme');
 });
 
+test('tool execution commands and results render as plain code blocks', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  await schema(app, dir);
+  await sql(app, dir, 'INSERT INTO session VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ['cmd', 'Project cmd', 'C:\\projects\\cmd', null, Date.now() - 2000, Date.now(), null]);
+  await sql(app, dir, 'INSERT INTO message VALUES (?, ?, ?, ?, ?)',
+    ['cmd-user', 'cmd', Date.now() - 2000, Date.now() - 2000, JSON.stringify({ role: 'user', time: { created: Date.now() - 2000 } })]);
+  await sql(app, dir, 'INSERT INTO message VALUES (?, ?, ?, ?, ?)', ['cmd-assistant', 'cmd', Date.now() - 1000, Date.now() - 1000, JSON.stringify({
+    role: 'assistant', time: { created: Date.now() - 1000 }, modelID: 'test-model', providerID: 'opencode',
+  })]);
+  await sql(app, dir, 'INSERT INTO part VALUES (?, ?, ?, ?, ?, ?)', ['cmd-tool', 'cmd-assistant', 'cmd', Date.now(), Date.now(),
+    JSON.stringify({ type: 'tool', tool: 'bash', state: { status: 'completed', input: { command: 'python script.py' }, output: 'line one\nline two' } })]);
+  await open(page);
+  const col = column(page, 'cmd');
+  await expect(col.locator('.session-event-command')).toHaveText('python script.py');
+  await expect(col.locator('.session-event-output')).toHaveText('line one\nline two');
+});
+
 test('composer sends messages into the running session and reports delivery', async ({ sandbox }) => {
   const { app, page, dir } = sandbox;
   await schema(app, dir);
@@ -177,7 +195,7 @@ test('mobile page renders markdown HTML from the API and keeps tool titles plain
     role: 'assistant', time: { created: Date.now() - 1000 }, modelID: 'test-model', providerID: 'opencode',
   })]);
   await sql(app, dir, 'INSERT INTO part VALUES (?, ?, ?, ?, ?, ?)', ['mob-tool', 'mob-assistant', 'mob', Date.now(), Date.now(),
-    JSON.stringify({ type: 'tool', tool: 'bash', state: { status: 'running', title: 'Plain **title**' } })]);
+    JSON.stringify({ type: 'tool', tool: 'bash', state: { status: 'completed', title: 'Plain **title**', input: { command: 'python hi.py' }, output: 'hello world' } })]);
   await sql(app, dir, 'INSERT INTO part VALUES (?, ?, ?, ?, ?, ?)', ['mob-text', 'mob-assistant', 'mob', Date.now(), Date.now(),
     JSON.stringify({ type: 'text', text: '### Summary\n- **done** item\n\n`code` and <b>raw</b>' })]);
 
@@ -211,5 +229,7 @@ test('mobile page renders markdown HTML from the API and keeps tool titles plain
   const toolEvent = session.activity.find((a: { id: string }) => a.id === 'mob-tool');
   expect(toolEvent.html).toBe(''); // tool titles stay plain text
   expect(toolEvent.text).toBe('Plain **title**');
+  expect(toolEvent.input).toBe('python hi.py');
+  expect(toolEvent.output).toBe('hello world');
   void app; void dir;
 });

@@ -34,6 +34,12 @@
 .session-event-label { font-size: 11px; color: var(--accent); font-weight: 600; margin-bottom: 5px; }
 .session-event p { white-space: pre-wrap; font-size: 12px; line-height: 1.65; }
 .session-event-tool p { color: var(--text2); }
+.session-event-command, .session-event-output { font-family: var(--mono, monospace); font-size: 11px; line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 10px; margin: 6px 0 0; max-height: 320px; overflow: auto; }
+.session-event-command { color: var(--text); }
+.session-event-output { color: var(--text2); }
+.session-event-output-error { color: var(--danger); border-color: var(--danger); }
 .session-event-text { font-size: 12px; line-height: 1.65; }
 .session-event-text p { white-space: pre-wrap; font-size: 12px; line-height: 1.65; margin: 0; }
 .session-event-text p + p { margin-top: 8px; }

@@ -68,9 +68,12 @@ function SessionColumn({ session, now, closing, onClose, onSend }: {
       {session.activity.map(item => <div key={item.id} className={`session-event session-event-${item.type}`}>
         <div className="session-event-label">{item.type === 'tool' ? `${item.tool} · ${toolStatus(item.status)}` :
           item.role === 'user' ? t('sessionsYou') : (session.source === 'antigravity' ? 'Antigravity' : 'OpenCode')}</div>
-        {item.text && (item.type === 'tool'
-          ? <p>{item.text}</p>
-          : <div className="session-event-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }} />)}
+        {item.type === 'tool' ? <>
+          {item.text && item.text !== item.input && <p>{item.text}</p>}
+          {item.input && <pre className="session-event-command" title={t('sessionsToolCommand')}>{item.input}</pre>}
+          {item.output && <pre className={`session-event-output${item.status === 'error' ? ' session-event-output-error' : ''}`}
+            title={t('sessionsToolOutput')}>{item.output}</pre>}
+        </> : item.text && <div className="session-event-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }} />}
       </div>)}
     </div>
     {session.source === 'opencode' && <form className="session-compose" onSubmit={e => { e.preventDefault(); void send(); }}>

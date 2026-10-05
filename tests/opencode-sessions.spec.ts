@@ -111,6 +111,34 @@ test('real SQLite sessions appear as independent columns with tools and accurate
   await expect(page.locator('[data-tour-id="sessions"]')).toHaveClass(/active/);
 });
 
+test('tool calls show the command that ran and its captured output', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  await schema(app, dir);
+  await seed(app, dir, 'run');
+  await sql(app, dir, 'INSERT INTO part VALUES (?, ?, ?, ?, ?, ?)', ['run-py', 'run-assistant', 'run', Date.now(), Date.now(),
+    JSON.stringify({ type: 'tool', tool: 'bash', state: { status: 'completed', input: { command: 'python analyze.py --fast' }, output: 'Total: 42' } })]);
+  await sql(app, dir, 'INSERT INTO part VALUES (?, ?, ?, ?, ?, ?)', ['run-err', 'run-assistant', 'run', Date.now(), Date.now(),
+    JSON.stringify({ type: 'tool', tool: 'bash', state: { status: 'error', input: { command: 'python boom.py' }, error: 'Traceback: NameError' } })]);
+  await open(page);
+  const col = column(page, 'run');
+  await expect(col).toContainText('python analyze.py --fast');
+  await expect(col).toContainText('Total: 42');
+  await expect(col).toContainText('python boom.py');
+  await expect(col.locator('.session-event-command')).toHaveCount(2);
+  await expect(col.locator('.session-event-output:not(.session-event-output-error)')).toHaveText('Total: 42');
+  await expect(col.locator('.session-event-output-error')).toContainText('Traceback: NameError');
+  // Input and output survive the mobile API payload as plain fields.
+  const api = await app.evaluate(({}, { modulePath, dbPath }) => {
+    const require = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json');
+    const { dirname } = require('path');
+    const { OpenCodeSessionMonitor } = require(modulePath);
+    const monitor = new OpenCodeSessionMonitor(() => dbPath, dirname(dbPath) + '/hidden-api.json');
+    return monitor.read();
+  }, { modulePath: MONITOR_JS, dbPath: path.join(dir, 'opencode.db') });
+  const tools = api.sessions[0].activity.filter((a: { type: string }) => a.type === 'tool');
+  expect(tools.find((a: { input: string }) => a.input === 'python analyze.py --fast').output).toBe('Total: 42');
+});
+
 test('columns keep a stable position while sessions change status and activity', async ({ sandbox }) => {
   const { app, page, dir } = sandbox;
   await schema(app, dir);

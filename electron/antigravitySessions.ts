@@ -17,6 +17,49 @@ const MAX_CONVERSATIONS = 250;
 // from Prompt Pad. Everything else (IDE, scheduled agents) stays invisible.
 const MARKER = 'pp-prompt-';
 
+// Result entries Antigravity writes after a tool call. Matching them to the
+// pending call lets the board show the command and what it printed.
+const TOOL_RESULT_TYPES = new Set([
+  'GENERIC', 'RUN_COMMAND', 'VIEW_FILE', 'LIST_DIRECTORY', 'GREP_SEARCH', 'SEARCH_WEB',
+  'READ_URL_CONTENT', 'CODE_ACTION', 'FIND', 'INVOKE_SUBAGENT', 'GENERATE_IMAGE',
+  'ASK_QUESTION', 'ERROR_MESSAGE',
+]);
+
+const MAX_TOOL_OUTPUT = 6000;
+
+// Antigravity often quotes its tool arguments ("\"git status\""); strip the
+// wrapping quotes so the command reads naturally on the board.
+function unwrapArg(value: unknown): string {
+  if (typeof value !== 'string') return value == null ? '' : String(value);
+  let text = value.trim();
+  for (let i = 0; i < 2; i++) {
+    if (text.length >= 2 && ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'")))) {
+      text = text.slice(1, -1).trim();
+    }
+  }
+  return text;
+}
+
+// Drop the "Created At / Completed At" envelope to keep just the payload.
+function cleanToolResult(content: string): string {
+  return content
+    .replace(/^Created At:[^\n]*\r?\n/, '')
+    .replace(/^Completed At:[^\n]*\r?\n/, '')
+    .trim();
+}
+
+// The command (or path/query) a call ran with, regardless of the tool used.
+function antigravityToolInput(args: unknown): string {
+  if (args && typeof args === 'object') {
+    const record = args as Record<string, unknown>;
+    for (const key of ['CommandLine', 'Command', 'AbsolutePath', 'Path', 'FilePath', 'Url', 'URL', 'query', 'Query']) {
+      const value = unwrapArg(record[key]);
+      if (value) return value;
+    }
+  }
+  return typeof args === 'string' ? unwrapArg(args) : '';
+}
+
 // Antigravity has two stores, each with a global index (titles, workspaces,
 // status) plus one SQLite database per conversation: the IDE under
 // ~/.gemini/antigravity and the CLI (agy) under ~/.gemini/antigravity-cli.
@@ -243,7 +286,9 @@ export class AntigravitySessionMonitor {
         if (working && activity.length > 0) {
           for (let i = activity.length - 1; i >= 0; i--) {
             if (activity[i].type === 'tool') {
-              activity[i].status = 'running';
+              // Only the tool still in flight is "running"; once a result was
+              // captured the call is done even if the conversation continues.
+              if (!activity[i].output) activity[i].status = 'running';
               break;
             }
           }
@@ -281,6 +326,8 @@ export class AntigravitySessionMonitor {
         const content = fs.readFileSync(transcriptPath, 'utf8');
         const lines = content.split(/\r?\n/).filter(line => line.trim());
         const recentLines = lines.slice(-80);
+        // Tool calls awaiting their result entry, so output can be attached.
+        const pendingTools: OpenCodeActivity[] = [];
         for (let i = 0; i < recentLines.length; i++) {
           try {
             const entry = JSON.parse(recentLines[i]);
@@ -310,20 +357,20 @@ export class AntigravitySessionMonitor {
                   if (typeof args === 'string') {
                     try { args = JSON.parse(args); } catch {}
                   }
-                  let desc = '';
-                  if (args && typeof args === 'object') {
-                    desc = args.CommandLine || args.toolAction || args.toolSummary ||
-                           args.AbsolutePath || args.query || args.Prompt || args.description || '';
-                    if (typeof desc !== 'string') desc = JSON.stringify(desc);
-                  }
-                  activity.push({
+                  const record = args && typeof args === 'object' ? args as Record<string, unknown> : {};
+                  const command = antigravityToolInput(args);
+                  const description = unwrapArg(record.toolAction) || unwrapArg(record.toolSummary);
+                  const toolActivity: OpenCodeActivity = {
                     id: `agy-${conversationId}-tool-${stepIdx}-${t}`,
                     role: 'assistant',
                     type: 'tool',
                     tool: String(toolName),
                     status: 'completed',
-                    text: desc ? desc.slice(0, 1000) : '',
-                  });
+                    text: description.slice(0, 1000),
+                    input: command.slice(0, 1000),
+                  };
+                  activity.push(toolActivity);
+                  pendingTools.push(toolActivity);
                 }
               }
               if (typeof entry.content === 'string' && entry.content.trim()) {
@@ -333,6 +380,13 @@ export class AntigravitySessionMonitor {
                   type: 'text',
                   text: entry.content.slice(-6000),
                 });
+              }
+            } else if (TOOL_RESULT_TYPES.has(entry.type) && typeof entry.content === 'string') {
+              const tool = pendingTools.shift();
+              const result = cleanToolResult(entry.content);
+              if (tool && result) {
+                tool.output = result.slice(0, MAX_TOOL_OUTPUT);
+                tool.status = String(entry.status || '').toUpperCase() === 'ERROR' ? 'error' : 'completed';
               }
             }
           } catch {}
@@ -356,7 +410,8 @@ export class AntigravitySessionMonitor {
                   try {
                     const parsed = JSON.parse(r.metadata.toString('utf8'));
                     const desc = parsed.toolAction || parsed.toolSummary || parsed.AbsolutePath || parsed.CommandLine || '';
-                    if (desc) {
+                    const command = antigravityToolInput(parsed);
+                    if (desc || command) {
                       activity.push({
                         id: `agy-${conversationId}-step-${r.idx}`,
                         role: 'assistant',
@@ -364,6 +419,7 @@ export class AntigravitySessionMonitor {
                         tool: parsed.toolName || (parsed.AbsolutePath ? 'file' : 'tool'),
                         status: 'completed',
                         text: String(desc).slice(0, 1000),
+                        input: command.slice(0, 1000),
                       });
                     }
                   } catch {}

@@ -150,6 +150,12 @@ test('antigravity columns display console activity and tool events from transcri
     }),
     JSON.stringify({
       step_index: 2,
+      type: 'GENERIC',
+      status: 'DONE',
+      content: 'Created At: 2026-01-01T00:00:00Z\nCompleted At: 2026-01-01T00:00:01Z\nThe command exited with code 0.\nOutput:\ngit status clean',
+    }),
+    JSON.stringify({
+      step_index: 3,
       type: 'PLANNER_RESPONSE',
       content: 'Antigravity has finished analyzing the codebase.',
       tool_calls: [],
@@ -164,6 +170,9 @@ test('antigravity columns display console activity and tool events from transcri
   await expect(column(page, 'agy-live')).toContainText('run_command');
   await expect(column(page, 'agy-live')).toContainText('git status');
   await expect(column(page, 'agy-live')).toContainText('Antigravity has finished analyzing the codebase.');
+  // The command that ran and its captured output are both shown.
+  await expect(column(page, 'agy-live').locator('.session-event-command')).toHaveText('git status');
+  await expect(column(page, 'agy-live').locator('.session-event-output')).toContainText('git status clean');
   await expect(column(page, 'agy-live').locator('.session-event-label').nth(0)).toContainText('You');
   await expect(column(page, 'agy-live').locator('.session-event-label').nth(1)).toContainText('run_command');
   await expect(column(page, 'agy-live').locator('.session-event-label').nth(2)).toContainText('Antigravity');

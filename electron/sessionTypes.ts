@@ -7,6 +7,11 @@ export interface OpenCodeActivity {
   text: string;
   tool?: string;
   status?: string;
+  // Tool calls only: the command/arguments that were executed and the captured
+  // result, so the board can show exactly what ran (e.g. a python command) and
+  // what it printed. Kept optional for backward compatibility.
+  input?: string;
+  output?: string;
 }
 
 export interface OpenCodeSession {

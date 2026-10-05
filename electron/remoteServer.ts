@@ -50,6 +50,11 @@ const INDEX_HTML = `<!DOCTYPE html>
   .event p { white-space: pre-wrap; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
   .event-tool { padding: 8px; border-left: 2px solid var(--border); background: var(--bg); border-radius: 4px; }
   .event-tool p { color: var(--text2); }
+  .event-code { font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.55; white-space: pre-wrap;
+    overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin: 6px 0 0; max-height: 320px; overflow: auto; color: var(--text); }
+  .event-output { color: var(--text2); }
+  .event-output.error { color: var(--danger); border-color: var(--danger); }
   .event-text { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
   .event-text p { margin: 0; }
   .event-text p + p { margin-top: 8px; }
@@ -125,11 +130,19 @@ function render() {
   });
   $('sessions').innerHTML = shown.map(s => {
     const isOpen = state.open.has(s.id);
-    const events = (s.activity || []).map(a =>
-      '<div class="event ' + (a.type === 'tool' ? 'event-tool' : '') + '"><div class="event-label">' +
-      esc(a.type === 'tool' ? (a.tool || 'tool') : (a.role === 'user' ? 'You' : 'OpenCode')) + '</div>' +
-      (a.type === 'text' && a.html ? '<div class="event-text">' + a.html + '</div>' :
-        (a.text ? '<p>' + esc(a.text) + '</p>' : '')) + '</div>').join('');
+    const events = (s.activity || []).map(a => {
+      const label = a.type === 'tool' ? (a.tool || 'tool') : (a.role === 'user' ? 'You' : 'OpenCode');
+      let body = '';
+      if (a.type === 'text') {
+        body = a.html ? '<div class="event-text">' + a.html + '</div>' : (a.text ? '<p>' + esc(a.text) + '</p>' : '');
+      } else {
+        if (a.text && a.text !== a.input) body += '<p>' + esc(a.text) + '</p>';
+        if (a.input) body += '<pre class="event-code">' + esc(a.input) + '</pre>';
+        if (a.output) body += '<pre class="event-code event-output' + (a.status === 'error' ? ' error' : '') + '">' + esc(a.output) + '</pre>';
+      }
+      return '<div class="event ' + (a.type === 'tool' ? 'event-tool' : '') + '"><div class="event-label">' +
+        esc(label) + '</div>' + body + '</div>';
+    }).join('');
     const composer = state.sendEnabled && s.source === 'opencode' ?
       '<form class="mini-compose" data-for="' + esc(s.id) + '"><input type="text" placeholder="Message this session…" autocomplete="off">' +
       '<button type="submit">Send</button></form>' + noteLine(s.id) : '';

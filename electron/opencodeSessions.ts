@@ -30,6 +30,39 @@ function object(data: string | null): Record<string, any> {
   } catch { return {}; }
 }
 
+const MAX_TOOL_TEXT = 8000;
+
+// The command or arguments a tool ran with, so executions (e.g. `python x.py`)
+// are visible on the board even while the tool is still running and has no title.
+export function toolInputText(value: Record<string, any>): string {
+  const input = value?.state?.input;
+  if (typeof input === 'string') return input.slice(0, MAX_TOOL_TEXT);
+  if (!input || typeof input !== 'object') return '';
+  for (const key of ['command', 'filePath', 'pattern', 'query', 'url']) {
+    const candidate = input[key];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.slice(0, MAX_TOOL_TEXT);
+  }
+  try {
+    const json = JSON.stringify(input);
+    return json && json !== '{}' ? json.slice(0, MAX_TOOL_TEXT) : '';
+  } catch { return ''; }
+}
+
+// The captured result of a tool call: an error, the command output, or the
+// metadata output OpenCode stores alongside it.
+export function toolOutputText(value: Record<string, any>): string {
+  const state = value?.state ?? {};
+  const candidates = [state.error, state.output, state.metadata?.output];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.slice(0, MAX_TOOL_TEXT);
+    if (candidate && typeof candidate === 'object') {
+      const message = candidate.data?.message ?? candidate.message;
+      if (typeof message === 'string' && message.trim()) return message.slice(0, MAX_TOOL_TEXT);
+    }
+  }
+  return '';
+}
+
 interface SessionRow {
   id: string;
   title: string;
@@ -139,9 +172,12 @@ export class OpenCodeSessionMonitor {
               if (value.type === 'text' && typeof value.text === 'string' && value.text.trim()) {
                 activity.push({ id: part.id, role: info.role || 'assistant', type: 'text', text: value.text.slice(-6000) });
               } else if (value.type === 'tool') {
+                const command = toolInputText(value);
+                const output = toolOutputText(value);
+                const title = String(value.state?.title || value.state?.input?.description || '').slice(0, 1000);
                 activity.push({ id: part.id, role: info.role || 'assistant', type: 'tool',
                   tool: String(value.tool || 'tool'), status: String(value.state?.status || 'pending'),
-                  text: String(value.state?.title || value.state?.input?.description || value.state?.error || '').slice(0, 1000) });
+                  text: title, input: command, output });
               }
             }
             if (info.error) activity.push({ id: message.id + '-error', role: 'assistant', type: 'text',
