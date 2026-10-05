@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.15.0** — Remote sessions go anywhere: configure an external URL (reverse proxy, tunnel, or custom domain) in Settings and the Sessions board's QR code and copyable URL will automatically embed your public endpoint with the active session token, making mobile access effortless.
+**Version 3.15.1** — Fix OpenCode launch script UTF-8 encoding on Windows: payloads and scripts now explicitly enforce UTF-8, ensuring prompts and folder paths with Spanish accents and tildes (á, é, í, ó, ú, ñ) are preserved accurately without Mojibake corruption.
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 

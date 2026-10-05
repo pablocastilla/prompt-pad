@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { buildOpenCodeWinScript } from '../electron/launcherScripts';
 
 const TEST_SCRIPT_PREFIX = 'pp-encoding-test-';
 
@@ -215,4 +216,72 @@ test.describe('PS1 encoding with BOM', () => {
       try { fs.unlinkSync(psPath); } catch { /* clean up */ }
     }
   });
+
+  test('buildOpenCodeWinScript specifies -Encoding UTF8 on all Get-Content calls', () => {
+    const script = buildOpenCodeWinScript({
+      cli: 'opencode',
+      workDir: 'C:\\test\\work',
+      model: 'opencode/minimax-m2.5-free',
+      message: 'Mira a ver qué ha pasado aquí y proponme una solución.',
+      yolo: false,
+      promptPath: 'C:\\test\\pp-prompt.txt',
+      launchTmpDir: 'C:\\test\\pp-launch',
+      serveAuthPath: 'C:\\test\\auth.json',
+      createPath: 'C:\\test\\pp-create.json',
+      sendPath: 'C:\\test\\pp-send.json',
+      title: 'Solución con tildes',
+    });
+
+    expect(script).toContain("Get-Content -LiteralPath 'C:\\test\\pp-create.json' -Raw -Encoding UTF8");
+    expect(script).toContain("Get-Content -LiteralPath 'C:\\test\\pp-send.json' -Raw -Encoding UTF8");
+    expect(script).toContain("Get-Content -LiteralPath $authFile -Raw -Encoding UTF8");
+    expect(script).toContain("Set-Content -LiteralPath $authFile -Encoding UTF8");
+  });
+
+  test('PowerShell 5.1 Get-Content with -Encoding UTF8 preserves Spanish tildes and avoids Mojibake', async () => {
+    if (process.platform !== 'win32') {
+      test.skip();
+      return;
+    }
+
+    const id = Date.now().toString();
+    const testJson = getTempPath(TEST_SCRIPT_PREFIX + id + '-payload.json');
+    const accentedPrompt = 'Mira a ver qué ha pasado aquí y proponme una solución. Tildes: á é í ó ú ñ Á É Í Ó Ú Ñ';
+    const jsonContent = JSON.stringify({ parts: [{ type: 'text', text: accentedPrompt }] });
+
+    // Write UTF-8 without BOM (standard Node fs.writeFileSync output)
+    fs.writeFileSync(testJson, jsonContent, 'utf-8');
+
+    const psPath = getTempPath(TEST_SCRIPT_PREFIX + id + '-test.ps1');
+    const script = [
+      `$utf8Raw = Get-Content -LiteralPath '${testJson.replace(/'/g, "''")}' -Raw -Encoding UTF8`,
+      `$parsed = $utf8Raw | ConvertFrom-Json`,
+      `Write-Output ('UTF8: ' + $parsed.parts[0].text)`,
+      `$ansiRaw = Get-Content -LiteralPath '${testJson.replace(/'/g, "''")}' -Raw`,
+      `$bytesAnsi = [Text.Encoding]::UTF8.GetBytes($ansiRaw)`,
+      `$mangled = [Text.Encoding]::UTF8.GetString($bytesAnsi) | ConvertFrom-Json`,
+      `Write-Output ('MANGLED: ' + $mangled.parts[0].text)`,
+    ].join('\n');
+
+    try {
+      fs.writeFileSync(psPath, '\uFEFF' + script, 'utf-8');
+      const output = runPS1AndGetOutput(psPath);
+
+      // With -Encoding UTF8: Spanish accents survive intact
+      expect(output).toContain('UTF8: ' + accentedPrompt);
+      expect(output).toContain('qué ha pasado aquí');
+      expect(output).toContain('solución');
+      expect(output).toContain('á é í ó ú ñ');
+
+      // Without -Encoding UTF8 in PowerShell 5.1: accents are mangled into Mojibake (Ã)
+      expect(output).toContain('MANGLED:');
+      expect(output).toContain('quÃ');
+      expect(output).toContain('aquÃ');
+      expect(output).toContain('soluciÃ');
+    } finally {
+      try { fs.unlinkSync(testJson); } catch { /* clean up */ }
+      try { fs.unlinkSync(psPath); } catch { /* clean up */ }
+    }
+  });
 });
+
