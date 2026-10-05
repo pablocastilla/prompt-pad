@@ -185,11 +185,16 @@ export function SessionsPanel() {
   const showRemoteQr = async () => {
     setRemoteBusy(true);
     try {
-      const info = await window.electronAPI.getRemoteSessionsQr();
+      const info = await window.electronAPI.getRemoteSessionsQr(settings.remoteSessionsExternalUrl);
       setRemote(info);
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { setRemoteBusy(false); }
   };
+  useEffect(() => {
+    if (remote) {
+      void showRemoteQr();
+    }
+  }, [settings.remoteSessionsExternalUrl]);
   const sendToSession = async (sessionId: string, text: string): Promise<string> => {
     const result = await window.electronAPI.sendOpenCodeMessage(sessionId, text);
     return result.title || sessionId;
@@ -238,7 +243,7 @@ export function SessionsPanel() {
           <code title={remote.url}>{remote.url}</code>
           <div className="sessions-remote-actions">
             <button className="btn" onClick={() => void navigator.clipboard?.writeText(remote.url)}>{t('sessionsRemoteCopy')}</button>
-            <span>{t('sessionsRemoteHint')}</span>
+            <span>{settings.remoteSessionsExternalUrl?.trim() ? t('sessionsRemoteExternalHint') : t('sessionsRemoteHint')}</span>
           </div>
         </div>
       </div>}

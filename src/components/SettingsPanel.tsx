@@ -47,6 +47,12 @@ export function SettingsPanel() {
     await window.electronAPI.saveSettings(next);
   };
 
+  const updateRemoteSessionsExternalUrl = async (value: string) => {
+    const next = { ...settings, remoteSessionsExternalUrl: value };
+    setSettings(next);
+    await window.electronAPI.saveSettings(next);
+  };
+
   const updateShortcutModifier = async (
     key: 'phraseShortcutModifier' | 'launchShortcutModifier' | 'openVsCodeShortcutModifier',
     value: Settings['phraseShortcutModifier'] | Settings['launchShortcutModifier'] | Settings['openVsCodeShortcutModifier']
@@ -133,6 +139,22 @@ export function SettingsPanel() {
           />
           <span>{t('sessionSound')}</span>
         </label>
+      </div>
+
+      <div className="settings-section">
+        <h4>{t('remoteSessionsSection')}</h4>
+        <div className="settings-info settings-info-spaced">{t('remoteSessionsInfo')}</div>
+        <div className="form-group">
+          <label htmlFor="remote-sessions-url">{t('remoteSessionsUrl')}</label>
+          <input
+            id="remote-sessions-url"
+            type="url"
+            className="settings-input"
+            placeholder={t('remoteSessionsUrlPlaceholder')}
+            value={settings.remoteSessionsExternalUrl || ''}
+            onChange={e => updateRemoteSessionsExternalUrl(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="settings-section">

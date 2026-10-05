@@ -485,3 +485,31 @@ export async function qrSvg(text: string, size = 148): Promise<string> {
     width: size,
   });
 }
+
+/**
+ * Format the remote sessions URL to encode in the QR code and display in the UI.
+ * If an external URL is configured (e.g. tunnel, reverse proxy, domain), it appends
+ * or updates the token query parameter `key`. Otherwise, it falls back to the default
+ * local LAN IP and port.
+ */
+export function formatRemoteSessionsUrl(
+  baseUrl: string | undefined | null,
+  host: string,
+  port: number,
+  key: string
+): string {
+  const trimmed = baseUrl?.trim();
+  if (!trimmed) {
+    return `http://${host}:${port}/?key=${key}`;
+  }
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  try {
+    const parsed = new URL(withScheme);
+    parsed.searchParams.set('key', key);
+    return parsed.toString();
+  } catch {
+    const sep = withScheme.includes('?') ? '&' : '?';
+    return `${withScheme}${sep}key=${encodeURIComponent(key)}`;
+  }
+}
+

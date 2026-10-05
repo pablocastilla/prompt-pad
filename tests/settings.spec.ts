@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { removeTestDir } from './helpers';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -49,7 +50,7 @@ test.describe('Settings panel', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -78,7 +79,7 @@ test.describe('Settings panel', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -107,7 +108,7 @@ test.describe('Settings panel', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -133,7 +134,7 @@ test.describe('Settings panel', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -166,7 +167,7 @@ test.describe('Settings panel', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -191,7 +192,7 @@ test.describe('Settings panel', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -224,7 +225,40 @@ test.describe('Settings panel', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
+    }
+  });
+
+  test('Settings allows configuring external URL for remote sessions', async () => {
+    const testDir = getTestDir();
+    try {
+      cleanSettings(testDir);
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+
+      await openSettings(page);
+
+      const urlInput = page.locator('#remote-sessions-url');
+      await expect(urlInput).toBeVisible();
+      await expect(urlInput).toHaveAttribute('placeholder', /https:\/\/(example|ejemplo)\.com:4127/);
+
+      await urlInput.fill('https://tunnel.example.com');
+      await page.waitForTimeout(200);
+
+      const settings = await page.evaluate(() => {
+        return (window as unknown as { electronAPI: { loadSettings: () => Promise<{ remoteSessionsExternalUrl?: string }> } })
+          .electronAPI.loadSettings();
+      });
+      expect(settings.remoteSessionsExternalUrl).toBe('https://tunnel.example.com');
+
+      const savedJson = JSON.parse(fs.readFileSync(getSettingsPath(testDir), 'utf8'));
+      expect(savedJson.remoteSessionsExternalUrl).toBe('https://tunnel.example.com');
+
+      await app.close();
+    } finally {
+      removeTestDir(testDir);
     }
   });
 });
+

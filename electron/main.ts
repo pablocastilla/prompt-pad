@@ -6,7 +6,7 @@ import * as os from 'os';
 import { spawn } from 'child_process';
 import { findOpenCodeDb as locateOpenCodeDb, OpenCodeSessionMonitor } from './opencodeSessions';
 import { findAntigravityDbs as locateAntigravityDb, AntigravitySessionMonitor } from './antigravitySessions';
-import { RemoteSessionsServer, qrSvg } from './remoteServer';
+import { RemoteSessionsServer, qrSvg, formatRemoteSessionsUrl } from './remoteServer';
 import { promptExcerpt } from './promptExcerpt';
 
 const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
@@ -1754,8 +1754,13 @@ async function startRemoteServer(): Promise<{ port: number; key: string }> {
 
 ipcMain.handle('remote-sessions:start', () => startRemoteServer());
 
-ipcMain.handle('remote-sessions:qr', async () => {
+ipcMain.handle('remote-sessions:qr', async (_e, overrideUrl?: string) => {
   const { port, key } = await startRemoteServer();
+  const settings = readJson<{ remoteSessionsExternalUrl?: string }>(getSettingsPath(), {});
+  const configuredUrl = (typeof overrideUrl === 'string' && overrideUrl.trim())
+    ? overrideUrl.trim()
+    : (typeof settings.remoteSessionsExternalUrl === 'string' ? settings.remoteSessionsExternalUrl.trim() : '');
+
   const interfaces = os.networkInterfaces();
   const candidates: string[] = [];
   for (const list of Object.values(interfaces)) {
@@ -1772,8 +1777,9 @@ ipcMain.handle('remote-sessions:qr', async () => {
   const localIpv4 = candidates.find(a => a.startsWith('192.168.')) ??
     candidates.find(a => a.startsWith('10.')) ?? candidates[0] ?? null;
   const host = localIpv4 || '127.0.0.1';
-  const qr = await qrSvg(`http://${host}:${port}/?key=${key}`);
-  return { url: `http://${host}:${port}/?key=${key}`, qr };
+  const finalUrl = formatRemoteSessionsUrl(configuredUrl, host, port, key);
+  const qr = await qrSvg(finalUrl);
+  return { url: finalUrl, qr };
 });
 
 interface DayCostRow {

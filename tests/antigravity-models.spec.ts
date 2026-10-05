@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { removeTestDir } from './helpers';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -56,7 +57,7 @@ test.describe('Antigravity Models Feature', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -87,7 +88,7 @@ test.describe('Antigravity Models Feature', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -124,7 +125,7 @@ test.describe('Antigravity Models Feature', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -169,7 +170,7 @@ test.describe('Antigravity Models Feature', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -234,7 +235,7 @@ test.describe('Antigravity Models Feature', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -278,7 +279,7 @@ test.describe('Antigravity Models Feature', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -302,7 +303,7 @@ test.describe('Antigravity Models Feature', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 });

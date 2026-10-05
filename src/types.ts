@@ -36,6 +36,7 @@ export interface Settings {
   phraseShortcutModifier: ShortcutModifier;
   launchShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
   openVsCodeShortcutModifier: 'ctrl+shift' | 'ctrl+alt' | 'ctrl+alt+shift';
+  remoteSessionsExternalUrl?: string;
 }
 
 // ── Attached file (transient – not persisted in session) ──
@@ -378,7 +379,7 @@ export interface ElectronAPI {
   dismissAntigravitySession: (id: string, turnId: string) => Promise<void>;
   restoreAntigravitySessions: () => Promise<void>;
   startRemoteSessions: () => Promise<{ port: number; key: string }>;
-  getRemoteSessionsQr: () => Promise<{ url: string; qr: string }>;
+  getRemoteSessionsQr: (externalUrl?: string) => Promise<{ url: string; qr: string }>;
   sendOpenCodeMessage: (sessionId: string, text: string) => Promise<{ id: string; title: string; created: boolean }>;
   getPRStats: () => Promise<PRStats>;
   getPricingData: () => Promise<Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> | null>;

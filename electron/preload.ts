@@ -86,7 +86,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Mobile sessions (remote server + QR)
   startRemoteSessions: () => ipcRenderer.invoke('remote-sessions:start'),
-  getRemoteSessionsQr: () => ipcRenderer.invoke('remote-sessions:qr'),
+  getRemoteSessionsQr: (externalUrl?: string) => ipcRenderer.invoke('remote-sessions:qr', externalUrl),
   sendOpenCodeMessage: (sessionId: string, text: string) => ipcRenderer.invoke('opencode-sessions:send', sessionId, text),
 
   // Git integration
