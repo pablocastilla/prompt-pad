@@ -5,17 +5,33 @@ import * as os from 'os';
 import * as path from 'path';
 import { renderMarkdown } from './markdown';
 import type { OpenCodeSessionMonitor } from './opencodeSessions';
+import type { OpenCodeInteractions, OpenCodePermissionRequest, OpenCodeQuestionRequest } from './sessionTypes';
+
+// Mobile palette mirrors the desktop themes in src/App.css so the phone follows
+// whichever theme is selected in Settings.
+const THEME_CSS = `
+  :root, [data-theme="dark"] { --bg: #09090b; --panel: #18181b; --border: #27272a; --text: #f4f4f5;
+    --text2: #a1a1aa; --accent: #818cf8; --accent-dim: rgba(129,140,248,.15); --accent-t: #fff;
+    --danger: #f87171; --ok: #34d399; --warn: #fbbf24; }
+  [data-theme="light"] { --bg: #fafafa; --panel: #f4f4f5; --border: #e4e4e7; --text: #18181b;
+    --text2: #52525b; --accent: #6366f1; --accent-dim: rgba(99,102,241,.12); --accent-t: #fff;
+    --danger: #ef4444; --ok: #059669; --warn: #b45309; }
+  [data-theme="gaudy"] { --bg: #140418; --panel: #210a29; --border: rgba(255,196,228,.18); --text: #d8fff6;
+    --text2: #ffd0ea; --accent: #ff78c8; --accent-dim: rgba(255,120,200,.14); --accent-t: #2f0d29;
+    --danger: #ff597d; --ok: #00ffcc; --warn: #ffe28a; }
+  [data-theme="cyberpunk"] { --bg: #060913; --panel: rgba(8,14,25,.94); --border: rgba(80,226,255,.2); --text: #dff8ff;
+    --text2: #8cb6c8; --accent: #47e9ff; --accent-dim: rgba(71,233,255,.14); --accent-t: #051018;
+    --danger: #ff4d8f; --ok: #5eead4; --warn: #ffe28a; }
+`;
 
 const INDEX_HTML = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="__THEME__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prompt Pad Sessions</title>
 <style>
-  :root { --bg: #16181d; --panel: #1e2126; --border: #2b2f36; --text: #e8eaed; --text2: #9aa0a8;
-    --accent: #5eead4; --accent-dim: rgba(94, 234, 212, .12); --danger: #ff597d;
-    --ok: #8ce99a; --warn: #ffe28a; }
+__THEME_CSS__
   * { box-sizing: border-box; margin: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; padding: 14px; }
   .toolbar { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
@@ -69,21 +85,34 @@ const INDEX_HTML = `<!DOCTYPE html>
   .event-text pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 11px; overflow-x: auto; margin: 8px 0; }
   .event-text pre code { padding: 0; border: none; background: transparent; white-space: pre; font-size: 11px; line-height: 1.6; }
   .event-text a { color: var(--accent); text-decoration: underline; }
-  .composer { position: sticky; bottom: 0; padding: 10px 0 2px; background: var(--bg); }
-  .composer form { display: flex; gap: 8px; }
-  .composer input[type=text] { flex: 1; padding: 12px; background: var(--panel); color: var(--text);
+  .interactions { padding: 0 14px; }
+  .interactions:not(:empty) { padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--accent-dim); }
+  .interaction { margin-bottom: 12px; }
+  .interaction:last-child { margin-bottom: 0; }
+  .q-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); margin-bottom: 4px; }
+  .q-text { font-size: 13px; line-height: 1.55; margin-bottom: 8px; overflow-wrap: anywhere; }
+  .q-item + .q-item { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+  .q-options { display: flex; flex-direction: column; gap: 6px; }
+  .q-opt { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--panel); font-size: 13px; cursor: pointer; }
+  .q-opt input { margin-top: 2px; flex-shrink: 0; }
+  .q-opt-label { font-weight: 600; }
+  .q-opt-desc { display: block; color: var(--text2); font-size: 11px; margin-top: 2px; }
+  .q-custom { width: 100%; margin-top: 8px; padding: 10px 12px; background: var(--panel); color: var(--text);
     border: 1px solid var(--border); border-radius: 8px; font-size: 16px; }
-  .composer button { padding: 12px 18px; border: none; border-radius: 8px; background: var(--accent);
-    color: #10221d; font-weight: 600; cursor: pointer; font-size: 15px; }
-  .composer button:disabled { opacity: .5; cursor: default; }
-  .composer-note { font-size: 11px; color: var(--text2); margin-top: 6px; min-height: 14px; }
-  .composer-note.error { color: var(--danger); }
-  .composer-note.ok { color: var(--ok); }
+  .interaction-reply { margin-top: 10px; padding: 10px 16px; border: none; border-radius: 8px; background: var(--accent);
+    color: var(--accent-t); font-weight: 600; cursor: pointer; font-size: 14px; }
+  .interaction-reply:disabled { opacity: .5; cursor: default; }
+  .interaction.permission .event-code { color: var(--danger); }
+  .perm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .perm-actions .interaction-reply { margin-top: 0; }
+  .perm-actions .interaction-reply[data-reply="reject"] { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .perm-actions .interaction-reply[data-reply="always"] { background: var(--panel); color: var(--accent); border: 1px solid var(--accent); }
   .mini-compose { display: flex; gap: 8px; margin-top: 12px; }
   .mini-compose input[type=text] { flex: 1; min-width: 0; padding: 10px 12px; background: var(--bg);
     color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 16px; }
   .mini-compose button { padding: 10px 14px; border: none; border-radius: 8px; background: var(--accent);
-    color: #10221d; font-weight: 600; cursor: pointer; font-size: 14px; }
+    color: var(--accent-t); font-weight: 600; cursor: pointer; font-size: 14px; }
   .mini-compose button:disabled { opacity: .5; cursor: default; }
   .mini-note { font-size: 11px; margin-top: 6px; color: var(--text2); }
   .mini-note.ok { color: var(--ok); }
@@ -97,13 +126,6 @@ const INDEX_HTML = `<!DOCTYPE html>
 <div class="controls"><input type="search" id="search" placeholder="Search sessions…" autocomplete="off"></div>
 <div class="sessions" id="sessions"></div>
 <div class="empty" id="empty" hidden>No sessions found</div>
-<div class="composer" id="composer" hidden>
-  <form id="promptForm">
-    <input type="text" id="promptInput" placeholder="Message to send to OpenCode (new session)…" autocomplete="off">
-    <button type="submit" id="promptSend">Send</button>
-  </form>
-  <div class="composer-note" id="promptNote"></div>
-</div>
 <script>
 const $ = id => document.getElementById(id);
 const KEY = new URLSearchParams(location.search).get('key') || '';
@@ -111,6 +133,7 @@ const withKey = path => path + (path.includes('?') ? '&' : '?') + 'key=' + encod
 const state = { sessions: [], open: new Set(JSON.parse(sessionStorage.getItem('pp-open') || '[]')), filter: '',
   notes: {}, sendEnabled: false };
 const pill = s => '<span class="status-pill status-' + s + '">' + s + '</span>';
+const NL = String.fromCharCode(10);
 function esc(text) { const d = document.createElement('div'); d.textContent = text == null ? '' : String(text); return d.innerHTML; }
 function noteLine(id) {
   const n = state.notes[id];
@@ -118,15 +141,54 @@ function noteLine(id) {
   if (Date.now() - n.at > 15000) { delete state.notes[id]; return ''; }
   return '<div class="mini-note ' + n.cls + '">' + esc(n.text) + '</div>';
 }
+function questionBlock(q) {
+  const items = (q.questions || []).map((info, qi) => {
+    const type = info.multiple ? 'checkbox' : 'radio';
+    const options = (info.options || []).map(o =>
+      '<label class="q-opt"><input type="' + type + '" name="q-' + esc(q.id) + '-' + qi +
+        '" data-key="' + esc(q.id + ':' + qi + ':' + o.label) + '" value="' + esc(o.label) + '">' +
+      '<span><span class="q-opt-label">' + esc(o.label) + '</span>' +
+      (o.description ? '<span class="q-opt-desc">' + esc(o.description) + '</span>' : '') + '</span></label>').join('');
+    const custom = info.custom ? '<input type="text" class="q-custom" data-key="' + esc(q.id + ':' + qi + ':custom') +
+      '" placeholder="Type your answer…" autocomplete="off">' : '';
+    return '<div class="q-item"><div class="q-header">' + esc(info.header || 'Question') + '</div>' +
+      '<div class="q-text">' + esc(info.question || '') + '</div>' +
+      '<div class="q-options">' + options + '</div>' + custom + '</div>';
+  }).join('');
+  return '<div class="interaction question" data-kind="question" data-req="' + esc(q.id) + '">' + items +
+    '<button type="button" class="interaction-reply" data-kind="question" data-req="' + esc(q.id) + '">Answer</button>' +
+    noteLine(q.id) + '</div>';
+}
+function permissionBlock(p) {
+  const detail = [p.permission, (p.patterns || []).join(NL)].filter(Boolean).join(NL);
+  return '<div class="interaction permission" data-kind="permission" data-req="' + esc(p.id) + '">' +
+    '<div class="q-header">Permission required</div>' +
+    '<pre class="event-code">' + esc(detail) + '</pre>' +
+    '<div class="perm-actions">' +
+    '<button type="button" class="interaction-reply" data-kind="permission" data-req="' + esc(p.id) + '" data-reply="once">Allow once</button>' +
+    '<button type="button" class="interaction-reply" data-kind="permission" data-req="' + esc(p.id) + '" data-reply="always">Allow always</button>' +
+    '<button type="button" class="interaction-reply" data-kind="permission" data-req="' + esc(p.id) + '" data-reply="reject">Reject</button>' +
+    '</div>' + noteLine(p.id) + '</div>';
+}
+function interactionsHtml(s) {
+  return (s.questions || []).map(questionBlock).concat((s.permissions || []).map(permissionBlock)).join('');
+}
 function render() {
   const q = state.filter.toLowerCase();
   const shown = state.sessions.filter(s => (s.title + ' ' + s.directory + ' ' + s.model).toLowerCase().includes(q));
-  // Preserve whatever is being typed across the 5-second re-render.
+  // Preserve whatever is being typed/selected across the 5-second re-render.
   const typing = new Map();
   let focused = null;
   document.querySelectorAll('form.mini-compose').forEach(f => {
-    typing.set(f.getAttribute('data-for'), f.querySelector('input').value);
-    if (document.activeElement === f.querySelector('input')) focused = f.getAttribute('data-for');
+    typing.set('m:' + f.getAttribute('data-for'), f.querySelector('input').value);
+    if (document.activeElement === f.querySelector('input')) focused = 'm:' + f.getAttribute('data-for');
+  });
+  document.querySelectorAll('.q-custom').forEach(inp => {
+    typing.set('k:' + inp.getAttribute('data-key'), inp.value);
+    if (document.activeElement === inp) focused = 'k:' + inp.getAttribute('data-key');
+  });
+  document.querySelectorAll('.interaction input[type=checkbox], .interaction input[type=radio]').forEach(inp => {
+    if (inp.checked) typing.set('s:' + inp.getAttribute('data-key'), '1');
   });
   $('sessions').innerHTML = shown.map(s => {
     const isOpen = state.open.has(s.id);
@@ -153,14 +215,23 @@ function render() {
       '<div class="session-meta session-model">' + esc(s.model || 'no model') + '</div>' +
       '<div class="status-row">' + pill(s.status) +
       '<span class="session-meta">' + new Date(s.updatedAt).toLocaleTimeString() + '</span></div></div>' +
+      '<div class="interactions">' + interactionsHtml(s) + '</div>' +
       '<div class="activity">' + (events || '<div class="event"><p>No activity</p></div>') + composer + '</div></article>';
   }).join('');
-  // Restore in-progress text and focus.
+  // Restore in-progress text, selections and focus.
   document.querySelectorAll('form.mini-compose').forEach(wrap => {
-    const id = wrap.getAttribute('data-for');
+    const k = 'm:' + wrap.getAttribute('data-for');
     const input = wrap.querySelector('input');
-    if (typing.has(id)) input.value = typing.get(id);
-    if (id === focused) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    if (typing.has(k)) input.value = typing.get(k);
+    if (k === focused) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  });
+  document.querySelectorAll('.q-custom').forEach(inp => {
+    const k = 'k:' + inp.getAttribute('data-key');
+    if (typing.has(k)) inp.value = typing.get(k);
+    if (k === focused) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  });
+  document.querySelectorAll('.interaction input[type=checkbox], .interaction input[type=radio]').forEach(inp => {
+    if (typing.get('s:' + inp.getAttribute('data-key')) === '1') inp.checked = true;
   });
   $('status').textContent = shown.length + ' session' + (shown.length === 1 ? '' : 's') + ' · updated ' + new Date().toLocaleTimeString();
 }
@@ -176,9 +247,9 @@ async function poll() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     state.sessions = data.sessions || [];
+    if (data.theme) document.documentElement.setAttribute('data-theme', data.theme);
     $('error').hidden = true;
     state.sendEnabled = data.sendEnabled !== false;
-    $('composer').hidden = !state.sendEnabled;
   } catch (err) {
     $('error').textContent = 'Error fetching sessions: ' + err.message;
     $('error').hidden = false;
@@ -211,31 +282,35 @@ document.addEventListener('submit', async e => {
     render();
   } finally { button.disabled = false; }
 });
-$('promptForm').addEventListener('submit', async e => {
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('.interaction-reply');
+  if (!btn) return;
   e.preventDefault();
-  const input = $('promptInput');
-  const text = input.value.trim();
-  if (!text) return;
-  const button = $('promptSend');
-  const note = $('promptNote');
-  button.disabled = true;
-  note.className = 'composer-note';
-  note.textContent = 'Sending…';
+  const kind = btn.getAttribute('data-kind');
+  const requestId = btn.getAttribute('data-req');
+  const payload = { kind, requestId };
+  if (kind === 'permission') {
+    payload.reply = btn.getAttribute('data-reply');
+  } else {
+    const box = btn.closest('.interaction');
+    payload.answers = [...box.querySelectorAll('.q-item')].map(item => {
+      const picked = [...item.querySelectorAll('input[type=checkbox]:checked, input[type=radio]:checked')].map(i => i.value);
+      const custom = item.querySelector('.q-custom');
+      if (custom && custom.value.trim()) picked.push(custom.value.trim());
+      return picked;
+    });
+  }
+  [...document.querySelectorAll('.interaction-reply[data-req="' + requestId + '"]')].forEach(b => { b.disabled = true; });
   try {
-    const res = await fetch(withKey('/api/send'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+    const res = await fetch(withKey('/api/interaction/reply'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
-    note.className = 'composer-note ok';
-    note.textContent = data.created ? 'Session created: ' + (data.title || data.id) : 'Message sent to session: ' + (data.title || data.id);
-    input.value = '';
-    poll();
   } catch (err) {
-    note.className = 'composer-note error';
-    note.textContent = 'Send failed: ' + err.message;
-  } finally { button.disabled = false; }
+    state.notes[requestId] = { cls: 'error', text: 'Reply failed: ' + err.message, at: Date.now() };
+  }
+  poll();
 });
 poll();
 setInterval(poll, 5000);
@@ -250,6 +325,12 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string));
 }
 
+/** The mobile page for a given theme; mirrors the selected desktop theme. */
+export function renderIndexHtml(theme = 'dark'): string {
+  const safe = ['light', 'dark', 'gaudy', 'cyberpunk'].includes(theme) ? theme : 'dark';
+  return INDEX_HTML.replace('__THEME__', safe).replace('__THEME_CSS__', THEME_CSS);
+}
+
 export class RemoteSessionsServer {
   private server: http.Server | null = null;
   // 8 hex chars (4 bytes) keeps the QR URL within version 2-L (32 data bytes).
@@ -257,10 +338,19 @@ export class RemoteSessionsServer {
   // Basic-auth credentials for the headless OpenCode server we spawn, persisted
   // so later app runs can authenticate against the still-running server.
   private serveAuthPath: string | null = null;
+  // Theme selected in Settings; the mobile page follows it.
+  private theme = 'dark';
 
   constructor(private readonly monitor: OpenCodeSessionMonitor, serveAuthPath?: string) {
     this.serveAuthPath = serveAuthPath ?? null;
   }
+
+  /** Track the desktop theme so the served mobile page matches it. */
+  setTheme(theme: string): void {
+    if (typeof theme === 'string' && theme) this.theme = theme;
+  }
+
+  get currentTheme(): string { return this.theme; }
 
   private readServeAuth(): { port: number; username: string; password: string } | null {
     try {
@@ -341,9 +431,19 @@ export class RemoteSessionsServer {
       }
       if (url.pathname === '/api/sessions' && req.method === 'GET') {
         const snapshot = this.monitor.read();
-        const body = JSON.stringify({ ...snapshot, sessions: snapshot.sessions.map(s => ({
+        const interactions = await this.listInteractions();
+        const permissions = new Map<string, typeof interactions.permissions>();
+        const questions = new Map<string, typeof interactions.questions>();
+        for (const permission of interactions.permissions) {
+          permissions.set(permission.sessionID, [...(permissions.get(permission.sessionID) || []), permission]);
+        }
+        for (const question of interactions.questions) {
+          questions.set(question.sessionID, [...(questions.get(question.sessionID) || []), question]);
+        }
+        const body = JSON.stringify({ ...snapshot, theme: this.theme, sessions: snapshot.sessions.map(s => ({
           id: s.id, title: s.title, directory: s.directory, model: s.model, status: s.status,
           updatedAt: s.updatedAt, createdAt: s.createdAt, source: s.source,
+          permissions: permissions.get(s.id) || [], questions: questions.get(s.id) || [],
           activity: s.activity.map(a => ({ ...a, html: a.type === 'text' ? renderMarkdown(a.text) : '' })),
         })), sendEnabled: true });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -362,33 +462,50 @@ export class RemoteSessionsServer {
         const text = typeof payload.text === 'string' ? payload.text.trim() : '';
         if (!text) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Empty message' })); return; }
         if (text.length > 20_000) { res.writeHead(413, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Message too long' })); return; }
-        // With a sessionId the message continues that live session; otherwise a
-        // fresh OpenCode session is created for it.
+        // A message must target an active session; asking with no session is not
+        // allowed, so there is no "create a fresh session" path here.
         const sessionId = typeof payload.sessionId === 'string' && payload.sessionId.length <= 256 ? payload.sessionId.trim() : '';
-        const result = sessionId ? await this.sendToSession(sessionId, text) : await this.sendToOpenCode(text);
+        if (!sessionId) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'An active session is required' })); return; }
+        const result = await this.sendToSession(sessionId, text);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(result));
         return;
       }
+      if (url.pathname === '/api/interaction/reply' && req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        for await (const chunk of req) {
+          size += (chunk as Buffer).length;
+          if (size > 64 * 1024) { res.writeHead(413, { 'Content-Type': 'text/plain' }); res.end('Payload too large'); return; }
+          chunks.push(chunk as Buffer);
+        }
+        const payload = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+        const requestId = typeof payload.requestId === 'string' ? payload.requestId.trim() : '';
+        const kind = payload.kind === 'permission' ? 'permission' : payload.kind === 'question' ? 'question' : '';
+        if (!requestId || !kind || requestId.length > 256) {
+          res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Invalid interaction' })); return;
+        }
+        if (kind === 'permission') {
+          const reply = ['once', 'always', 'reject'].includes(payload.reply) ? payload.reply as 'once' | 'always' | 'reject' : 'reject';
+          const message = typeof payload.message === 'string' && payload.message ? payload.message.slice(0, 2000) : undefined;
+          await this.replyPermission(requestId, reply, message);
+        } else {
+          const answers = Array.isArray(payload.answers)
+            ? payload.answers.map((a: unknown) => Array.isArray(a) ? a.filter(x => typeof x === 'string').map((x: string) => x.slice(0, 500)) : [])
+            : [];
+          await this.replyQuestion(requestId, answers);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
       // Everything else serves the single-page mobile UI.
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(INDEX_HTML);
+      res.end(renderIndexHtml(this.theme));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Internal error: ' + (err instanceof Error ? err.message : String(err)));
     }
-  }
-
-  /** Send a prompt through the OpenCode HTTP server, creating a fresh session. */
-  private async sendToOpenCode(text: string): Promise<{ id: string; title: string; created: boolean }> {
-    const base = await this.ensureOpenCodeServer();
-    const created = await this.requestOpenCode<{ id?: string; title?: string }>(base, 'POST', '/session', { title: 'Prompt Pad (mobile)' });
-    const sessionId = created?.id;
-    if (!sessionId) throw new Error('OpenCode did not return a session id');
-    await this.requestOpenCode(base, 'POST', `/session/${sessionId}/prompt_async`, {
-      parts: [{ type: 'text', text }],
-    });
-    return { id: sessionId, title: created.title || 'Prompt Pad (mobile)', created: true };
   }
 
   /** Send a prompt into an already-running OpenCode session (fire and forget). */
@@ -406,15 +523,47 @@ export class RemoteSessionsServer {
     return this.sendToSession(sessionId, text);
   }
 
-  /** Find or spawn `opencode serve` on a known port, polling the port until it answers. */
-  private async ensureOpenCodeServer(): Promise<string> {
+  // ── Live interactions (permissions and questions) ────────────────────────────
+
+  /**
+   * Pending permission/question requests across all sessions. Only reuses a
+   * server that is already running (never spawns one just to poll) and stays
+   * best-effort, so polling the board without a server yields no interactions.
+   */
+  async listInteractions(): Promise<OpenCodeInteractions> {
+    const empty: OpenCodeInteractions = { permissions: [], questions: [] };
+    let base: string | null;
+    try { base = await this.resolveRunningServer(); } catch { return empty; }
+    if (!base) return empty;
+    const [permissions, questions] = await Promise.all([
+      this.requestOpenCode<OpenCodePermissionRequest[]>(base, 'GET', '/permission', undefined).catch(() => []),
+      this.requestOpenCode<OpenCodeQuestionRequest[]>(base, 'GET', '/question', undefined).catch(() => []),
+    ]);
+    return {
+      permissions: Array.isArray(permissions) ? permissions : [],
+      questions: Array.isArray(questions) ? questions : [],
+    };
+  }
+
+  async replyPermission(requestId: string, reply: 'once' | 'always' | 'reject', message?: string): Promise<void> {
+    const base = await this.ensureOpenCodeServer();
+    await this.requestOpenCode(base, 'POST', `/permission/${encodeURIComponent(requestId)}/reply`,
+      message ? { reply, message } : { reply });
+  }
+
+  async replyQuestion(requestId: string, answers: string[][]): Promise<void> {
+    const base = await this.ensureOpenCodeServer();
+    await this.requestOpenCode(base, 'POST', `/question/${encodeURIComponent(requestId)}/reply`, { answers });
+  }
+
+  /** Reuse an OpenCode server already listening on this machine, if any. */
+  private async resolveRunningServer(): Promise<string | null> {
     const persisted = this.readServeAuth();
     for (const port of [4096, 4097]) {
       const base = `http://127.0.0.1:${port}`;
-      const existing = await this.pingOpenCode(base);
-      if (existing) return base;
-      // A server that answers 401 requires basic auth: try ours (from a previous
-      // run) first, then OpenCode's own persisted service password.
+      if (await this.pingOpenCode(base)) { this.activeServeAuth = null; return base; }
+      // A server answering 401 needs basic auth: try ours (previous run) first,
+      // then OpenCode's own persisted service password.
       if (persisted && persisted.port === port && await this.pingOpenCode(base, persisted)) {
         this.activeServeAuth = persisted;
         return base;
@@ -425,6 +574,13 @@ export class RemoteSessionsServer {
         return base;
       }
     }
+    return null;
+  }
+
+  /** Find or spawn `opencode serve` on a known port, polling the port until it answers. */
+  private async ensureOpenCodeServer(): Promise<string> {
+    const running = await this.resolveRunningServer();
+    if (running) return running;
     // No server running: spawn one headless in the background, protected with
     // basic auth. Port 0 lets the OS assign a free one (4097 may be taken); the
     // real port is read from the server's own "listening on" banner.

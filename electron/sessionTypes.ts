@@ -29,6 +29,9 @@ export interface OpenCodeSession {
   activity: OpenCodeActivity[];
   // Which product the session belongs to; defaults to OpenCode.
   source?: 'opencode' | 'antigravity';
+  // Pending live interactions attached by the server readers (not from SQLite).
+  permissions?: OpenCodePermissionRequest[];
+  questions?: OpenCodeQuestionRequest[];
 }
 
 export interface OpenCodeSessionsSnapshot {
@@ -36,4 +39,39 @@ export interface OpenCodeSessionsSnapshot {
   sessions: OpenCodeSession[];
   hiddenCount: number;
   checkedAt: number;
+}
+
+// Live interactions the agent is waiting on. These live in the running OpenCode
+// server (not SQLite), so the board and the mobile page poll them separately.
+export interface OpenCodeQuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface OpenCodeQuestionInfo {
+  question: string;
+  header: string;
+  options: OpenCodeQuestionOption[];
+  multiple?: boolean;
+  custom?: boolean;
+}
+
+export interface OpenCodeQuestionRequest {
+  id: string;
+  sessionID: string;
+  questions: OpenCodeQuestionInfo[];
+}
+
+export interface OpenCodePermissionRequest {
+  id: string;
+  sessionID: string;
+  permission: string;
+  patterns: string[];
+  metadata?: Record<string, unknown>;
+  always?: string[];
+}
+
+export interface OpenCodeInteractions {
+  permissions: OpenCodePermissionRequest[];
+  questions: OpenCodeQuestionRequest[];
 }

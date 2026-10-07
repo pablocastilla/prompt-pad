@@ -83,6 +83,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAntigravitySessions: () => ipcRenderer.invoke('antigravity-sessions:list'),
   dismissAntigravitySession: (id: string, turnId: string) => ipcRenderer.invoke('antigravity-sessions:dismiss', id, turnId),
   restoreAntigravitySessions: () => ipcRenderer.invoke('antigravity-sessions:restore'),
+  getOpenCodeInteractions: () => ipcRenderer.invoke('opencode-interactions:list'),
+  replyOpenCodePermission: (requestId: string, reply: string, message?: string) => ipcRenderer.invoke('opencode-interactions:permission-reply', requestId, reply, message),
+  replyOpenCodeQuestion: (requestId: string, answers: string[][]) => ipcRenderer.invoke('opencode-interactions:question-reply', requestId, answers),
 
   // Mobile sessions (remote server + QR)
   startRemoteSessions: () => ipcRenderer.invoke('remote-sessions:start'),

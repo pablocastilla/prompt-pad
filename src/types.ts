@@ -1,5 +1,9 @@
-import type { OpenCodeSessionsSnapshot } from '../electron/sessionTypes';
-export type { OpenCodeSession, OpenCodeSessionStatus, OpenCodeSessionsSnapshot } from '../electron/sessionTypes';
+import type { OpenCodeSessionsSnapshot, OpenCodeInteractions } from '../electron/sessionTypes';
+export type {
+  OpenCodeSession, OpenCodeSessionStatus, OpenCodeSessionsSnapshot,
+  OpenCodeInteractions, OpenCodeQuestionRequest, OpenCodeQuestionInfo, OpenCodeQuestionOption,
+  OpenCodePermissionRequest,
+} from '../electron/sessionTypes';
 
 // ── Phrase ──
 export interface Phrase {
@@ -378,6 +382,9 @@ export interface ElectronAPI {
   getAntigravitySessions: () => Promise<OpenCodeSessionsSnapshot>;
   dismissAntigravitySession: (id: string, turnId: string) => Promise<void>;
   restoreAntigravitySessions: () => Promise<void>;
+  getOpenCodeInteractions: () => Promise<OpenCodeInteractions>;
+  replyOpenCodePermission: (requestId: string, reply: 'once' | 'always' | 'reject', message?: string) => Promise<void>;
+  replyOpenCodeQuestion: (requestId: string, answers: string[][]) => Promise<void>;
   startRemoteSessions: () => Promise<{ port: number; key: string }>;
   getRemoteSessionsQr: (externalUrl?: string) => Promise<{ url: string; qr: string }>;
   sendOpenCodeMessage: (sessionId: string, text: string) => Promise<{ id: string; title: string; created: boolean }>;

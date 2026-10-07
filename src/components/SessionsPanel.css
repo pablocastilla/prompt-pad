@@ -29,6 +29,27 @@
 .session-status-completed { color: var(--phrase-color); }
 .session-status-error { color: var(--danger); }
 .session-expiry { font-size: 11px; color: var(--text2); margin-top: 8px; }
+.session-interactions { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--accent-dim); }
+.session-interaction { display: flex; flex-direction: column; gap: 8px; }
+.session-interaction-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+.session-interaction-text { font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.session-interaction-command { font-family: var(--mono, monospace); font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 0; max-height: 200px; overflow: auto; color: var(--text); }
+.session-question-options { display: flex; flex-direction: column; gap: 6px; }
+.session-question-option { display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px; border: 1px solid var(--border);
+  border-radius: 7px; background: var(--panel-bg); cursor: pointer; }
+.session-question-option input { margin-top: 2px; flex-shrink: 0; accent-color: var(--accent); }
+.session-question-option span { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.session-question-option strong { font-weight: 600; }
+.session-question-option small { color: var(--text2); font-size: 11px; }
+.session-question-custom { width: 100%; padding: 8px 10px; background: var(--input-bg, var(--bg)); color: var(--text);
+  border: 1px solid var(--input-bd, var(--border)); border-radius: 7px; font-size: 12px; font-family: inherit; }
+.session-interaction-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.session-interaction-actions button { padding: 7px 13px; border: none; border-radius: 7px; background: var(--accent);
+  color: #10221d; font-weight: 600; cursor: pointer; font-size: 12px; }
+.session-interaction-actions button:disabled { opacity: .5; cursor: default; }
+.session-interaction-actions .session-interaction-reject { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.session-interaction-error { font-size: 11px; color: var(--danger); overflow-wrap: anywhere; }
 .session-activity { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; overflow-wrap: anywhere; }
 .session-event { margin-bottom: 14px; }
 .session-event-label { font-size: 11px; color: var(--accent); font-weight: 600; margin-bottom: 5px; }

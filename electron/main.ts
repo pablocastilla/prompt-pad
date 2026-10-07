@@ -420,6 +420,7 @@ app.on('will-quit', () => remoteServer?.stop());
 // Settings
 ipcMain.handle('settings:load', () => {
   const settings = readJson(getSettingsPath(), { theme: 'dark', language: 'auto', useOneDrive: true });
+  remoteServer?.setTheme(typeof settings.theme === 'string' ? settings.theme : 'dark');
   if (TEST_DIR) return settings; // Never force OneDrive in test mode
   if (detectOneDrivePath()) {
     return { ...settings, useOneDrive: true };
@@ -427,6 +428,7 @@ ipcMain.handle('settings:load', () => {
   return settings;
 });
 ipcMain.handle('settings:save', (_e, s: Record<string, unknown>) => {
+  remoteServer?.setTheme(typeof s.theme === 'string' ? s.theme : 'dark');
   if (TEST_DIR) {
     useOneDrive = false;
     safeWrite(getSettingsPath(), JSON.stringify(s, null, 2));
@@ -1525,6 +1527,8 @@ ipcMain.handle('opencode-sessions:send', async (_e, sessionId: unknown, text: un
     throw new Error('Invalid message');
   }
   if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
+  const theme = readJson<{ theme?: string }>(getSettingsPath(), {}).theme;
+  if (typeof theme === 'string' && theme) remoteServer.setTheme(theme);
   return remoteServer.sendToSessionForIpc(sessionId.trim(), text.trim());
 });
 
@@ -1549,6 +1553,8 @@ async function startRemoteServer(): Promise<{ port: number; key: string }> {
   if (!remoteServer) {
     remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
   }
+  const theme = readJson<{ theme?: string }>(getSettingsPath(), {}).theme;
+  if (typeof theme === 'string' && theme) remoteServer.setTheme(theme);
   let port = REMOTE_PORT;
   try {
     port = await remoteServer.start(REMOTE_PORT, '0.0.0.0');
@@ -1560,6 +1566,31 @@ async function startRemoteServer(): Promise<{ port: number; key: string }> {
 }
 
 ipcMain.handle('remote-sessions:start', () => startRemoteServer());
+
+// Live pending permissions/questions from the running OpenCode server, so the
+// board can show and answer what the agent is asking. Disabled in test mode.
+const EMPTY_INTERACTIONS = { permissions: [], questions: [] };
+ipcMain.handle('opencode-interactions:list', async () => {
+  if (TEST_DIR) return EMPTY_INTERACTIONS;
+  if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
+  try { return await remoteServer.listInteractions(); } catch { return EMPTY_INTERACTIONS; }
+});
+ipcMain.handle('opencode-interactions:permission-reply', async (_e, requestId: unknown, reply: unknown, message?: unknown) => {
+  if (TEST_DIR) throw new Error('Sessions replies are disabled in test mode');
+  if (typeof requestId !== 'string' || !/^per/.test(requestId) || requestId.length > 256) throw new Error('Invalid permission request');
+  if (reply !== 'once' && reply !== 'always' && reply !== 'reject') throw new Error('Invalid permission reply');
+  if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
+  return remoteServer.replyPermission(requestId, reply, typeof message === 'string' && message ? message.slice(0, 2000) : undefined);
+});
+ipcMain.handle('opencode-interactions:question-reply', async (_e, requestId: unknown, answers: unknown) => {
+  if (TEST_DIR) throw new Error('Sessions replies are disabled in test mode');
+  if (typeof requestId !== 'string' || !/^que/.test(requestId) || requestId.length > 256) throw new Error('Invalid question request');
+  const normalized = Array.isArray(answers)
+    ? answers.map(a => Array.isArray(a) ? a.filter(x => typeof x === 'string').map(x => (x as string).slice(0, 500)) : [])
+    : [];
+  if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
+  return remoteServer.replyQuestion(requestId, normalized);
+});
 
 ipcMain.handle('remote-sessions:qr', async (_e, overrideUrl?: string) => {
   const { port, key } = await startRemoteServer();

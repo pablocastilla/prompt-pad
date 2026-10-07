@@ -1,7 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { t } from '../i18n';
 import { useStore } from '../store';
-import type { OpenCodeSession, OpenCodeSessionStatus, OpenCodeSessionsSnapshot } from '../types';
+import type {
+  OpenCodeSession, OpenCodeSessionStatus, OpenCodeSessionsSnapshot,
+  OpenCodeInteractions, OpenCodePermissionRequest, OpenCodeQuestionRequest,
+} from '../types';
 import { renderMarkdown } from '../../electron/markdown';
 import './SessionsPanel.css';
 
@@ -10,8 +13,89 @@ const statusKeys = {
   error: 'sessionsFailed', unknown: 'sessionsUnknown',
 } as const satisfies Record<OpenCodeSessionStatus, Parameters<typeof t>[0]>;
 
-function SessionColumn({ session, now, closing, onClose, onSend }: {
-  session: OpenCodeSession; now: number; closing: boolean; onClose: () => void; onSend: (id: string, text: string) => Promise<string>;
+const emptyInteractions = (): OpenCodeInteractions => ({ permissions: [], questions: [] });
+
+function PermissionBlock({ request, onReply }: {
+  request: OpenCodePermissionRequest;
+  onReply: (reply: 'once' | 'always' | 'reject') => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const reply = async (value: 'once' | 'always' | 'reject') => {
+    setBusy(true);
+    setError('');
+    try { await onReply(value); }
+    catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setBusy(false); }
+  };
+  const detail = [request.permission, ...(request.patterns || [])].filter(Boolean).join('\n');
+  return <div className="session-interaction session-interaction-permission">
+    <div className="session-interaction-label">{t('sessionsPermission')}</div>
+    <pre className="session-interaction-command">{detail}</pre>
+    <div className="session-interaction-actions">
+      <button type="button" disabled={busy} onClick={() => void reply('once')}>{t('sessionsAllowOnce')}</button>
+      <button type="button" disabled={busy} onClick={() => void reply('always')}>{t('sessionsAllowAlways')}</button>
+      <button type="button" className="session-interaction-reject" disabled={busy} onClick={() => void reply('reject')}>{t('sessionsReject')}</button>
+    </div>
+    {error && <div className="session-interaction-error">{error}</div>}
+  </div>;
+}
+
+function QuestionBlock({ request, onAnswer }: {
+  request: OpenCodeQuestionRequest;
+  onAnswer: (answers: string[][]) => Promise<void>;
+}) {
+  const [selected, setSelected] = useState<string[][]>(() => request.questions.map(() => []));
+  const [custom, setCustom] = useState<string[]>(() => request.questions.map(() => ''));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const toggle = (qi: number, label: string, multiple?: boolean) => {
+    setSelected(prev => prev.map((arr, i) => {
+      if (i !== qi) return arr;
+      if (multiple) return arr.includes(label) ? arr.filter(l => l !== label) : [...arr, label];
+      return arr.includes(label) ? [] : [label];
+    }));
+  };
+  const submit = async () => {
+    const answers = request.questions.map((q, i) => {
+      const picked = [...(selected[i] || [])];
+      if (q.custom && (custom[i] || '').trim()) picked.push(custom[i].trim());
+      return picked;
+    });
+    setBusy(true);
+    setError('');
+    try { await onAnswer(answers); }
+    catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setBusy(false); }
+  };
+  return <div className="session-interaction session-interaction-question">
+    {request.questions.map((q, qi) => <div className="session-question" key={qi}>
+      <div className="session-interaction-label">{q.header || t('sessionsQuestion')}</div>
+      <p className="session-interaction-text">{q.question}</p>
+      <div className="session-question-options">
+        {q.options.map(o => <label key={o.label} className="session-question-option">
+          <input type={q.multiple ? 'checkbox' : 'radio'} name={`q-${request.id}-${qi}`}
+            checked={(selected[qi] || []).includes(o.label)} disabled={busy}
+            onChange={() => toggle(qi, o.label, q.multiple)} />
+          <span><strong>{o.label}</strong>{o.description && <small>{o.description}</small>}</span>
+        </label>)}
+      </div>
+      {q.custom && <input className="session-question-custom" value={custom[qi] || ''} disabled={busy}
+        placeholder={t('sessionsQuestionCustom')} aria-label={t('sessionsQuestionCustom')}
+        onChange={e => setCustom(prev => prev.map((v, i) => i === qi ? e.target.value : v))} />}
+    </div>)}
+    <div className="session-interaction-actions">
+      <button type="button" disabled={busy} onClick={() => void submit()}>{t('sessionsAnswer')}</button>
+    </div>
+    {error && <div className="session-interaction-error">{error}</div>}
+  </div>;
+}
+
+function SessionColumn({ session, interactions, now, closing, onClose, onSend, onReplyPermission, onAnswerQuestion }: {
+  session: OpenCodeSession; interactions: OpenCodeInteractions; now: number; closing: boolean;
+  onClose: () => void; onSend: (id: string, text: string) => Promise<string>;
+  onReplyPermission: (requestId: string, reply: 'once' | 'always' | 'reject') => Promise<void>;
+  onAnswerQuestion: (requestId: string, answers: string[][]) => Promise<void>;
 }) {
   const body = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
@@ -41,6 +125,7 @@ function SessionColumn({ session, now, closing, onClose, onSend }: {
       setNote({ cls: 'error', text: t('sessionsSendFailed') + ' ' + (err instanceof Error ? err.message : String(err)), at: Date.now() });
     }
   };
+  const hasInteractions = interactions.permissions.length > 0 || interactions.questions.length > 0;
   return <article className={`session-column session-column-${session.source || 'opencode'}`} data-session-id={session.id} data-status={session.status} aria-label={session.title}>
     <header className="session-column-header">
       <div className="session-heading">
@@ -62,6 +147,12 @@ function SessionColumn({ session, now, closing, onClose, onSend }: {
         {t('sessionsClosesIn')} {Math.max(0, Math.ceil((session.expiresAt - now) / 60000))} min
       </div>}
     </header>
+    {hasInteractions && <div className="session-interactions" aria-live="polite">
+      {interactions.questions.map(request => <QuestionBlock key={request.id} request={request}
+        onAnswer={answers => onAnswerQuestion(request.id, answers)} />)}
+      {interactions.permissions.map(request => <PermissionBlock key={request.id} request={request}
+        onReply={reply => onReplyPermission(request.id, reply)} />)}
+    </div>}
     <div className="session-activity" ref={body} tabIndex={0} aria-label={t('sessionsActivity')}
       onScroll={() => { if (body.current) follow.current = body.current.scrollHeight - body.current.scrollTop - body.current.clientHeight < 40; }}>
       {session.activity.length === 0 && <p className="session-meta">{t('sessionsNoActivity')}</p>}
@@ -92,6 +183,7 @@ export function SessionsPanel() {
   const addToast = useStore(s => s.addToast);
   const [opencode, setOpencode] = useState<OpenCodeSessionsSnapshot | null>(null);
   const [antigravity, setAntigravity] = useState<OpenCodeSessionsSnapshot | null>(null);
+  const [interactions, setInteractions] = useState<OpenCodeInteractions>(emptyInteractions);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
@@ -99,6 +191,7 @@ export function SessionsPanel() {
   const [search, setSearch] = useState('');
   const [remote, setRemote] = useState<{ url: string; qr: string } | null>(null);
   const [remoteBusy, setRemoteBusy] = useState(false);
+  const board = useRef<HTMLDivElement>(null);
   const orderKeys = useRef<string[]>([]);
   const statusMemory = useRef(new Map<string, OpenCodeSessionStatus>());
   const gaudyRef = useRef(settings.theme === 'gaudy');
@@ -108,9 +201,10 @@ export function SessionsPanel() {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const [oc, agy] = await Promise.allSettled([
+        const [oc, agy, ix] = await Promise.allSettled([
           window.electronAPI.getOpenCodeSessions(),
           window.electronAPI.getAntigravitySessions(),
+          window.electronAPI.getOpenCodeInteractions(),
         ]);
         if (disposed) return;
         const errors: string[] = [];
@@ -118,6 +212,7 @@ export function SessionsPanel() {
         else setOpencode(oc.value);
         if (agy.status === 'rejected') errors.push(String(agy.reason));
         else setAntigravity(agy.value);
+        if (ix.status === 'fulfilled') setInteractions(ix.value);
         setError(errors.join(' · '));
         // Gaudy flair: kitschy toasts when a watched turn reaches a final state.
         if (gaudyRef.current) {
@@ -148,6 +243,22 @@ export function SessionsPanel() {
     void poll();
     return () => { disposed = true; clearTimeout(timer); };
   }, [revision]);
+
+  // Scrolling over the board (outside a column's own scroll area) moves the board
+  // horizontally, so wide sessions are reachable without a horizontal scrollbar.
+  useEffect(() => {
+    const element = board.current;
+    if (!element) return;
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY === 0) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('.session-activity, .session-compose, .session-event-command, .session-event-output, .session-event-text pre')) return;
+      element.scrollLeft += event.deltaY;
+      event.preventDefault();
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, []);
 
   const changeVisibility = async (session?: OpenCodeSession) => {
     setClosing(session?.id || 'restore');
@@ -202,6 +313,16 @@ export function SessionsPanel() {
     const result = await window.electronAPI.sendOpenCodeMessage(sessionId, text);
     return result.title || sessionId;
   };
+  const replyPermission = async (requestId: string, reply: 'once' | 'always' | 'reject') => {
+    await window.electronAPI.replyOpenCodePermission(requestId, reply);
+    setInteractions(prev => ({ ...prev, permissions: prev.permissions.filter(p => p.id !== requestId) }));
+    setRevision(v => v + 1);
+  };
+  const answerQuestion = async (requestId: string, answers: string[][]) => {
+    await window.electronAPI.replyOpenCodeQuestion(requestId, answers);
+    setInteractions(prev => ({ ...prev, questions: prev.questions.filter(q => q.id !== requestId) }));
+    setRevision(v => v + 1);
+  };
   const query = search.trim().toLocaleLowerCase();
   const keyOf = (session: OpenCodeSession) => `${session.source || 'opencode'}-${session.id}`;
   const allSessions = [...(opencode?.sessions || []), ...(antigravity?.sessions || [])]
@@ -217,6 +338,10 @@ export function SessionsPanel() {
   const sessions = allSessions
     .filter(s => `${s.title} ${s.directory} ${s.model}`.toLocaleLowerCase().includes(query))
     .sort((a, b) => (position.get(keyOf(a)) ?? 0) - (position.get(keyOf(b)) ?? 0));
+  const interactionsFor = (session: OpenCodeSession): OpenCodeInteractions => ({
+    permissions: interactions.permissions.filter(p => p.sessionID === session.id),
+    questions: interactions.questions.filter(q => q.sessionID === session.id),
+  });
   const hiddenCount = (opencode?.hiddenCount || 0) + (antigravity?.hiddenCount || 0);
   return <section className="sessions-panel" aria-label={t('sessionsTitle')}>
     <div className="sessions-toolbar">
@@ -255,9 +380,11 @@ export function SessionsPanel() {
     {loading && !opencode && !antigravity && <p className="sessions-empty" role="status">{t('sessionsLoading')}</p>}
     {!loading && !error && !opencode?.dbPath && !antigravity?.dbPath && <p className="sessions-empty">{t('statsDbNotFound')}</p>}
     {(opencode?.dbPath || antigravity?.dbPath) && sessions.length === 0 && <p className="sessions-empty">{query ? t('sessionsNoMatches') : t('sessionsEmpty')}</p>}
-    <div className="sessions-board">
-      {sessions.map(session => <SessionColumn key={`${session.source || 'opencode'}-${session.id}`} session={session} now={opencode?.checkedAt || antigravity?.checkedAt || Date.now()}
-        closing={closing !== null} onClose={() => void changeVisibility(session)} onSend={sendToSession} />)}
+    <div className="sessions-board" ref={board}>
+      {sessions.map(session => <SessionColumn key={`${session.source || 'opencode'}-${session.id}`} session={session}
+        interactions={interactionsFor(session)} now={opencode?.checkedAt || antigravity?.checkedAt || Date.now()}
+        closing={closing !== null} onClose={() => void changeVisibility(session)} onSend={sendToSession}
+        onReplyPermission={replyPermission} onAnswerQuestion={answerQuestion} />)}
     </div>
     {(opencode?.dbPath || antigravity?.dbPath) && <footer className="sessions-source">
       {opencode?.dbPath && <div title={opencode.dbPath}>SQLite · {opencode.dbPath} · {t('sessionsLastCheck')} {new Date(opencode.checkedAt).toLocaleTimeString()}</div>}
