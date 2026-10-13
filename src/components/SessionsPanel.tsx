@@ -330,10 +330,11 @@ export function SessionsPanel() {
   const live = new Set(allSessions.map(keyOf));
   const kept = orderKeys.current.filter(key => live.has(key));
   const placed = new Set(kept);
-  // New columns join at the left; once placed, a column never moves again even
-  // though its status and activity keep changing on every poll.
+  // Columns never move once the board is built: existing sessions keep their
+  // slot even as their status and activity change on every poll, and new
+  // sessions join at the right end so the leftmost columns stay readable.
   const added = allSessions.filter(session => !placed.has(keyOf(session))).map(keyOf);
-  orderKeys.current = [...added, ...kept];
+  orderKeys.current = [...kept, ...added];
   const position = new Map(orderKeys.current.map((key, index) => [key, index]));
   const sessions = allSessions
     .filter(s => `${s.title} ${s.directory} ${s.model}`.toLocaleLowerCase().includes(query))

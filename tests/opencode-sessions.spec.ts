@@ -161,6 +161,20 @@ test('columns keep a stable position while sessions change status and activity',
   await expect.poll(order).toEqual(['newer', 'older']);
 });
 
+test('sessions created after the board is open join at the right end', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  await schema(app, dir);
+  await seed(app, dir, 'first', { age: 2 * MINUTE });
+  await seed(app, dir, 'second', { age: 1 * MINUTE });
+  await open(page);
+  const order = () => page.locator('.session-column').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-session-id')));
+  await expect.poll(order).toEqual(['second', 'first']);
+  // A brand-new session must not shove the existing columns leftwards.
+  await seed(app, dir, 'third');
+  await expect(column(page, 'third')).toContainText('Please check third', { timeout: 8000 });
+  await expect.poll(order).toEqual(['second', 'first', 'third']);
+});
+
 test('polling streams new activity, detects finalization and removes exactly at the 30-minute boundary', async ({ sandbox }) => {
   const { app, page, dir } = sandbox;
   await schema(app, dir);
