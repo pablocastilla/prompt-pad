@@ -373,6 +373,21 @@ function createWindow() {
   }
 }
 
+function findOpenCodeExe(cli: 'opencode' | 'opencode2'): string {
+  if (process.platform === 'win32') {
+    const npmDir = path.join(process.env.APPDATA || '', 'npm');
+    const candidates = [
+      path.join(npmDir, 'node_modules', '@opencode', 'cli', 'bin', `${cli}.exe`),
+      path.join(npmDir, 'node_modules', '@opencode-ai', 'cli', 'bin', `${cli}.exe`),
+      path.join(npmDir, 'node_modules', 'opencode-ai', 'bin', `${cli}.exe`),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
+    }
+  }
+  return cli;
+}
+
 // Preload OpenCode model lists in the background at startup so the model
 // picker shows models immediately and the first CLI call never blocks the UI.
 async function preloadOpenCodeModels(): Promise<void> {
@@ -380,14 +395,14 @@ async function preloadOpenCodeModels(): Promise<void> {
     const cached = cli === 'opencode2' ? openCode2ModelsCache : openCodeModelsCache;
     if (cached && cached.length > 0) return;
     let output = '';
-    if (cli === 'opencode') {
+    try {
+      output = await runCommand(cli, ['models'], 30000);
+    } catch {
       try {
-        output = await runCommand('opencode', ['models', '--verbose'], 30000);
+        output = await runCommand(findOpenCodeExe(cli), ['models'], 30000);
       } catch {
-        output = await runCommand('opencode', ['models'], 30000);
+        return;
       }
-    } else {
-      output = await runCommand('opencode2', ['models'], 30000);
     }
     const parsed = parseOpenCodeModels(output);
     if (parsed.length === 0) return;
@@ -521,28 +536,40 @@ let openCode2ModelsCache: { id: string; label: string }[] | null = null;
 let copilotModelsCache: { id: string; label: string }[] | null = null;
 let antigravityModelsCache: { id: string; label: string }[] | null = null;
 
-function mockModelsFor(testFile: string): { id: string; label: string }[] | null {
+async function mockModelsFor(testFile: string): Promise<{ id: string; label: string }[] | null> {
   const mockFile = path.join(TEST_DIR!, testFile);
   if (!fs.existsSync(mockFile)) return null;
   const raw = fs.readFileSync(mockFile, 'utf-8');
   const data = JSON.parse(raw);
-  if (data && typeof data === 'object' && 'shouldThrow' in data && data.shouldThrow) {
-    throw new Error(data.message || 'CLI not found');
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    if ('delayMs' in data && typeof data.delayMs === 'number') {
+      await new Promise(r => setTimeout(r, data.delayMs));
+    }
+    if ('shouldThrow' in data && data.shouldThrow) {
+      throw new Error(data.message || 'CLI not found');
+    }
+    if ('models' in data && Array.isArray(data.models)) {
+      return data.models;
+    }
   }
   return data;
 }
 
 ipcMain.handle('models:get-opencode', async () => {
   if (TEST_DIR) {
-    const mock = mockModelsFor('mock-opencode-models.json');
+    const mock = await mockModelsFor('mock-opencode-models.json');
     if (mock) return mock;
   }
   if (openCodeModelsCache && openCodeModelsCache.length > 0) return openCodeModelsCache;
   let output = '';
   try {
-    output = await runCommand('opencode', ['models', '--verbose']);
+    output = await runCommand('opencode', ['models'], 30000);
   } catch {
-    output = await runCommand('opencode', ['models']);
+    try {
+      output = await runCommand('opencode', ['models'], 30000);
+    } catch {
+      output = await runCommand(findOpenCodeExe('opencode'), ['models'], 30000);
+    }
   }
 
   const parsed = parseOpenCodeModels(output);
@@ -555,15 +582,10 @@ ipcMain.handle('models:get-opencode', async () => {
 
 ipcMain.handle('models:get-opencode2', async () => {
   if (TEST_DIR) {
-    const mock = mockModelsFor('mock-opencode2-models.json');
+    const mock = await mockModelsFor('mock-opencode2-models.json');
     if (mock) return mock;
   }
   if (openCode2ModelsCache && openCode2ModelsCache.length > 0) return openCode2ModelsCache;
-  const exe = process.platform === 'win32'
-    ? path.join(process.env.APPDATA || '', 'npm', 'node_modules', '@opencode-ai', 'cli', 'bin', 'opencode2.exe')
-    : 'opencode2';
-  // The first call may cold-start the shared background service, so allow a
-  // generous timeout and retry once before giving up (a warm service is fast).
   let output = '';
   try {
     output = await runCommand('opencode2', ['models'], 30000);
@@ -571,8 +593,7 @@ ipcMain.handle('models:get-opencode2', async () => {
     try {
       output = await runCommand('opencode2', ['models'], 30000);
     } catch {
-      // Retry without shell resolution quirks (e.g. .cmd shim issues on Windows)
-      output = await runCommand(exe, ['models'], 30000);
+      output = await runCommand(findOpenCodeExe('opencode2'), ['models'], 30000);
     }
   }
 
@@ -828,6 +849,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
         const sendPath = path.join(tmpDir, 'pp-send-' + id + '.json');
         fs.writeFileSync(createPath, JSON.stringify({ title }), 'utf-8');
         const model = normalizeOpenCodeModel(config.model);
+        fs.writeFileSync(path.join(tmpDir, 'pp-model.json'), JSON.stringify({ model }), 'utf-8');
         const providerId = model.includes('/') ? model.slice(0, model.indexOf('/')) : '';
         const sendPayload: Record<string, unknown> = { parts: [{ type: 'text', text: message }] };
         if (providerId && model.length > providerId.length + 1) sendPayload.model = { providerID: providerId, modelID: model.slice(providerId.length + 1) };
@@ -912,11 +934,10 @@ async function executeLaunchOpenCode(config: {
   const promptPath = path.join(launchTmpDir, promptFileName);
   fs.writeFileSync(promptPath, prompt, 'utf-8');
 
-  // OpenCode 2 has no top-level --model flag and its beta ignores
-  // OPENCODE_CONFIG_CONTENT, so the selected model goes into a temporary
-  // config file referenced by OPENCODE_CONFIG (see buildOpenCodeWinScript).
-  // The launch script deletes the whole temp dir on exit.
-  if (cli === 'opencode2') {
+  // OpenCode 2 has no top-level --model flag and passes the selected model
+  // through a temporary config file referenced by OPENCODE_CONFIG
+  // (see buildOpenCodeWinScript). The launch script deletes the temp dir on exit.
+  if (cli === 'opencode' || cli === 'opencode2') {
     fs.writeFileSync(path.join(launchTmpDir, 'pp-model.json'), JSON.stringify({ model }), 'utf-8');
   }
   // Payloads for the shared-server flow (OpenCode 1): the session-create body

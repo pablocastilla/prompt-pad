@@ -1,6 +1,6 @@
 # Prompt Pad
 
-**Version 3.17.0** — Answer OpenCode from the board: pending `question` prompts and permission requests now appear on the sessions board and the mobile page, with allow once / always / reject and option-and-custom answers delivered straight to the running session; the mobile page follows your selected theme; a vertical wheel over the board scrolls it horizontally; and the phone can only message an active session (no anonymous "new session" box).
+**Version 3.18.0** — OpenCode option (provider 1) now runs on OpenCode 2 architecture using standalone mode, interactive TUI, and model configuration via `OPENCODE_CONFIG`. Sessions continue to be monitored live on the sessions board and mobile page.
 
 A native desktop app (Electron + React) for writing, organising, and firing AI prompts at **OpenCode**, **GitHub Copilot**, **Claude Code**, **Codex**, **Antigravity** or **OpenCode 2** — without leaving your keyboard.
 
@@ -235,8 +235,7 @@ The Gaudy theme is best experienced live. It features:
 - **Drag-to-reorder**: drag the ⠿ handle to reprioritise configs. The `Ctrl+Shift+N` shortcuts follow the list order and are auto-saved.
 - **Keyboard shortcuts**: `Ctrl/⌘+Shift+1` through `+9` (and `+0`) fire the corresponding launch config on the current tab's content.
 - **Open folder in VS Code**: each launch shortcut can also open the launch folder in VS Code using a configurable modifier in Settings (`Ctrl+Shift`, `Ctrl+Alt`, or `Ctrl+Alt+Shift`).
-- **Pin favourite models**: pin OpenCode models in the picker for quick access with number keys.
-- **Shared server launches (OpenCode 1):** launching a prompt no longer relies on the CLI inline flow — the launcher starts or reuses the shared headless `opencode serve` (port `4097`, protected with a random Basic-Auth password persisted in `~/.prompt-pad/opencode-serve-auth.json`, also honored when OpenCode's own `service.json` password is present), delivers the prompt through the server's async HTTP API with the chosen model, and opens the TUI with `opencode attach` bound to that session. Every client attached to the server (your terminal and the mobile page) sees every message live, and permission approvals happen in the TUI as always. OpenCode 2 keeps its own `--standalone` private-server flow (its sessions accept monitoring but not phone sends).
+- **OpenCode launches (OpenCode 2 standalone flow):** both provider 1 (OpenCode) and provider 6 (OpenCode 2) run with the OpenCode 2 architecture. Prompt Pad launches OpenCode in standalone mode (`--standalone --prompt "<message>"` with `--auto`), passing the selected model via `OPENCODE_CONFIG` pointing to a temporary configuration file. Its sessions are monitored live on the sessions board and mobile page.
 - **Prompt-file seed with content summary**: the prompt travels as a temp file that the seed message tells the agent to read; the seed also embeds a one-line excerpt (`Summary of the file content: …`). The session name for API-created sessions uses the same smart excerpt after stripping every inserted saved-phrase span, so it describes the task — phrases still reach the AI in the full file.
 
 ### Git Changes Panel

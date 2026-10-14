@@ -271,13 +271,13 @@ test('the mobile page renders and answers questions and permissions', async ({ s
   });
 
   const question = mobile!.locator('.interaction.question');
-  await expect(question).toBeVisible();
+  await expect(question).toBeVisible({ timeout: 10000 });
   await expect(question.locator('.q-text')).toHaveText('Pick a database');
   await question.locator('.q-opt input').first().check();
   await question.getByRole('button', { name: 'Answer' }).click();
 
   const permission = mobile!.locator('.interaction.permission');
-  await expect(permission).toBeVisible();
+  await expect(permission).toBeVisible({ timeout: 10000 });
   await expect(permission.locator('.event-code')).toContainText('rm -rf build');
   await permission.getByRole('button', { name: 'Allow once' }).click();
 

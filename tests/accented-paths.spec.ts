@@ -226,9 +226,9 @@ test.describe('Launch with accented folder paths', () => {
       const scripts = readLaunchScripts(testDir);
       expect(scripts.length).toBeGreaterThan(0);
       const lastScript = scripts[scripts.length - 1];
-      expect(lastScript).toContain("Get-Content -LiteralPath '");
-      expect(lastScript).toContain("-Raw -Encoding UTF8");
       expect(lastScript).toContain("Set-Location -LiteralPath 'C:\\Users\\José\\proyectos\\solución'");
+      expect(lastScript).toContain("$ocArgs = @('--standalone', '--prompt'");
+      expect(lastScript).toContain("Summary of the file content: Mira a ver qué ha pasado aquí y proponme una solución. Tildes: á é í ó ú ñ");
       expect(lastScript).not.toContain('Ã');
 
       await app.close();

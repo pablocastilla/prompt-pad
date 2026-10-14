@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { buildOpenCodeShScript, buildOpenCodeWinScript } from '../electron/launcherScripts';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -227,7 +228,7 @@ test.describe('OpenCode 2 launch option', () => {
     }
   });
 
-  test('opencode (v1) launch script starts the shared server, sends through its API and attaches the TUI', async ({}, testInfo) => {
+  test('opencode (option 1) launch script opens the interactive TUI as opencode2 with the model via OPENCODE_CONFIG temp file', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -260,23 +261,18 @@ test.describe('OpenCode 2 launch option', () => {
       const scripts = readLaunchScripts(testDir);
       expect(scripts).toHaveLength(1);
       const script = scripts[0];
-      // Shared headless server management: reuse from the auth file, fall back
-      // to an unsecured 4096, otherwise spawn + wait + persist credentials.
-      expect(script).toContain("$authFile = '");
-      expect(script).toContain("Invoke-WebRequest -Uri ('http://127.0.0.1:' + $auth.port + '/session')");
-      expect(script).toContain("Invoke-WebRequest -Uri 'http://127.0.0.1:4096/session'");
-      expect(script).toContain("@('serve', '--port', '0', '--hostname', '127.0.0.1')");
-      // The prompt is delivered through the shared server's HTTP API...
-      expect(script).toContain('/prompt_async?directory=');
-      expect(script).toContain('/session?directory=');
-      // ...and the TUI attaches to that same session so phone prompts continue it live.
-      // (attach has no --auto flag — unknown options make yargs print its help and abort)
-      expect(script).toContain("@('attach', ('http://127.0.0.1:' + $port), '-s', $sid)");
-      expect(script).toContain("if ($pw) { $attachArgs += @('-p', $pw) }");
-      // The message travels in a payload file, never inline in the script.
-      expect(script).toMatch(/pp-send-[\w-]+\.json'/);
-      expect(script).not.toContain('@(\'--model\'');
+
+      // Option 1 (opencode) now launches as OpenCode 2: interactive TUI with --standalone
+      // and model config via OPENCODE_CONFIG
+      expect(script).toMatch(/\$env:OPENCODE_CONFIG = '[^']+pp-model\.json'/);
+      expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'Read the file at");
+      expect(script).toContain("Summary of the file content: v1 script test'");
+      expect(script).toContain("& $opencodePath @ocArgs");
+      expect(script).not.toContain("'attach'");
+      expect(script).not.toContain("'serve'");
       expect(script).not.toContain("'run'");
+      expect(script).not.toContain("@('--model'");
+      expect(script).not.toMatch(/'[^']*"/);
     } finally {
       await cleanupTestDir(testDir);
     }
@@ -447,5 +443,80 @@ test.describe('OpenCode 2 launch option', () => {
     } finally {
       await cleanupTestDir(testDir);
     }
+  });
+
+  test('opencode option 1 creates pp-model.json in launch directory with selected model', async () => {
+    const testDir = getTestDir();
+    try {
+      saveTestSettings(testDir);
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'OC1 Model File Test', folder: '/tmp/oc1-model' },
+      ]));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+      fs.writeFileSync(path.join(testDir, 'mock-opencode-models.json'), JSON.stringify([
+        { id: 'opencode-go/glm-5.3-flash', label: 'GLM 5.3 Flash Go' },
+      ]));
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.editor-textarea').fill('model config file test');
+
+      await page.keyboard.press('Control+Shift+1');
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
+      await page.keyboard.press('1');
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.locator('.model-picker-item').first().click();
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      await page.waitForTimeout(500);
+
+      await app.close();
+
+      // Find the created pp-model.json in os.tmpdir
+      const launchDirs = fs.readdirSync(os.tmpdir()).filter(f => f.startsWith('pp-launch-'));
+      const modelFiles = launchDirs
+        .map(d => path.join(os.tmpdir(), d, 'pp-model.json'))
+        .filter(f => fs.existsSync(f));
+      expect(modelFiles.length).toBeGreaterThan(0);
+      const latestModelFile = modelFiles.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+      const modelContent = JSON.parse(fs.readFileSync(latestModelFile, 'utf-8'));
+      expect(modelContent.model).toBe('opencode-go/glm-5.3-flash');
+    } finally {
+      await cleanupTestDir(testDir);
+    }
+  });
+
+  test('opencode launch script passes --auto when yolo mode is enabled', () => {
+    const script = buildOpenCodeWinScript({
+      cli: 'opencode',
+      workDir: 'C:\\test\\work',
+      model: 'opencode/minimax-m2.5-free',
+      message: 'test yolo message',
+      yolo: true,
+      promptPath: 'C:\\test\\prompt.txt',
+      launchTmpDir: 'C:\\test\\launch-tmp',
+    });
+
+    expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'test yolo message', '--auto')");
+    expect(script).toContain("$env:OPENCODE_CONFIG = 'C:\\test\\launch-tmp\\pp-model.json'");
+  });
+
+  test('buildOpenCodeShScript outputs OpenCode 2 standalone command with model config for opencode', () => {
+    const shScript = buildOpenCodeShScript({
+      cli: 'opencode',
+      workDir: '/home/user/work',
+      model: 'opencode/minimax-m2.5-free',
+      message: 'sh test message',
+      yolo: false,
+      promptPath: '/tmp/prompt.txt',
+      launchTmpDir: '/tmp/pp-launch-123',
+    });
+
+    expect(shScript).toContain('export OPENCODE_CONFIG="/tmp/pp-launch-123/pp-model.json"');
+    expect(shScript).toContain('opencode --standalone --prompt "sh test message"');
+    expect(shScript).not.toContain('--auto');
   });
 });

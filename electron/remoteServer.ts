@@ -364,20 +364,26 @@ export class RemoteSessionsServer {
 
   /**
    * OpenCode's own service mode persists its server password in
-   * `~/.config/opencode/service.json`; servers already running on this machine
-   * use it. Reading it lets us reuse those servers instead of failing with 401.
+   * `~/.local/state/opencode/service.json` (v2) or `~/.config/opencode/service.json`;
+   * servers already running on this machine use it. Reading it lets us reuse
+   * those servers instead of failing with 401.
    */
-  private readOpenCodeServiceAuth(): { username: string; password: string } | null {
+  private readOpenCodeServiceAuth(): { username: string; password: string; url?: string } | null {
     try {
+      const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state');
       const configHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-      const candidates = [path.join(configHome, 'opencode', 'service.json'),
-        ...(process.env.APPDATA ? [path.join(process.env.APPDATA, 'opencode', 'service.json')] : [])];
+      const candidates = [
+        path.join(stateHome, 'opencode', 'service.json'),
+        path.join(configHome, 'opencode', 'service.json'),
+        ...(process.env.APPDATA ? [path.join(process.env.APPDATA, 'opencode', 'service.json')] : []),
+      ];
       for (const file of candidates) {
         try {
           const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
           if (typeof parsed?.password === 'string' && parsed.password) {
             const username = typeof parsed.username === 'string' && parsed.username ? parsed.username : 'opencode';
-            return { username, password: parsed.password };
+            const url = typeof parsed.url === 'string' && parsed.url ? parsed.url : undefined;
+            return { username, password: parsed.password, url };
           }
         } catch { /* next candidate */ }
       }
@@ -559,7 +565,16 @@ export class RemoteSessionsServer {
   /** Reuse an OpenCode server already listening on this machine, if any. */
   private async resolveRunningServer(): Promise<string | null> {
     const persisted = this.readServeAuth();
-    for (const port of [4096, 4097]) {
+    const serviceAuth = this.readOpenCodeServiceAuth();
+    const ports = [4096, 4097];
+    if (serviceAuth?.url) {
+      try {
+        const u = new URL(serviceAuth.url);
+        const p = Number(u.port);
+        if (p && !ports.includes(p)) ports.unshift(p);
+      } catch {}
+    }
+    for (const port of ports) {
       const base = `http://127.0.0.1:${port}`;
       if (await this.pingOpenCode(base)) { this.activeServeAuth = null; return base; }
       // A server answering 401 needs basic auth: try ours (previous run) first,
@@ -568,7 +583,6 @@ export class RemoteSessionsServer {
         this.activeServeAuth = persisted;
         return base;
       }
-      const serviceAuth = this.readOpenCodeServiceAuth();
       if (await this.pingOpenCode(base, serviceAuth)) {
         this.activeServeAuth = serviceAuth;
         return base;

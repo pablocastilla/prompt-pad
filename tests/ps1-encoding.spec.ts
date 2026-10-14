@@ -217,7 +217,7 @@ test.describe('PS1 encoding with BOM', () => {
     }
   });
 
-  test('buildOpenCodeWinScript specifies -Encoding UTF8 on all Get-Content calls', () => {
+  test('buildOpenCodeWinScript formats OpenCode 2 launch arguments with preserved accents and temp model config', () => {
     const script = buildOpenCodeWinScript({
       cli: 'opencode',
       workDir: 'C:\\test\\work',
@@ -232,10 +232,10 @@ test.describe('PS1 encoding with BOM', () => {
       title: 'Solución con tildes',
     });
 
-    expect(script).toContain("Get-Content -LiteralPath 'C:\\test\\pp-create.json' -Raw -Encoding UTF8");
-    expect(script).toContain("Get-Content -LiteralPath 'C:\\test\\pp-send.json' -Raw -Encoding UTF8");
-    expect(script).toContain("Get-Content -LiteralPath $authFile -Raw -Encoding UTF8");
-    expect(script).toContain("Set-Content -LiteralPath $authFile -Encoding UTF8");
+    expect(script).toContain("$env:OPENCODE_CONFIG = 'C:\\test\\pp-launch\\pp-model.json'");
+    expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'Mira a ver qué ha pasado aquí y proponme una solución.')");
+    expect(script).toContain("& $opencodePath @ocArgs");
+    expect(script).toContain('Set-Location -LiteralPath \'C:\\test\\work\'');
   });
 
   test('PowerShell 5.1 Get-Content with -Encoding UTF8 preserves Spanish tildes and avoids Mojibake', async () => {

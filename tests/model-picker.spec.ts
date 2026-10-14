@@ -36,6 +36,17 @@ function writeTestSettings(testDir: string, extra: Record<string, unknown> = {})
   }, null, 2), 'utf-8');
 }
 
+async function cleanupTestDir(testDir: string) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      fs.rmSync(testDir, { recursive: true, force: true });
+      return;
+    } catch {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+}
+
 test.describe('Model picker behavior', () => {
   test('OpenCode model picker supports scrolling long model lists', async () => {
     const testDir = getTestDir();
@@ -105,7 +116,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -113,28 +124,23 @@ test.describe('Model picker behavior', () => {
     const testDir = getTestDir();
     try {
       writeLaunches(testDir);
-
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-
-      await page.evaluate(() => {
-        const api = (window as unknown as {
-          electronAPI: {
-            getOpenCodeModels: () => Promise<Array<{ id: string; label: string }>>;
-          };
-        }).electronAPI;
-
-        api.getOpenCodeModels = async () => {
-          await new Promise(resolve => setTimeout(resolve, 450));
-          return [
+      fs.writeFileSync(
+        path.join(testDir, 'mock-opencode-models.json'),
+        JSON.stringify({
+          delayMs: 2000,
+          models: [
             { id: 'opencode-go/glm-5.1', label: 'GLM 5.1 Go' },
             { id: 'opencode-go/kimi-k2.6', label: 'Kimi K2.6 Go' },
             { id: 'opencode/kimi-k2.6', label: 'Kimi K2.6' },
             { id: 'opencode/minimax-m2.7', label: 'Minimax M2.7' },
-          ];
-        };
-      });
+          ],
+        }, null, 2),
+        'utf-8'
+      );
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
 
       await page.locator('.activity-btn').first().click();
       await page.locator('.launch-list-item').first().click();
@@ -146,16 +152,21 @@ test.describe('Model picker behavior', () => {
 
       const loading = page.locator('.model-picker-loading').first();
       await expect(loading).toBeVisible();
-      await expect(page.locator('.model-picker-loading-dot')).toBeVisible();
+      const dot = page.locator('.model-picker-loading-dot');
+      await expect(dot).toBeVisible();
 
-      const animationName = await page.locator('.model-picker-loading-dot').evaluate((el) =>
-        window.getComputedStyle(el).animationName
-      );
-      expect(animationName).toContain('model-picker-pulse');
+      await expect(async () => {
+        const animationName = await dot.evaluate((el) => window.getComputedStyle(el).animationName);
+        expect(animationName).toContain('model-picker-pulse');
+      }).toPass({ timeout: 1800 });
+
+      // After loading finishes, the fetched models should appear
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.model-picker-item[data-model-index="0"]')).toBeVisible({ timeout: 5000 });
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -201,7 +212,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -250,7 +261,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -309,7 +320,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -344,7 +355,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -409,7 +420,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -466,7 +477,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -525,7 +536,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -571,7 +582,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -623,7 +634,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -677,7 +688,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -731,7 +742,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -777,7 +788,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 
@@ -827,7 +838,7 @@ test.describe('Model picker behavior', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      await cleanupTestDir(testDir);
     }
   });
 });
