@@ -48,187 +48,8 @@ async function cleanupTestDir(testDir: string) {
   }
 }
 
-test.describe('OpenCode 2 launch option', () => {
-  test('getOpenCode2Models IPC returns models from mock CLI catalog', async () => {
-    const testDir = getTestDir();
-    try {
-      saveTestSettings(testDir);
-      fs.writeFileSync(path.join(testDir, 'mock-opencode2-models.json'), JSON.stringify([
-        { id: 'opencode-go/glm-5.3-flash', label: 'GLM 5.3 Flash Go' },
-        { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
-        { id: 'nvidia/mistralai/mistral-7b-instruct-v0.3', label: 'Nvidia Mistralai Mistral 7B Instruct V0.3' },
-      ]));
-
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-
-      const models = await page.evaluate(async () => {
-        return (window as unknown as {
-          electronAPI: { getOpenCode2Models: () => Promise<{ id: string; label: string }[]> }
-        }).electronAPI.getOpenCode2Models();
-      });
-
-      expect(Array.isArray(models)).toBe(true);
-      expect(models).toHaveLength(3);
-      expect(models.map(m => m.id)).toContain('opencode/minimax-m2.5-free');
-
-      await app.close();
-    } finally {
-      await cleanupTestDir(testDir);
-    }
-  });
-
-  test('selecting OpenCode 2 in provider picker shows model list with tier toggles', async () => {
-    const testDir = getTestDir();
-    try {
-      saveTestSettings(testDir);
-      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'OC2 Test', folder: '/tmp' },
-      ]));
-      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
-      fs.writeFileSync(path.join(testDir, 'mock-opencode2-models.json'), JSON.stringify([
-        { id: 'opencode-go/glm-5.3-flash', label: 'GLM 5.3 Flash Go' },
-        { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
-      ]));
-
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(500);
-
-      await page.locator('.activity-btn').first().click();
-      await page.locator('.editor-textarea').fill('opencode2 picker test');
-
-      await page.locator('.launch-list-item').first().dblclick();
-      await expect(page.locator('.provider-picker-list')).toBeVisible();
-
-      await page.locator('.provider-picker-item[data-provider="opencode2"]').click();
-
-      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('.model-picker-tool-badge')).toContainText('OpenCode 2');
-
-      // OpenCode-family tier toggles are shown for OpenCode 2 too
-      await expect(page.locator('.model-picker-go-toggle[data-tier="go"]')).toBeVisible();
-      await expect(page.locator('.model-picker-go-toggle[data-tier="zen"]')).toBeVisible();
-
-      const items = page.locator('.model-picker-item');
-      await expect(items).toHaveCount(2);
-
-      // Searching filters by model name
-      await page.locator('.model-picker-search-input').fill('minimax');
-      await page.waitForTimeout(200);
-      await expect(page.locator('.model-picker-item')).toHaveCount(1);
-      await expect(page.locator('.model-picker-item-label').first()).toContainText('MiniMax');
-
-      await app.close();
-    } finally {
-      await cleanupTestDir(testDir);
-    }
-  });
-
-  test('launching with a model calls executeLaunch with tool=opencode2 and normalized model', async () => {
-    const testDir = getTestDir();
-    try {
-      saveTestSettings(testDir);
-      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'OC2 Launch Test', folder: '/tmp/oc2' },
-      ]));
-      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
-      fs.writeFileSync(path.join(testDir, 'mock-opencode2-models.json'), JSON.stringify([
-        { id: 'opencode-go/glm-5.3-flash', label: 'GLM 5.3 Flash Go' },
-      ]));
-
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(500);
-
-      await page.locator('.activity-btn').first().click();
-      await page.locator('.editor-textarea').fill('opencode2 launch test');
-
-      await page.keyboard.press('Control+Shift+1');
-      await expect(page.locator('.provider-picker-list')).toBeVisible();
-
-      // Numeric shortcut 6 -> opencode2
-      await page.keyboard.press('6');
-      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
-
-      await page.locator('.model-picker-item').first().click();
-      await page.waitForTimeout(500);
-
-      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
-
-      const calls = readLaunchCalls(testDir);
-      expect(calls).toHaveLength(1);
-      expect(calls[0].tool).toBe('opencode2');
-      expect(calls[0].normalizedModel).toBe('opencode-go/glm-5.3-flash');
-      expect(calls[0].prompt).toBe('opencode2 launch test');
-
-      // History entry records the opencode2 tool
-      const history = JSON.parse(fs.readFileSync(path.join(testDir, 'launch-history.json'), 'utf-8'));
-      expect(history).toHaveLength(1);
-      expect(history[0].tool).toBe('opencode2');
-      expect(history[0].model).toBe('opencode-go/glm-5.3-flash');
-
-      await app.close();
-    } finally {
-      await cleanupTestDir(testDir);
-    }
-  });
-
-  test('opencode2 launch script opens the interactive TUI with the model via OPENCODE_CONFIG temp file', async () => {
-    const testDir = getTestDir();
-    try {
-      saveTestSettings(testDir);
-      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'OC2 Script Test', folder: '/tmp/oc2' },
-      ]));
-      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
-      fs.writeFileSync(path.join(testDir, 'mock-opencode2-models.json'), JSON.stringify([
-        { id: 'opencode-go/glm-5.3-flash', label: 'GLM 5.3 Flash Go' },
-      ]));
-
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(500);
-
-      await page.locator('.activity-btn').first().click();
-      await page.locator('.editor-textarea').fill('script test');
-
-      await page.keyboard.press('Control+Shift+1');
-      await expect(page.locator('.provider-picker-list')).toBeVisible();
-      await page.keyboard.press('6');
-      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
-      await page.locator('.model-picker-item').first().click();
-      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
-      await page.waitForTimeout(500);
-
-      await app.close();
-
-      const scripts = readLaunchScripts(testDir);
-      expect(scripts).toHaveLength(1);
-      const script = scripts[0];
-
-      // OpenCode 2 opens the interactive TUI with interactive form dialogs and cancellation
-      // and passes the model through a temp config file (OPENCODE_CONFIG) with --standalone
-      expect(script).toMatch(/\$env:OPENCODE_CONFIG = '[^']+pp-model\.json'/);
-      expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'Read the file at");
-      expect(script).toContain("Summary of the file content: script test'");
-      expect(script).toContain("'--auto')");
-      expect(script).toContain("& $opencodePath @ocArgs");
-      expect(script).not.toContain("'run'");
-      expect(script).not.toContain("@('--model'");
-      // The seed message must never contain double quotes: PowerShell 5.1 native
-      // argument passing mangles them and the CLI then rejects the arguments.
-      expect(script).not.toMatch(/'[^']*"/);
-    } finally {
-      await cleanupTestDir(testDir);
-    }
-  });
-
-  test('opencode (option 1) launch script opens the interactive TUI as opencode2 with the model via OPENCODE_CONFIG temp file', async () => {
+test.describe('OpenCode launch (OpenCode 2 architecture)', () => {
+  test('opencode (option 1) launch script opens the interactive TUI with the model via OPENCODE_CONFIG temp file', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -262,8 +83,8 @@ test.describe('OpenCode 2 launch option', () => {
       expect(scripts).toHaveLength(1);
       const script = scripts[0];
 
-      // Option 1 (opencode) now launches as OpenCode 2: interactive TUI with --standalone
-      // and model config via OPENCODE_CONFIG
+      // Option 1 (opencode) launches on the OpenCode 2 architecture: interactive TUI
+      // with --standalone and model config via OPENCODE_CONFIG
       expect(script).toMatch(/\$env:OPENCODE_CONFIG = '[^']+pp-model\.json'/);
       expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'Read the file at");
       expect(script).toContain("Summary of the file content: v1 script test'");
@@ -400,51 +221,6 @@ test.describe('OpenCode 2 launch option', () => {
     }
   });
 
-  test('pinned models for opencode2 persist and are preserved on load', async () => {
-    const testDir = getTestDir();
-    try {
-      saveTestSettings(testDir, {
-        pinnedModels: {
-          opencode: ['opencode/minimax-m2.5-free'],
-          opencode2: ['opencode-go/glm-5.3-flash'],
-        },
-      });
-      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
-        { id: 'l1', name: 'OC2 Pin Test', folder: '/tmp' },
-      ]));
-      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
-      fs.writeFileSync(path.join(testDir, 'mock-opencode2-models.json'), JSON.stringify([
-        { id: 'opencode-go/glm-5.3-flash', label: 'GLM 5.3 Flash Go' },
-        { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
-      ]));
-
-      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
-      const page = await app.firstWindow();
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(500);
-
-      await page.locator('.activity-btn').first().click();
-      await page.locator('.editor-textarea').fill('pin test');
-      await page.locator('.launch-list-item').first().dblclick();
-      await page.locator('.provider-picker-item[data-provider="opencode2"]').click();
-      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
-
-      // The pinned model appears in the Pinned section
-      await expect(page.locator('.model-picker-section-header').first()).toHaveText(/Pinned/i);
-      await expect(page.locator('.model-picker-item.pinned')).toHaveCount(1);
-
-      await app.close();
-      await new Promise(r => setTimeout(r, 500));
-
-      // Settings still contain both tools' pins after the picker ran
-      const saved = JSON.parse(fs.readFileSync(path.join(testDir, 'settings.json'), 'utf-8'));
-      expect(saved.pinnedModels?.opencode2).toEqual(['opencode-go/glm-5.3-flash']);
-      expect(saved.pinnedModels?.opencode).toEqual(['opencode/minimax-m2.5-free']);
-    } finally {
-      await cleanupTestDir(testDir);
-    }
-  });
-
   test('opencode option 1 creates pp-model.json in launch directory with selected model', async () => {
     const testDir = getTestDir();
     try {
@@ -484,6 +260,60 @@ test.describe('OpenCode 2 launch option', () => {
       const latestModelFile = modelFiles.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
       const modelContent = JSON.parse(fs.readFileSync(latestModelFile, 'utf-8'));
       expect(modelContent.model).toBe('opencode-go/glm-5.3-flash');
+    } finally {
+      await cleanupTestDir(testDir);
+    }
+  });
+
+  test('legacy opencode2 pins and history entries load without offering the option', async () => {
+    const testDir = getTestDir();
+    try {
+      // A settings file written by an older version may still carry opencode2 pins,
+      // and an old history file may contain opencode2 entries. Neither should
+      // break loading, and the provider picker must not offer opencode2 anymore.
+      saveTestSettings(testDir, {
+        pinnedModels: {
+          opencode: ['opencode/minimax-m2.5-free'],
+          opencode2: ['opencode-go/glm-5.3-flash'],
+        },
+      });
+      fs.writeFileSync(path.join(testDir, 'launches.json'), JSON.stringify([
+        { id: 'l1', name: 'Legacy Pins Test', folder: '/tmp' },
+      ]));
+      fs.writeFileSync(path.join(testDir, 'phrases.json'), '[]');
+      fs.writeFileSync(path.join(testDir, 'launch-history.json'), JSON.stringify([
+        { id: 'h1', launchId: 'l0', launchName: 'Old', tool: 'opencode2', model: 'opencode-go/glm-5.3-flash', prompt: 'legacy', timestamp: 1, folder: '/tmp' },
+      ]));
+      fs.writeFileSync(path.join(testDir, 'mock-opencode-models.json'), JSON.stringify([
+        { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
+        { id: 'opencode-go/glm-5.3-flash', label: 'GLM 5.3 Flash Go' },
+      ]));
+
+      const app = await electron.launch({ args: [MAIN_JS], env: { ...process.env, PROMPT_PAD_TEST_DIR: testDir } });
+      const page = await app.firstWindow();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(500);
+
+      await page.locator('.activity-btn').first().click();
+      await page.locator('.editor-textarea').fill('legacy pins test');
+      await page.locator('.launch-list-item').first().dblclick();
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
+
+      // The removed option is gone
+      await expect(page.locator('.provider-picker-item[data-provider="opencode2"]')).toHaveCount(0);
+
+      // OpenCode still shows its own pinned model
+      await page.locator('.provider-picker-item[data-provider="opencode"]').click();
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('.model-picker-item.pinned')).toHaveCount(1);
+
+      await app.close();
+      await new Promise(r => setTimeout(r, 500));
+
+      // The legacy opencode2 pin is preserved as-is in settings (no data loss)
+      const saved = JSON.parse(fs.readFileSync(path.join(testDir, 'settings.json'), 'utf-8'));
+      expect(saved.pinnedModels?.opencode).toEqual(['opencode/minimax-m2.5-free']);
+      expect(saved.pinnedModels?.opencode2).toEqual(['opencode-go/glm-5.3-flash']);
     } finally {
       await cleanupTestDir(testDir);
     }

@@ -373,7 +373,7 @@ function createWindow() {
   }
 }
 
-function findOpenCodeExe(cli: 'opencode' | 'opencode2'): string {
+function findOpenCodeExe(cli: string): string {
   if (process.platform === 'win32') {
     const npmDir = path.join(process.env.APPDATA || '', 'npm');
     const candidates = [
@@ -391,25 +391,20 @@ function findOpenCodeExe(cli: 'opencode' | 'opencode2'): string {
 // Preload OpenCode model lists in the background at startup so the model
 // picker shows models immediately and the first CLI call never blocks the UI.
 async function preloadOpenCodeModels(): Promise<void> {
-  const loadCli = async (cli: 'opencode' | 'opencode2') => {
-    const cached = cli === 'opencode2' ? openCode2ModelsCache : openCodeModelsCache;
-    if (cached && cached.length > 0) return;
-    let output = '';
+  if (openCodeModelsCache && openCodeModelsCache.length > 0) return;
+  let output = '';
+  try {
+    output = await runCommand('opencode', ['models'], 30000);
+  } catch {
     try {
-      output = await runCommand(cli, ['models'], 30000);
+      output = await runCommand(findOpenCodeExe('opencode'), ['models'], 30000);
     } catch {
-      try {
-        output = await runCommand(findOpenCodeExe(cli), ['models'], 30000);
-      } catch {
-        return;
-      }
+      return;
     }
-    const parsed = parseOpenCodeModels(output);
-    if (parsed.length === 0) return;
-    if (cli === 'opencode2') openCode2ModelsCache = parsed;
-    else openCodeModelsCache = parsed;
-  };
-  await Promise.allSettled([loadCli('opencode'), loadCli('opencode2')]);
+  }
+  const parsed = parseOpenCodeModels(output);
+  if (parsed.length === 0) return;
+  openCodeModelsCache = parsed;
 }
 
 app.whenReady().then(() => {
@@ -532,7 +527,6 @@ async function fetchModelsDev(): Promise<Record<string, any> | null> {
 
 // Dynamic model lists (cached in process memory)
 let openCodeModelsCache: { id: string; label: string }[] | null = null;
-let openCode2ModelsCache: { id: string; label: string }[] | null = null;
 let copilotModelsCache: { id: string; label: string }[] | null = null;
 let antigravityModelsCache: { id: string; label: string }[] | null = null;
 
@@ -577,31 +571,6 @@ ipcMain.handle('models:get-opencode', async () => {
     throw new Error('No models returned from opencode CLI');
   }
   openCodeModelsCache = parsed;
-  return parsed;
-});
-
-ipcMain.handle('models:get-opencode2', async () => {
-  if (TEST_DIR) {
-    const mock = await mockModelsFor('mock-opencode2-models.json');
-    if (mock) return mock;
-  }
-  if (openCode2ModelsCache && openCode2ModelsCache.length > 0) return openCode2ModelsCache;
-  let output = '';
-  try {
-    output = await runCommand('opencode2', ['models'], 30000);
-  } catch {
-    try {
-      output = await runCommand('opencode2', ['models'], 30000);
-    } catch {
-      output = await runCommand(findOpenCodeExe('opencode2'), ['models'], 30000);
-    }
-  }
-
-  const parsed = parseOpenCodeModels(output);
-  if (parsed.length === 0) {
-    throw new Error('No models returned from opencode2 CLI');
-  }
-  openCode2ModelsCache = parsed;
   return parsed;
 });
 
@@ -659,7 +628,6 @@ ipcMain.handle('models:get-antigravity', async () => {
 
 ipcMain.handle('models:clear-cache', () => {
   openCodeModelsCache = null;
-  openCode2ModelsCache = null;
   copilotModelsCache = null;
   antigravityModelsCache = null;
   modelsDevCache = null;
@@ -817,7 +785,6 @@ ipcMain.handle('launch:execute', async (_e, config: {
   phraseRanges?: { start: number; end: number }[];
 }) => {
   const tool = config.tool === 'opencode' ? 'opencode' :
-               config.tool === 'opencode2' ? 'opencode2' :
                config.tool === 'antigravity' ? 'antigravity' :
                config.tool === 'claude-code' ? 'claude-code' :
                config.tool === 'codex' ? 'codex' :
@@ -827,7 +794,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
   if (TEST_DIR) {
     try {
       const normalizedModel =
-        tool === 'opencode' || tool === 'opencode2' ? normalizeOpenCodeModel(config.model) :
+        tool === 'opencode' ? normalizeOpenCodeModel(config.model) :
         tool === 'antigravity' ? normalizeAntigravityModel(config.model) :
         tool === 'copilot' ? normalizeModel(config.model) : config.model;
 
@@ -838,7 +805,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
         'utf-8'
       );
       // Also capture the exact launch script so tests can assert on the CLI args
-      if (tool === 'opencode' || tool === 'opencode2') {
+      if (tool === 'opencode') {
         const tmpId = 'pp-launch-' + id;
         const tmpDir = path.join(os.tmpdir(), tmpId);
         fs.mkdirSync(tmpDir, { recursive: true });
@@ -876,9 +843,7 @@ ipcMain.handle('launch:execute', async (_e, config: {
   }
 
   if (tool === 'opencode') {
-    return executeLaunchOpenCode(config, 'opencode');
-  } else if (tool === 'opencode2') {
-    return executeLaunchOpenCode(config, 'opencode2');
+    return executeLaunchOpenCode(config);
   } else if (tool === 'antigravity') {
     return executeLaunchAntigravity(config);
   } else if (tool === 'claude-code') {
@@ -921,7 +886,7 @@ function sessionTitle(prompt: string, phraseRanges?: { start: number; end: numbe
 async function executeLaunchOpenCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
-} & LaunchPromptExtras, cli: 'opencode' | 'opencode2' = 'opencode') {
+} & LaunchPromptExtras) {
   const { folder, yolo, prompt, attachedFilePaths = [] } = config;
   const model = normalizeOpenCodeModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
@@ -934,12 +899,10 @@ async function executeLaunchOpenCode(config: {
   const promptPath = path.join(launchTmpDir, promptFileName);
   fs.writeFileSync(promptPath, prompt, 'utf-8');
 
-  // OpenCode 2 has no top-level --model flag and passes the selected model
+  // OpenCode has no top-level --model flag and passes the selected model
   // through a temporary config file referenced by OPENCODE_CONFIG
   // (see buildOpenCodeWinScript). The launch script deletes the temp dir on exit.
-  if (cli === 'opencode' || cli === 'opencode2') {
-    fs.writeFileSync(path.join(launchTmpDir, 'pp-model.json'), JSON.stringify({ model }), 'utf-8');
-  }
+  fs.writeFileSync(path.join(launchTmpDir, 'pp-model.json'), JSON.stringify({ model }), 'utf-8');
   // Payloads for the shared-server flow (OpenCode 1): the session-create body
   // and the prompt body are generated here so the launcher scripts never deal
   // with JSON escaping.
@@ -975,7 +938,7 @@ async function executeLaunchOpenCode(config: {
 
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.ps1');
-    const script = buildOpenCodeWinScript({ cli, workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath: SERVE_AUTH_PATH, createPath, sendPath, title });
+    const script = buildOpenCodeWinScript({ cli: 'opencode', workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath: SERVE_AUTH_PATH, createPath, sendPath, title });
     writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
@@ -990,7 +953,7 @@ async function executeLaunchOpenCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
-    const script = buildOpenCodeShScript({ cli, workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath: SERVE_AUTH_PATH, createPath, sendPath });
+    const script = buildOpenCodeShScript({ cli: 'opencode', workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath: SERVE_AUTH_PATH, createPath, sendPath });
     fs.writeFileSync(shPath, script, { mode: 0o755 });
     if (process.platform === 'darwin') {
       const appleScript = [

@@ -294,7 +294,7 @@ test.describe('Launch configuration form', () => {
 });
 
 test.describe('Provider picker navigation', () => {
-  test('provider picker shows exactly 6 providers in opencode/copilot/claude-code/codex/antigravity/opencode2 order', async () => {
+  test('provider picker shows exactly 5 providers in opencode/copilot/claude-code/codex/antigravity order', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -321,13 +321,16 @@ test.describe('Provider picker navigation', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible();
 
       const providers = page.locator('.provider-picker-list .provider-picker-item');
-      await expect(providers).toHaveCount(6);
+      await expect(providers).toHaveCount(5);
 
       const providerNames = await providers.evaluateAll((els) => els.map((el) => el.getAttribute('data-provider')));
-      expect(providerNames).toEqual(['opencode', 'copilot', 'claude-code', 'codex', 'antigravity', 'opencode2']);
+      expect(providerNames).toEqual(['opencode', 'copilot', 'claude-code', 'codex', 'antigravity']);
 
-      // Each item shows its numeric shortcut (1..6)
-      for (let i = 0; i < 6; i++) {
+      // The removed OpenCode 2 option must not be present anywhere in the picker
+      await expect(page.locator('.provider-picker-item[data-provider="opencode2"]')).toHaveCount(0);
+
+      // Each item shows its numeric shortcut (1..5)
+      for (let i = 0; i < 5; i++) {
         const shortcut = providers.nth(i).locator('.provider-picker-shortcut');
         await expect(shortcut).toHaveText(String(i + 1));
       }
@@ -637,7 +640,7 @@ test.describe('Provider picker navigation', () => {
     }
   });
 
-  test('numeric key 6 opens model picker for opencode2 (it has a model API)', async () => {
+  test('numeric key 6 is ignored now that the OpenCode 2 option is gone', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -651,12 +654,13 @@ test.describe('Provider picker navigation', () => {
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
 
+      // A stale getOpenCode2Models handler must never be reachable from the UI
       await page.evaluate(() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI;
-        api.getOpenCode2Models = async () => [
-          { id: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 Free' },
-        ];
+        api.getOpenCode2Models = async () => {
+          throw new Error('opencode2 model API must not be reachable');
+        };
       });
 
       await page.locator('.editor-textarea').fill('test prompt');
@@ -665,15 +669,14 @@ test.describe('Provider picker navigation', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
+      // Only 5 providers exist, so key 6 has no mapping and is a no-op
+      await expect(page.locator('.provider-picker-item')).toHaveCount(5);
       await page.keyboard.press('6');
       await page.waitForTimeout(500);
 
-      // OpenCode 2 has a model picker, so the overlay stays visible with the model list
-      await expect(page.locator('.model-picker-list')).toBeVisible();
-      await expect(page.locator('.provider-picker-list')).not.toBeVisible();
-      await expect(page.locator('.model-picker-tool-badge')).toContainText('OpenCode 2');
-
-      // No launch call should have happened yet (still in model picker)
+      // Still on the provider step: no model picker opened and nothing launched
+      await expect(page.locator('.provider-picker-list')).toBeVisible();
+      await expect(page.locator('.model-picker-list')).not.toBeVisible();
       const calls = readLaunchCalls(testDir);
       expect(calls).toHaveLength(0);
 

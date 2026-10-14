@@ -14,7 +14,9 @@ export interface Phrase {
 }
 
 // ── Launch Configuration ──
-// 'gemini' is kept for backward compatibility with old launch history entries.
+// 'gemini' and 'opencode2' are kept for backward compatibility with old launch
+// history entries. Neither is offered in the provider picker anymore: OpenCode's
+// option 1 already runs on the OpenCode 2 architecture.
 export type LaunchTool = 'copilot' | 'opencode' | 'antigravity' | 'claude-code' | 'codex' | 'gemini' | 'opencode2';
 
 export interface LaunchConfig {
@@ -360,7 +362,6 @@ export interface ElectronAPI {
     phraseRanges?: PhraseRange[];
   }) => Promise<boolean>;
   getOpenCodeModels: () => Promise<ModelOption[]>;
-  getOpenCode2Models: () => Promise<ModelOption[]>;
   getCopilotModels: () => Promise<ModelOption[]>;
   getAntigravityModels: () => Promise<ModelOption[]>;
   getDefaultModels: () => Promise<{ copilot: string; opencode: string; antigravity: string }>;

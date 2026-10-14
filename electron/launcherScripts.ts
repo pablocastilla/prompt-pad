@@ -4,13 +4,13 @@ export function escapeSingleQuotePS(s: string): string {
   return s.replace(/'/g, "''");
 }
 
-// Build the Windows PowerShell script that launches OpenCode or OpenCode 2.
-// OpenCode 2 is now the standard for both option 1 (cli: 'opencode') and
-// option 6 (cli: 'opencode2'): the selected model is written to a temporary
-// config file referenced by OPENCODE_CONFIG; --standalone runs a private
-// session that reads that config and opens the interactive TUI with --prompt.
+// Build the Windows PowerShell script that launches OpenCode.
+// OpenCode's option 1 runs on the OpenCode 2 architecture: the selected model is
+// written to a temporary config file referenced by OPENCODE_CONFIG; --standalone
+// runs a private session that reads that config and opens the interactive TUI
+// with --prompt.
 export function buildOpenCodeWinScript(opts: {
-  cli: 'opencode' | 'opencode2';
+  cli: 'opencode';
   workDir: string; model: string; message: string;
   yolo: boolean; promptPath: string; launchTmpDir: string;
   serveAuthPath?: string; createPath?: string; sendPath?: string; title?: string;
@@ -67,10 +67,10 @@ export function buildOpenCodeWinScript(opts: {
   ].join('\n');
 }
 
-// Build the Linux/macOS shell script that launches OpenCode or OpenCode 2.
+// Build the Linux/macOS shell script that launches OpenCode.
 // Uses the temporary config file + --standalone with interactive TUI prompt.
 export function buildOpenCodeShScript(opts: {
-  cli: 'opencode' | 'opencode2';
+  cli: 'opencode';
   workDir: string; model: string; message: string;
   yolo: boolean; promptPath: string; launchTmpDir: string;
   serveAuthPath?: string; createPath?: string; sendPath?: string;
