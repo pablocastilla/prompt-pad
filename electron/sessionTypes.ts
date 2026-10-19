@@ -12,6 +12,9 @@ export interface OpenCodeActivity {
   // what it printed. Kept optional for backward compatibility.
   input?: string;
   output?: string;
+  // Subagent calls only: the child session that ran it, so the board can jump
+  // to the subagent's own column and messages.
+  childId?: string;
 }
 
 export interface OpenCodeSession {
@@ -20,6 +23,9 @@ export interface OpenCodeSession {
   title: string;
   directory: string;
   parentId: string | null;
+  // Agent that owns the session (OpenCode stores it on session_v2). Subagent
+  // columns show it so the child is easy to identify next to its parent.
+  agent?: string;
   model: string;
   status: OpenCodeSessionStatus;
   createdAt: number;

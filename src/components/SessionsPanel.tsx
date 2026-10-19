@@ -91,11 +91,13 @@ function QuestionBlock({ request, onAnswer }: {
   </div>;
 }
 
-function SessionColumn({ session, interactions, now, closing, onClose, onSend, onReplyPermission, onAnswerQuestion }: {
+function SessionColumn({ session, interactions, now, closing, knownSessions, onClose, onSend, onReplyPermission, onAnswerQuestion, onFocusSession }: {
   session: OpenCodeSession; interactions: OpenCodeInteractions; now: number; closing: boolean;
+  knownSessions: Set<string>;
   onClose: () => void; onSend: (id: string, text: string) => Promise<string>;
   onReplyPermission: (requestId: string, reply: 'once' | 'always' | 'reject') => Promise<void>;
   onAnswerQuestion: (requestId: string, answers: string[][]) => Promise<void>;
+  onFocusSession: (id: string) => void;
 }) {
   const body = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
@@ -135,7 +137,10 @@ function SessionColumn({ session, interactions, now, closing, onClose, onSend, o
           title={t('sessionsDismissHint')} aria-label={`${t('sessionsDismiss')}: ${session.title}`}>×</button>
       </div>
       <div className="session-directory" title={session.directory}>{session.directory}</div>
-      {session.parentId && <div className="session-meta" title={session.parentId}>{t('sessionsChild')}</div>}
+      {session.parentId && <div className="session-meta session-parent" title={session.parentId}>
+        <span className="session-child-badge">{t('sessionsChild')}</span>
+        {session.agent && <span className="session-agent">{session.agent}</span>}
+      </div>}
       <div className="session-model" title={session.model}>{session.model || t('sessionsNoModel')}</div>
       <div className="session-status-row">
         <span className={`session-status session-status-${session.status}`}>{t(statusKeys[session.status])}</span>
@@ -158,12 +163,15 @@ function SessionColumn({ session, interactions, now, closing, onClose, onSend, o
       {session.activity.length === 0 && <p className="session-meta">{t('sessionsNoActivity')}</p>}
       {session.activity.map(item => <div key={item.id} className={`session-event session-event-${item.type}`}>
         <div className="session-event-label">{item.type === 'tool' ? `${item.tool} · ${toolStatus(item.status)}` :
-          item.role === 'user' ? t('sessionsYou') : (session.source === 'antigravity' ? 'Antigravity' : 'OpenCode')}</div>
+          item.role === 'user' ? t('sessionsYou') : (session.source === 'antigravity' ? 'Antigravity' : item.role !== 'assistant' ? item.role : 'OpenCode')}</div>
         {item.type === 'tool' ? <>
           {item.text && item.text !== item.input && <p>{item.text}</p>}
           {item.input && <pre className="session-event-command" title={t('sessionsToolCommand')}>{item.input}</pre>}
           {item.output && <pre className={`session-event-output${item.status === 'error' ? ' session-event-output-error' : ''}`}
             title={t('sessionsToolOutput')}>{item.output}</pre>}
+          {item.childId && knownSessions.has(item.childId) && <button type="button" className="session-subagent-link"
+            data-child-session={item.childId} title={`${t('sessionsOpenSubagent')}: ${item.childId}`}
+            onClick={() => onFocusSession(item.childId!)}>↳ {t('sessionsOpenSubagent')}</button>}
         </> : item.text && <div className="session-event-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }} />}
       </div>)}
     </div>
@@ -344,6 +352,14 @@ export function SessionsPanel() {
     questions: interactions.questions.filter(q => q.sessionID === session.id),
   });
   const hiddenCount = (opencode?.hiddenCount || 0) + (antigravity?.hiddenCount || 0);
+  const knownSessions = new Set(sessions.map(session => session.id));
+  const focusSession = (id: string) => {
+    const target = board.current?.querySelector<HTMLElement>(`[data-session-id="${id.replace(/"/g, '\\"')}"]`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    target.classList.add('session-column-focus');
+    window.setTimeout(() => target.classList.remove('session-column-focus'), 1600);
+  };
   return <section className="sessions-panel" aria-label={t('sessionsTitle')}>
     <div className="sessions-toolbar">
       <div><h2>▥ {t('sessionsTitle')}</h2><p>{t('sessionsSubtitle')}</p></div>
@@ -384,8 +400,8 @@ export function SessionsPanel() {
     <div className="sessions-board" ref={board}>
       {sessions.map(session => <SessionColumn key={`${session.source || 'opencode'}-${session.id}`} session={session}
         interactions={interactionsFor(session)} now={opencode?.checkedAt || antigravity?.checkedAt || Date.now()}
-        closing={closing !== null} onClose={() => void changeVisibility(session)} onSend={sendToSession}
-        onReplyPermission={replyPermission} onAnswerQuestion={answerQuestion} />)}
+        closing={closing !== null} knownSessions={knownSessions} onClose={() => void changeVisibility(session)} onSend={sendToSession}
+        onReplyPermission={replyPermission} onAnswerQuestion={answerQuestion} onFocusSession={focusSession} />)}
     </div>
     {(opencode?.dbPath || antigravity?.dbPath) && <footer className="sessions-source">
       {opencode?.dbPath && <div title={opencode.dbPath}>SQLite · {opencode.dbPath} · {t('sessionsLastCheck')} {new Date(opencode.checkedAt).toLocaleTimeString()}</div>}

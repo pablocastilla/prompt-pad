@@ -50,6 +50,9 @@ __THEME_CSS__
   .session-title h3 { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
   .session-meta { font-size: 11px; color: var(--text2); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .session-model { color: var(--accent); }
+  .child-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px;
+    background: var(--border); color: var(--text2); text-transform: uppercase; letter-spacing: .03em; margin-right: 6px; }
+  .agent-name { color: var(--accent); }
   .status-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
   .status-pill { font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; background: var(--border); }
   .status-working { color: var(--accent); background: var(--accent-dim); }
@@ -71,6 +74,8 @@ __THEME_CSS__
     padding: 8px 10px; margin: 6px 0 0; max-height: 320px; overflow: auto; color: var(--text); }
   .event-output { color: var(--text2); }
   .event-output.error { color: var(--danger); border-color: var(--danger); }
+  .event-goto { margin-top: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--accent-dim); color: var(--accent); font-weight: 600; cursor: pointer; font-size: 12px; }
   .event-text { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
   .event-text p { margin: 0; }
   .event-text p + p { margin-top: 8px; }
@@ -193,7 +198,8 @@ function render() {
   $('sessions').innerHTML = shown.map(s => {
     const isOpen = state.open.has(s.id);
     const events = (s.activity || []).map(a => {
-      const label = a.type === 'tool' ? (a.tool || 'tool') : (a.role === 'user' ? 'You' : 'OpenCode');
+      const label = a.type === 'tool' ? (a.tool || 'tool')
+        : (a.role === 'user' ? 'You' : (a.role && a.role !== 'assistant' ? a.role : 'OpenCode'));
       let body = '';
       if (a.type === 'text') {
         body = a.html ? '<div class="event-text">' + a.html + '</div>' : (a.text ? '<p>' + esc(a.text) + '</p>' : '');
@@ -201,6 +207,7 @@ function render() {
         if (a.text && a.text !== a.input) body += '<p>' + esc(a.text) + '</p>';
         if (a.input) body += '<pre class="event-code">' + esc(a.input) + '</pre>';
         if (a.output) body += '<pre class="event-code event-output' + (a.status === 'error' ? ' error' : '') + '">' + esc(a.output) + '</pre>';
+        if (a.childId) body += '<button type="button" class="event-goto" data-goto="' + esc(a.childId) + '">↳ Open sub-session</button>';
       }
       return '<div class="event ' + (a.type === 'tool' ? 'event-tool' : '') + '"><div class="event-label">' +
         esc(label) + '</div>' + body + '</div>';
@@ -212,6 +219,8 @@ function render() {
       '<div class="session-header" onclick="toggle(this.parentElement)"><div class="session-title"><h3>' +
       esc(s.title || s.id) + '</h3><span class="chevron">▼</span></div>' +
       '<div class="session-meta" title="' + esc(s.directory) + '">' + esc(s.directory) + '</div>' +
+      (s.parentId ? '<div class="session-meta" title="' + esc(s.parentId) + '"><span class="child-badge">Sub-session</span>' +
+        (s.agent ? '<span class="agent-name">' + esc(s.agent) + '</span>' : '') + '</div>' : '') +
       '<div class="session-meta session-model">' + esc(s.model || 'no model') + '</div>' +
       '<div class="status-row">' + pill(s.status) +
       '<span class="session-meta">' + new Date(s.updatedAt).toLocaleTimeString() + '</span></div></div>' +
@@ -283,6 +292,19 @@ document.addEventListener('submit', async e => {
   } finally { button.disabled = false; }
 });
 document.addEventListener('click', async e => {
+  const goto = e.target.closest('[data-goto]');
+  if (goto) {
+    e.preventDefault();
+    const id = goto.getAttribute('data-goto');
+    const target = document.querySelector('.session[data-id="' + CSS.escape(id) + '"]');
+    if (target) {
+      state.open.add(id);
+      sessionStorage.setItem('pp-open', JSON.stringify([...state.open]));
+      target.classList.add('open');
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    return;
+  }
   const btn = e.target.closest('.interaction-reply');
   if (!btn) return;
   e.preventDefault();
@@ -449,6 +471,7 @@ export class RemoteSessionsServer {
         const body = JSON.stringify({ ...snapshot, theme: this.theme, sessions: snapshot.sessions.map(s => ({
           id: s.id, title: s.title, directory: s.directory, model: s.model, status: s.status,
           updatedAt: s.updatedAt, createdAt: s.createdAt, source: s.source,
+          agent: s.agent, parentId: s.parentId,
           permissions: permissions.get(s.id) || [], questions: questions.get(s.id) || [],
           activity: s.activity.map(a => ({ ...a, html: a.type === 'text' ? renderMarkdown(a.text) : '' })),
         })), sendEnabled: true });
