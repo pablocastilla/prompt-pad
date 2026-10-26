@@ -57,7 +57,7 @@ test.describe('Default and free/cheap models feature', () => {
 
       expect(defaults).toBeDefined();
       expect(defaults.copilot).toBe('auto');
-      expect(defaults.opencode).toBe('opencode/minimax-m2.5-free');
+      expect(defaults.opencode).toBe('opencode/deepseek-v4.1-flash-free');
       expect(defaults.antigravity).toBe('gemini-3.8-flash-medium');
 
       await app.close();
@@ -126,7 +126,7 @@ test.describe('Default and free/cheap models feature', () => {
 
       const opencodeCall = calls.find(c => c.tool === 'opencode');
       expect(opencodeCall).toBeDefined();
-      expect(opencodeCall?.normalizedModel).toBe('opencode/minimax-m2.5-free');
+      expect(opencodeCall?.normalizedModel).toBe('opencode/deepseek-v4.1-flash-free');
 
       const antigravityCall = calls.find(c => c.tool === 'antigravity');
       expect(antigravityCall).toBeDefined();

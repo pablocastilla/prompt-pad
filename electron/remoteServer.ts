@@ -1,11 +1,30 @@
 import * as http from 'http';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
+import { execFile } from 'child_process';
 import { renderMarkdown } from './markdown';
 import type { OpenCodeSessionMonitor } from './opencodeSessions';
 import type { OpenCodeInteractions, OpenCodePermissionRequest, OpenCodeQuestionRequest } from './sessionTypes';
+import {
+  createOpenCodeSession,
+  detectOpenCodeFlavor,
+  findOpenCodeExecutable,
+  formToQuestionPlan,
+  buildFormAnswer,
+  listOpenCodeForms,
+  listOpenCodePermissions,
+  permissionToLegacy,
+  readOpenCodeServiceAuth,
+  replyOpenCodeForm,
+  replyOpenCodePermission,
+  requestOpenCode,
+  sendOpenCodePrompt,
+  type FormPlan,
+  type OpenCodeAuth,
+  type OpenCodeServerOverride,
+  type OpenCodeServerTarget,
+} from './opencodeApi';
 
 // Mobile palette mirrors the desktop themes in src/App.css so the phone follows
 // whichever theme is selected in Settings.
@@ -341,7 +360,6 @@ setInterval(poll, 5000);
 </html>`;
 
 const TOKEN_HEADER = 'x-prompt-pad-key';
-const SEND_TIMEOUT_MS = 10_000;
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string));
@@ -362,9 +380,22 @@ export class RemoteSessionsServer {
   private serveAuthPath: string | null = null;
   // Theme selected in Settings; the mobile page follows it.
   private theme = 'dark';
+  // The OpenCode server the mobile page, the desktop board and launches share.
+  private activeTarget: OpenCodeServerTarget | null = null;
+  // Test-only escape hatch: point the integration at a fake v2/v1 server.
+  private readonly override: OpenCodeServerOverride | null;
+  // Pending v2 interactions need their session id on reply, but the UI only
+  // sends the request id. These maps are rebuilt on every poll.
+  private pendingPermissions = new Map<string, string>();
+  private pendingForms = new Map<string, FormPlan>();
 
-  constructor(private readonly monitor: OpenCodeSessionMonitor, serveAuthPath?: string) {
+  constructor(
+    private readonly monitor: OpenCodeSessionMonitor,
+    serveAuthPath?: string,
+    override?: OpenCodeServerOverride | null,
+  ) {
     this.serveAuthPath = serveAuthPath ?? null;
+    this.override = override ?? null;
   }
 
   /** Track the desktop theme so the served mobile page matches it. */
@@ -381,35 +412,6 @@ export class RemoteSessionsServer {
         return { port: parsed.port, username: typeof parsed.username === 'string' && parsed.username ? parsed.username : 'opencode', password: parsed.password };
       }
     } catch { /* missing or corrupt: fall through */ }
-    return null;
-  }
-
-  /**
-   * OpenCode's own service mode persists its server password in
-   * `~/.local/state/opencode/service.json` (v2) or `~/.config/opencode/service.json`;
-   * servers already running on this machine use it. Reading it lets us reuse
-   * those servers instead of failing with 401.
-   */
-  private readOpenCodeServiceAuth(): { username: string; password: string; url?: string } | null {
-    try {
-      const stateHome = process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state');
-      const configHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-      const candidates = [
-        path.join(stateHome, 'opencode', 'service.json'),
-        path.join(configHome, 'opencode', 'service.json'),
-        ...(process.env.APPDATA ? [path.join(process.env.APPDATA, 'opencode', 'service.json')] : []),
-      ];
-      for (const file of candidates) {
-        try {
-          const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-          if (typeof parsed?.password === 'string' && parsed.password) {
-            const username = typeof parsed.username === 'string' && parsed.username ? parsed.username : 'opencode';
-            const url = typeof parsed.url === 'string' && parsed.url ? parsed.url : undefined;
-            return { username, password: parsed.password, url };
-          }
-        } catch { /* next candidate */ }
-      }
-    } catch { /* fall through */ }
     return null;
   }
 
@@ -539,10 +541,8 @@ export class RemoteSessionsServer {
 
   /** Send a prompt into an already-running OpenCode session (fire and forget). */
   private async sendToSession(sessionId: string, text: string): Promise<{ id: string; title: string; created: boolean }> {
-    const base = await this.ensureOpenCodeServer();
-    await this.requestOpenCode(base, 'POST', `/session/${encodeURIComponent(sessionId)}/prompt_async`, {
-      parts: [{ type: 'text', text }],
-    });
+    const target = await this.ensureOpenCodeServer();
+    await sendOpenCodePrompt(target, sessionId, text);
     const live = this.monitor.read().sessions.find(s => s.id === sessionId);
     return { id: sessionId, title: live?.title || sessionId, created: false };
   }
@@ -550,6 +550,38 @@ export class RemoteSessionsServer {
   /** Entry point for the desktop board IPC; same flow as the mobile mini-composer. */
   async sendToSessionForIpc(sessionId: string, text: string): Promise<{ id: string; title: string; created: boolean }> {
     return this.sendToSession(sessionId, text);
+  }
+
+  /**
+   * Launcher entry point: create a session on the shared server and deliver the
+   * prompt there, so the TUI (opened with --session) and the phone observe the
+   * exact same conversation. Returns the session id even when the prompt could
+   * not be delivered, so the TUI still opens and the user can retry.
+   */
+  async createSessionWithPrompt(options: {
+    title: string; prompt: string; directory: string; model?: string;
+  }): Promise<{
+    id: string; promptSent: boolean; error?: string;
+    flavor: 'v1' | 'v2'; serverUrl: string; password?: string;
+  }> {
+    const target = await this.ensureOpenCodeServer();
+    const id = await createOpenCodeSession(target, {
+      title: options.title,
+      directory: options.directory,
+      model: options.model,
+    });
+    const result = {
+      id,
+      flavor: target.flavor,
+      serverUrl: target.base,
+      password: target.auth?.password,
+    };
+    try {
+      await sendOpenCodePrompt(target, id, options.prompt, options.model);
+      return { ...result, promptSent: true };
+    } catch (err) {
+      return { ...result, promptSent: false, error: err instanceof Error ? err.message : String(err) };
+    }
   }
 
   // ── Live interactions (permissions and questions) ────────────────────────────
@@ -561,12 +593,15 @@ export class RemoteSessionsServer {
    */
   async listInteractions(): Promise<OpenCodeInteractions> {
     const empty: OpenCodeInteractions = { permissions: [], questions: [] };
-    let base: string | null;
-    try { base = await this.resolveRunningServer(); } catch { return empty; }
-    if (!base) return empty;
+    let target: OpenCodeServerTarget | null;
+    try { target = await this.resolveRunningServer(); } catch { return empty; }
+    if (!target) return empty;
+    if (target.flavor === 'v2') return this.listV2Interactions(target);
     const [permissions, questions] = await Promise.all([
-      this.requestOpenCode<OpenCodePermissionRequest[]>(base, 'GET', '/permission', undefined).catch(() => []),
-      this.requestOpenCode<OpenCodeQuestionRequest[]>(base, 'GET', '/question', undefined).catch(() => []),
+      requestOpenCode<OpenCodePermissionRequest[]>(target, 'GET', '/permission', undefined)
+        .catch(() => []),
+      requestOpenCode<OpenCodeQuestionRequest[]>(target, 'GET', '/question', undefined)
+        .catch(() => []),
     ]);
     return {
       permissions: Array.isArray(permissions) ? permissions : [],
@@ -574,59 +609,190 @@ export class RemoteSessionsServer {
     };
   }
 
+  /**
+   * OpenCode 2 keeps pending permissions and forms on the session, not in a
+   * global list. Ask only sessions that can still be waiting for an answer
+   * (running/waiting/recently unknown), which keeps polling light.
+   */
+  private async listV2Interactions(target: OpenCodeServerTarget): Promise<OpenCodeInteractions> {
+    let sessions;
+    try { sessions = this.monitor.read().sessions; } catch { return { permissions: [], questions: [] }; }
+    const now = Date.now();
+    const candidates = sessions
+      .filter(session => session.source !== 'antigravity')
+      .filter(session => session.status === 'working' || session.status === 'waiting' ||
+        (session.status === 'unknown' && now - session.updatedAt < 15 * 60 * 1000))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 24);
+
+    const permissions: OpenCodePermissionRequest[] = [];
+    const questions: OpenCodeQuestionRequest[] = [];
+    const nextPermissions = new Map<string, string>();
+    const nextForms = new Map<string, FormPlan>();
+    await Promise.all(candidates.map(async session => {
+      const [sessionPermissions, sessionForms] = await Promise.all([
+        listOpenCodePermissions(target, session.id).catch(() => []),
+        listOpenCodeForms(target, session.id).catch(() => []),
+      ]);
+      for (const permission of sessionPermissions) {
+        if (!permission?.id) continue;
+        permissions.push(permissionToLegacy(permission));
+        nextPermissions.set(permission.id, session.id);
+      }
+      for (const form of sessionForms) {
+        if (!form?.id) continue;
+        const plan = formToQuestionPlan(form);
+        if (!plan) continue;
+        questions.push(plan.question);
+        nextForms.set(form.id, plan);
+      }
+    }));
+    this.pendingPermissions = nextPermissions;
+    this.pendingForms = nextForms;
+    return { permissions, questions };
+  }
+
   async replyPermission(requestId: string, reply: 'once' | 'always' | 'reject', message?: string): Promise<void> {
-    const base = await this.ensureOpenCodeServer();
-    await this.requestOpenCode(base, 'POST', `/permission/${encodeURIComponent(requestId)}/reply`,
+    const target = await this.ensureOpenCodeServer();
+    if (target.flavor === 'v2') {
+      const sessionId = this.pendingPermissions.get(requestId);
+      if (!sessionId) throw new Error('Permission request expired; refresh the sessions board.');
+      await replyOpenCodePermission(target, sessionId, requestId, reply, message);
+      this.pendingPermissions.delete(requestId);
+      return;
+    }
+    await requestOpenCode(target, 'POST', `/permission/${encodeURIComponent(requestId)}/reply`,
       message ? { reply, message } : { reply });
   }
 
   async replyQuestion(requestId: string, answers: string[][]): Promise<void> {
-    const base = await this.ensureOpenCodeServer();
-    await this.requestOpenCode(base, 'POST', `/question/${encodeURIComponent(requestId)}/reply`, { answers });
+    const target = await this.ensureOpenCodeServer();
+    if (target.flavor === 'v2') {
+      const plan = this.pendingForms.get(requestId);
+      if (!plan) throw new Error('Question expired; refresh the sessions board.');
+      await replyOpenCodeForm(target, plan.form.sessionID, requestId, buildFormAnswer(plan, answers));
+      this.pendingForms.delete(requestId);
+      return;
+    }
+    await requestOpenCode(target, 'POST', `/question/${encodeURIComponent(requestId)}/reply`, { answers });
   }
 
   /** Reuse an OpenCode server already listening on this machine, if any. */
-  private async resolveRunningServer(): Promise<string | null> {
+  private async resolveRunningServer(): Promise<OpenCodeServerTarget | null> {
+    if (this.override) {
+      const base = this.override.base.replace(/\/+$/, '');
+      if (this.activeTarget?.base === base) return this.activeTarget;
+      const auth = this.override.auth ?? null;
+      const flavor = this.override.flavor ?? await detectOpenCodeFlavor(base, auth);
+      if (!flavor) return null;
+      this.activeTarget = { base, flavor, auth };
+      return this.activeTarget;
+    }
+
+    // Reuse the server we already found, as long as it is still alive (the
+    // background service can be restarted by the CLI at any time).
+    if (this.activeTarget) {
+      const flavor = await detectOpenCodeFlavor(this.activeTarget.base, this.activeTarget.auth);
+      if (flavor) {
+        this.activeTarget.flavor = flavor;
+        return this.activeTarget;
+      }
+      this.activeTarget = null;
+    }
+
     const persisted = this.readServeAuth();
-    const serviceAuth = this.readOpenCodeServiceAuth();
-    const ports = [4096, 4097];
+    const serviceAuth = readOpenCodeServiceAuth();
+    const attempts: Array<{ base: string; auth: OpenCodeAuth | null }> = [];
+    const add = (base: string, auth: OpenCodeAuth | null) => {
+      if (attempts.some(attempt => attempt.base === base && attempt.auth?.password === auth?.password)) return;
+      attempts.push({ base, auth });
+    };
     if (serviceAuth?.url) {
       try {
-        const u = new URL(serviceAuth.url);
-        const p = Number(u.port);
-        if (p && !ports.includes(p)) ports.unshift(p);
-      } catch {}
+        const url = new URL(serviceAuth.url);
+        const base = url.origin;
+        add(base, serviceAuth);
+        add(base, null);
+      } catch { /* ignore malformed url */ }
     }
-    for (const port of ports) {
+    if (persisted) {
+      const base = `http://127.0.0.1:${persisted.port}`;
+      add(base, persisted);
+      add(base, null);
+    }
+    for (const port of [4096, 4097]) {
       const base = `http://127.0.0.1:${port}`;
-      if (await this.pingOpenCode(base)) { this.activeServeAuth = null; return base; }
-      // A server answering 401 needs basic auth: try ours (previous run) first,
-      // then OpenCode's own persisted service password.
-      if (persisted && persisted.port === port && await this.pingOpenCode(base, persisted)) {
-        this.activeServeAuth = persisted;
-        return base;
-      }
-      if (await this.pingOpenCode(base, serviceAuth)) {
-        this.activeServeAuth = serviceAuth;
-        return base;
+      add(base, null);
+      add(base, serviceAuth);
+      add(base, persisted);
+    }
+
+    for (const attempt of attempts) {
+      const flavor = await detectOpenCodeFlavor(attempt.base, attempt.auth);
+      if (flavor) {
+        this.activeTarget = { base: attempt.base, flavor, auth: attempt.auth };
+        return this.activeTarget;
       }
     }
     return null;
   }
 
-  /** Find or spawn `opencode serve` on a known port, polling the port until it answers. */
-  private async ensureOpenCodeServer(): Promise<string> {
+  /** Find or start the OpenCode server used by the TUI, phone and launcher. */
+  private async ensureOpenCodeServer(): Promise<OpenCodeServerTarget> {
     const running = await this.resolveRunningServer();
     if (running) return running;
-    // No server running: spawn one headless in the background, protected with
-    // basic auth. Port 0 lets the OS assign a free one (4097 may be taken); the
-    // real port is read from the server's own "listening on" banner.
+    // OpenCode 2 runs a managed background service; the TUI attaches to it,
+    // which is what makes messages from Prompt Pad visible in the terminal.
+    // A privately spawned `opencode serve` would NOT be the server the TUI
+    // uses, so never fall back to one on a v2 CLI.
+    if (await openCodeSupportsService()) {
+      const service = await this.startOpenCodeService();
+      if (service) return service;
+      throw new Error('OpenCode service did not start. Run "opencode" once, then retry.');
+    }
+    // No service command (OpenCode 1): spawn a private headless server.
+    return this.spawnOpenCodeServer();
+  }
+
+  private serviceAttempted = false;
+
+  /**
+   * `opencode service start` exists only on OpenCode 2. Starting it from the
+   * app makes the first launch shareable even before the user runs a TUI.
+   */
+  private async startOpenCodeService(): Promise<OpenCodeServerTarget | null> {
+    if (this.override || process.env.PROMPT_PAD_DISABLE_SERVICE_START === '1') return null;
+    if (!(await openCodeSupportsService())) return null;
+    if (!this.serviceAttempted) {
+      this.serviceAttempted = true;
+      const { spawn } = await import('child_process');
+      const command = findOpenCodeExecutable();
+      try {
+        const child = spawn(command, ['service', 'start'], {
+          detached: true, stdio: 'ignore', windowsHide: true,
+          shell: process.platform === 'win32' && command === 'opencode',
+        });
+        child.unref();
+      } catch { return null; }
+    }
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline) {
+      const target = await this.resolveRunningServer();
+      if (target) return target;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    return null;
+  }
+
+  /** Spawn `opencode serve` on a free port and read its real port from the banner. */
+  private async spawnOpenCodeServer(): Promise<OpenCodeServerTarget> {
     const { spawn } = await import('child_process');
     const password = crypto.randomBytes(16).toString('hex');
     const auth = { username: 'opencode', password };
-    const child = spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
+    const command = findOpenCodeExecutable();
+    const child = spawn(command, ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
       detached: true, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true,
-      shell: process.platform === 'win32',
+      shell: process.platform === 'win32' && command === 'opencode',
       env: { ...process.env, OPENCODE_SERVER_PASSWORD: password },
     });
     let serveLog = '';
@@ -637,49 +803,33 @@ export class RemoteSessionsServer {
     while (Date.now() < deadline) {
       const match = serveLog.match(/listening on http:\/\/127\.0\.0\.1:(\d+)/);
       if (match) {
-        this.activeServeAuth = auth;
+        const base = `http://127.0.0.1:${match[1]}`;
+        const flavor = await detectOpenCodeFlavor(base, auth) ?? 'v1';
         this.writeServeAuth({ port: Number(match[1]), username: auth.username, password });
-        return `http://127.0.0.1:${match[1]}`;
+        this.activeTarget = { base, flavor, auth };
+        return this.activeTarget;
       }
       await new Promise(r => setTimeout(r, 400));
     }
     throw new Error('OpenCode server did not start (is opencode on PATH?)');
   }
-
-  private activeServeAuth: { username: string; password: string } | null = null;
-
-  private async pingOpenCode(base: string, auth?: { username: string; password: string } | null): Promise<boolean> {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 2000);
-      const res = await fetch(`${base}/session`, {
-        signal: controller.signal,
-        ...(auth ? { headers: { Authorization: `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString('base64')}` } } : {}),
-      });
-      clearTimeout(timer);
-      return res.ok;
-    } catch { return false; }
-  }
-
-  private async requestOpenCode<T>(base: string, method: string, apiPath: string, body: unknown): Promise<T> {
-    const auth = this.activeServeAuth;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
-    try {
-      const res = await fetch(base + apiPath, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(auth ? { Authorization: `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString('base64')}` } : {}),
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`OpenCode API ${res.status}: ${await res.text().catch(() => '')}`);
-      return res.status === 204 ? ({} as T) : (await res.json()) as T;
-    } finally { clearTimeout(timer); }
-  }
 }
+
+let serviceSupport: Promise<boolean> | null = null;
+
+/** Cache the OpenCode 2 detection so a v1 install never pays a service-start wait. */
+function openCodeSupportsService(): Promise<boolean> {
+  if (serviceSupport) return serviceSupport;
+  serviceSupport = new Promise<boolean>(resolve => {
+    const command = findOpenCodeExecutable();
+    execFile(command, ['service', '--help'], {
+      timeout: 8000, windowsHide: true,
+      shell: process.platform === 'win32' && command === 'opencode',
+    }, (error) => resolve(!error));
+  });
+  return serviceSupport;
+}
+
 
 /** Render a QR code as inline SVG via the `qrcode` package (no external assets). */
 export async function qrSvg(text: string, size = 148): Promise<string> {

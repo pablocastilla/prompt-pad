@@ -49,7 +49,7 @@ async function cleanupTestDir(testDir: string) {
 }
 
 test.describe('OpenCode launch (OpenCode 2 architecture)', () => {
-  test('opencode (option 1) launch script opens the interactive TUI with the model via OPENCODE_CONFIG temp file', async () => {
+  test('standalone fallback script opens the interactive TUI with the model via OPENCODE_CONFIG temp file', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -83,8 +83,9 @@ test.describe('OpenCode launch (OpenCode 2 architecture)', () => {
       expect(scripts).toHaveLength(1);
       const script = scripts[0];
 
-      // Option 1 (opencode) launches on the OpenCode 2 architecture: interactive TUI
-      // with --standalone and model config via OPENCODE_CONFIG
+      // The test-mode capture keeps the standalone fallback script. The real
+      // launch first creates a shared v2 session (covered by the OpenCode 2 API
+      // suite) and only uses this script when no service is reachable.
       expect(script).toMatch(/\$env:OPENCODE_CONFIG = '[^']+pp-model\.json'/);
       expect(script).toContain("$ocArgs = @('--standalone', '--prompt', 'Read the file at");
       expect(script).toContain("Summary of the file content: v1 script test'");

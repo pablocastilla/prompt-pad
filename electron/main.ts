@@ -9,14 +9,24 @@ import { findAntigravityDbs as locateAntigravityDb, AntigravitySessionMonitor } 
 import { RemoteSessionsServer, qrSvg, formatRemoteSessionsUrl } from './remoteServer';
 import { promptExcerpt } from './promptExcerpt';
 import { buildOpenCodeWinScript, buildOpenCodeShScript, escapeSingleQuotePS } from './launcherScripts';
+import { DEFAULT_OPENCODE_MODEL, resolveOpenCodeLaunchModel, type OpenCodeServerOverride } from './opencodeApi';
+export { DEFAULT_OPENCODE_MODEL, resolveOpenCodeLaunchModel };
 export { buildOpenCodeWinScript, buildOpenCodeShScript, escapeSingleQuotePS };
 
 const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
+// Playwright can point the sessions integration at a fake OpenCode server so the
+// real v2/v1 HTTP flow is exercised without spawning terminals or a service.
+const TEST_OPENCODE_API = TEST_DIR ? (process.env.PROMPT_PAD_OPENCODE_TEST_API || '') : '';
+function openCodeServerOverride(): OpenCodeServerOverride | null {
+  if (!TEST_OPENCODE_API) return null;
+  const username = process.env.PROMPT_PAD_OPENCODE_TEST_API_USER || 'opencode';
+  const password = process.env.PROMPT_PAD_OPENCODE_TEST_API_PASSWORD || '';
+  return { base: TEST_OPENCODE_API, auth: password ? { username, password } : null };
+}
 const APP_DIR    = TEST_DIR ? TEST_DIR : path.join(os.homedir(), '.prompt-pad');
 if (TEST_DIR) app.setPath('userData', path.join(TEST_DIR, 'electron-profile'));
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
 export const DEFAULT_MODEL = 'auto';
-export const DEFAULT_OPENCODE_MODEL = 'opencode/minimax-m2.5-free';
 export const DEFAULT_ANTIGRAVITY_MODEL = 'gemini-3.8-flash-medium';
 
 // Maximum reasoning effort supported by each model
@@ -888,7 +898,17 @@ async function executeLaunchOpenCode(config: {
   attachedFilePaths?: string[];
 } & LaunchPromptExtras) {
   const { folder, yolo, prompt, attachedFilePaths = [] } = config;
-  const model = normalizeOpenCodeModel(config.model);
+  // The model list may not have finished loading on a cold start; wait for it
+  // so a retired pinned model can fall back instead of failing the launch.
+  if (!openCodeModelsCache || openCodeModelsCache.length === 0) {
+    // Don't let a slow CLI stall the launch: 3 s is enough for a warm call.
+    await Promise.race([
+      preloadOpenCodeModels().catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, 3000)),
+    ]);
+  }
+  const availableModels = (openCodeModelsCache || []).map(model => model.id);
+  const model = resolveOpenCodeLaunchModel(config.model, availableModels);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
   const id = Date.now().toString();
 
@@ -899,13 +919,11 @@ async function executeLaunchOpenCode(config: {
   const promptPath = path.join(launchTmpDir, promptFileName);
   fs.writeFileSync(promptPath, prompt, 'utf-8');
 
-  // OpenCode has no top-level --model flag and passes the selected model
-  // through a temporary config file referenced by OPENCODE_CONFIG
-  // (see buildOpenCodeWinScript). The launch script deletes the temp dir on exit.
+  // Standalone fallback: OpenCode has no top-level --model flag, so the selected
+  // model travels in a temporary config file referenced by OPENCODE_CONFIG.
+  // The launch script deletes the temp dir when the TUI exits.
   fs.writeFileSync(path.join(launchTmpDir, 'pp-model.json'), JSON.stringify({ model }), 'utf-8');
-  // Payloads for the shared-server flow (OpenCode 1): the session-create body
-  // and the prompt body are generated here so the launcher scripts never deal
-  // with JSON escaping.
+
   const copiedNames = new Set<string>([promptFileName]);
   const attachedFileNames: string[] = [];
   for (const srcPath of attachedFilePaths) {
@@ -926,19 +944,38 @@ async function executeLaunchOpenCode(config: {
   }
 
   const title = sessionTitle(prompt, config.phraseRanges);
-  const createPath = path.join(launchTmpDir, 'pp-create-' + id + '.json');
-  const sendPath = path.join(launchTmpDir, 'pp-send-' + id + '.json');
-  const providerId = model.includes('/') ? model.slice(0, model.indexOf('/')) : '';
-  const modelField = providerId && model.length > providerId.length + 1
-    ? { providerID: providerId, modelID: model.slice(providerId.length + 1) } : null;
-  const sendPayload: Record<string, unknown> = { parts: [{ type: 'text', text: message }] };
-  if (modelField) sendPayload.model = modelField;
-  fs.writeFileSync(createPath, JSON.stringify({ title }), 'utf-8');
-  fs.writeFileSync(sendPath, JSON.stringify(sendPayload), 'utf-8');
+
+  // Prefer the shared OpenCode server (v2 background service or v1 server): the
+  // prompt is delivered through the same API the phone and the sessions board
+  // use, and the terminal only attaches to that session with --session. This is
+  // what lets commands fired from Prompt Pad stay visible and answerable in the
+  // running TUI, including permissions and questions.
+  let sharedSession: { id: string; flavor: 'v1' | 'v2'; serverUrl: string; password?: string } | null = null;
+  try {
+    const launcher = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
+    const created = await launcher.createSessionWithPrompt({
+      title, prompt: message, directory: workDir, model,
+    });
+    sharedSession = created;
+    if (!created.promptSent) {
+      console.warn('[prompt-pad] OpenCode session created but the prompt was not delivered:', created.error);
+    }
+  } catch (err) {
+    console.warn('[prompt-pad] Shared OpenCode session unavailable, using --standalone:', err);
+  }
+  // OpenCode 2 opens the session with --session; OpenCode 1 attaches to the
+  // shared HTTP server (its TUI has no --session/--standalone equivalent).
+  const attachOptions = sharedSession
+    ? (sharedSession.flavor === 'v1'
+      ? { sessionId: sharedSession.id, serverUrl: sharedSession.serverUrl, password: sharedSession.password }
+      : { sessionId: sharedSession.id })
+    : null;
 
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.ps1');
-    const script = buildOpenCodeWinScript({ cli: 'opencode', workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath: SERVE_AUTH_PATH, createPath, sendPath, title });
+    const script = attachOptions
+      ? buildOpenCodeWinScript({ cli: 'opencode', workDir, yolo, launchTmpDir, ...attachOptions })
+      : buildOpenCodeWinScript({ cli: 'opencode', workDir, model, message, yolo, promptPath, launchTmpDir });
     writePS1(psPath, script);
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
@@ -953,7 +990,9 @@ async function executeLaunchOpenCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-oc-' + id + '.sh');
-    const script = buildOpenCodeShScript({ cli: 'opencode', workDir, model, message, yolo, promptPath, launchTmpDir, serveAuthPath: SERVE_AUTH_PATH, createPath, sendPath });
+    const script = attachOptions
+      ? buildOpenCodeShScript({ cli: 'opencode', workDir, yolo, launchTmpDir, ...attachOptions })
+      : buildOpenCodeShScript({ cli: 'opencode', workDir, model, message, yolo, promptPath, launchTmpDir });
     fs.writeFileSync(shPath, script, { mode: 0o755 });
     if (process.platform === 'darwin') {
       const appleScript = [
@@ -1502,18 +1541,18 @@ ipcMain.handle('opencode-sessions:list', () => sessionMonitor.read());
 ipcMain.handle('opencode-sessions:dismiss', (_e, id: string, turnId: string) => sessionMonitor.dismiss(id, turnId));
 ipcMain.handle('opencode-sessions:restore', () => sessionMonitor.restore());
 // Send a message into a live OpenCode session from the sessions board, reusing
-// the same headless `opencode serve` the mobile page and launcher rely on. In
-// test mode there is no server and the call fails loudly instead of spawning.
+// the same server the terminal UI, the phone and the launcher share. In test
+// mode there is no server unless Playwright points at a fake one.
 ipcMain.handle('opencode-sessions:send', async (_e, sessionId: unknown, text: unknown) => {
-  if (TEST_DIR) throw new Error('Sessions sending is disabled in test mode');
+  if (TEST_DIR && !TEST_OPENCODE_API) throw new Error('Sessions sending is disabled in test mode');
   if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 256 ||
       typeof text !== 'string' || !text.trim() || text.length > 20_000) {
     throw new Error('Invalid message');
   }
-  if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
+  const server = getRemoteServer();
   const theme = readJson<{ theme?: string }>(getSettingsPath(), {}).theme;
-  if (typeof theme === 'string' && theme) remoteServer.setTheme(theme);
-  return remoteServer.sendToSessionForIpc(sessionId.trim(), text.trim());
+  if (typeof theme === 'string' && theme) server.setTheme(theme);
+  return server.sendToSessionForIpc(sessionId.trim(), text.trim());
 });
 
 // Antigravity (Google) conversations launched from Prompt Pad, in both the IDE
@@ -1533,47 +1572,52 @@ ipcMain.handle('antigravity-sessions:restore', () => antigravityMonitor.restore(
 const REMOTE_PORT = 4127;
 let remoteServer: RemoteSessionsServer | null = null;
 
-async function startRemoteServer(): Promise<{ port: number; key: string }> {
+function getRemoteServer(): RemoteSessionsServer {
   if (!remoteServer) {
-    remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
+    remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH, openCodeServerOverride());
   }
+  return remoteServer;
+}
+
+async function startRemoteServer(): Promise<{ port: number; key: string }> {
+  const server = getRemoteServer();
   const theme = readJson<{ theme?: string }>(getSettingsPath(), {}).theme;
-  if (typeof theme === 'string' && theme) remoteServer.setTheme(theme);
+  if (typeof theme === 'string' && theme) server.setTheme(theme);
   let port = REMOTE_PORT;
   try {
-    port = await remoteServer.start(REMOTE_PORT, '0.0.0.0');
+    port = await server.start(REMOTE_PORT, '0.0.0.0');
   } catch {
     // Port busy: fall back to a random one (0 = ephemeral).
-    port = await remoteServer.start(0, '0.0.0.0');
+    port = await server.start(0, '0.0.0.0');
   }
-  return { port, key: remoteServer.accessToken };
+  return { port, key: server.accessToken };
 }
 
 ipcMain.handle('remote-sessions:start', () => startRemoteServer());
 
 // Live pending permissions/questions from the running OpenCode server, so the
-// board can show and answer what the agent is asking. Disabled in test mode.
+// board can show and answer what the agent is asking. Disabled in test mode
+// unless a fake API server is provided.
 const EMPTY_INTERACTIONS = { permissions: [], questions: [] };
 ipcMain.handle('opencode-interactions:list', async () => {
-  if (TEST_DIR) return EMPTY_INTERACTIONS;
-  if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
-  try { return await remoteServer.listInteractions(); } catch { return EMPTY_INTERACTIONS; }
+  if (TEST_DIR && !TEST_OPENCODE_API) return EMPTY_INTERACTIONS;
+  const server = getRemoteServer();
+  try { return await server.listInteractions(); } catch { return EMPTY_INTERACTIONS; }
 });
 ipcMain.handle('opencode-interactions:permission-reply', async (_e, requestId: unknown, reply: unknown, message?: unknown) => {
-  if (TEST_DIR) throw new Error('Sessions replies are disabled in test mode');
-  if (typeof requestId !== 'string' || !/^per/.test(requestId) || requestId.length > 256) throw new Error('Invalid permission request');
+  if (TEST_DIR && !TEST_OPENCODE_API) throw new Error('Sessions replies are disabled in test mode');
+  if (typeof requestId !== 'string' || !/^per_[A-Za-z0-9_-]+$/.test(requestId) || requestId.length > 256) throw new Error('Invalid permission request');
   if (reply !== 'once' && reply !== 'always' && reply !== 'reject') throw new Error('Invalid permission reply');
-  if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
-  return remoteServer.replyPermission(requestId, reply, typeof message === 'string' && message ? message.slice(0, 2000) : undefined);
+  return getRemoteServer().replyPermission(requestId, reply, typeof message === 'string' && message ? message.slice(0, 2000) : undefined);
 });
 ipcMain.handle('opencode-interactions:question-reply', async (_e, requestId: unknown, answers: unknown) => {
-  if (TEST_DIR) throw new Error('Sessions replies are disabled in test mode');
-  if (typeof requestId !== 'string' || !/^que/.test(requestId) || requestId.length > 256) throw new Error('Invalid question request');
+  if (TEST_DIR && !TEST_OPENCODE_API) throw new Error('Sessions replies are disabled in test mode');
+  // OpenCode 2 forms use frm_ ids; v1 questions use que_.
+  if (typeof requestId !== 'string' || !/^(que|frm|form)_[A-Za-z0-9_-]+$/.test(requestId) || requestId.length > 256) throw new Error('Invalid question request');
   const normalized = Array.isArray(answers)
     ? answers.map(a => Array.isArray(a) ? a.filter(x => typeof x === 'string').map(x => (x as string).slice(0, 500)) : [])
     : [];
-  if (!remoteServer) remoteServer = new RemoteSessionsServer(sessionMonitor, SERVE_AUTH_PATH);
-  return remoteServer.replyQuestion(requestId, normalized);
+  return getRemoteServer().replyQuestion(requestId, normalized);
 });
 
 ipcMain.handle('remote-sessions:qr', async (_e, overrideUrl?: string) => {
