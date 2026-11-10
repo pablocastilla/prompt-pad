@@ -2,14 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { t } from '../i18n';
 import type { OpenCodeDayCost, OpenCodeStats, PRStats, DayPRs } from '../types';
 
+function localDateKey(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
 
-  if (dateStr === today.toISOString().slice(0, 10)) return t('statsToday');
-  if (dateStr === yesterday.toISOString().slice(0, 10)) return t('statsYesterday');
+  if (dateStr === localDateKey(today)) return t('statsToday');
+  if (dateStr === localDateKey(yesterday)) return t('statsYesterday');
 
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
@@ -101,7 +106,9 @@ export function StatsPanel() {
     );
   }
 
-  if (error || !data) {
+  // A missing database has no error attached: it is a legitimate empty result
+  // with dbPath null, so show the install hint instead of an empty dashboard.
+  if (error || !data || !data.dbPath) {
     return (
       <div className="stats-panel">
         <div className="stats-error">
@@ -122,7 +129,7 @@ export function StatsPanel() {
   for (let i = 29; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateKey(d);
     const oc = days.find(x => x.date === key);
     const pr = prData.days.find(x => x.date === key);
     fullMonth.push({
@@ -139,7 +146,7 @@ export function StatsPanel() {
   const maxCost = Math.max(...fullMonth.map(d => d.cost), 0.001);
   const maxTokens = Math.max(...fullMonth.map(d => d.tokensIn + d.tokensOut), 1);
   const maxPrs = Math.max(...fullMonth.map(d => d.prs), 1);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDateKey(new Date());
   const hasPrData = prData.total > 0;
 
   return (

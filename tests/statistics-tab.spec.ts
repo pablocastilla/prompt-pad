@@ -1,7 +1,8 @@
-import { test, expect, _electron as electron } from '@playwright/test';
+import { test, expect, _electron as electron, ElectronApplication } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { removeTestDir } from './helpers';
 
 const MAIN_JS = path.join(__dirname, '..', 'dist-electron', 'main.js');
 
@@ -9,6 +10,32 @@ function getTestDir(): string {
   const dir = path.join(os.tmpdir(), `pp-test-${crypto.randomUUID()}`);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+// Seed a real OpenCode 2 database so the dashboard has something to draw: the
+// panel now tells the user when no database exists instead of showing an empty
+// chart, so tests that assert chart content need real rows.
+async function seedStatsDb(app: ElectronApplication, testDir: string) {
+  await app.evaluate(({}, dbPath) => {
+    const require = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json');
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath);
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session (id TEXT PRIMARY KEY, title TEXT, directory TEXT, parent_id TEXT,
+          cost REAL, tokens_input INTEGER, tokens_output INTEGER, model TEXT,
+          time_created INTEGER, time_updated INTEGER, time_archived INTEGER);
+        CREATE TABLE IF NOT EXISTS session_v2 (id TEXT PRIMARY KEY, title TEXT, directory TEXT, parent_id TEXT,
+          cost REAL, tokens_input INTEGER, tokens_output INTEGER, model TEXT,
+          time_created INTEGER, time_updated INTEGER, time_archived INTEGER);
+      `);
+      const now = Date.now();
+      db.prepare('INSERT INTO session_v2 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+        'ses-stats', 'Stats fixture', 'C:\\work', null, 0.5, 1200, 300,
+        '{"id":"deepseek-v4.1-flash","providerID":"opencode-go"}', now, now, null,
+      );
+    } finally { db.close(); }
+  }, path.join(testDir, 'opencode.db'));
 }
 
 function cleanSession(testDir: string) {
@@ -62,7 +89,7 @@ test.describe('Statistics tab', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -96,7 +123,7 @@ test.describe('Statistics tab', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -109,6 +136,7 @@ test.describe('Statistics tab', () => {
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
+      await seedStatsDb(app, testDir);
 
       // Open stats
       await page.locator('.activity-btn', { hasText: '📊' }).click();
@@ -145,7 +173,7 @@ test.describe('Statistics tab', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -169,7 +197,7 @@ test.describe('Statistics tab', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -182,6 +210,7 @@ test.describe('Statistics tab', () => {
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
+      await seedStatsDb(app, testDir);
 
       // Open stats
       await page.locator('.activity-btn', { hasText: '📊' }).click();
@@ -194,7 +223,7 @@ test.describe('Statistics tab', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 
@@ -207,6 +236,7 @@ test.describe('Statistics tab', () => {
       const page = await app.firstWindow();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(500);
+      await seedStatsDb(app, testDir);
 
       // Open stats
       await page.locator('.activity-btn', { hasText: '📊' }).click();
@@ -222,7 +252,7 @@ test.describe('Statistics tab', () => {
 
       await app.close();
     } finally {
-      fs.rmSync(testDir, { recursive: true, force: true });
+      removeTestDir(testDir);
     }
   });
 });

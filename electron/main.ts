@@ -1656,6 +1656,75 @@ interface DayCostRow {
   tokensOut: number;
 }
 
+interface StatsSessionRow {
+  id: string;
+  timeCreated: number;
+  cost: number;
+  tokensIn: number;
+  tokensOut: number;
+  model: string | null;
+}
+
+// OpenCode stores sessions in `session` (v1) and, since the v2 architecture,
+// also in `session_v2`. Both live in the same opencode.db, but each session is
+// written to only one of them, so statistics must read both tables or recent
+// activity disappears from the dashboard.
+function statsTableColumns(db: any, table: string): Set<string> {
+  try {
+    return new Set((db.prepare(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>).map(c => c.name));
+  } catch {
+    return new Set();
+  }
+}
+
+function readStatsSessions(db: any, table: string, sinceMs: number): StatsSessionRow[] {
+  const columns = statsTableColumns(db, table);
+  // Older schemas may not have every column: read what exists and default the rest.
+  if (!columns.has('id') || !columns.has('time_created')) return [];
+  const column = (name: string) => (columns.has(name) ? `"${name}"` : '0');
+
+  const rows = db.prepare(`
+    SELECT
+      id,
+      time_created,
+      ${column('cost')}          AS cost,
+      ${column('tokens_input')}  AS tokens_in,
+      ${column('tokens_output')} AS tokens_out,
+      ${column('model')}         AS model
+    FROM "${table}"
+    WHERE time_created >= ?
+  `).all(sinceMs) as any[];
+
+  return rows.map(row => ({
+    id: String(row.id),
+    timeCreated: Number(row.time_created) || 0,
+    cost: Number(row.cost) || 0,
+    tokensIn: Number(row.tokens_in) || 0,
+    tokensOut: Number(row.tokens_out) || 0,
+    model: typeof row.model === 'string' ? row.model : null,
+  }));
+}
+
+function parseStatsModelId(raw: string | null): string {
+  if (!raw) return 'unknown';
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      if (typeof parsed.id === 'string' && parsed.id) return parsed.id;
+      if (typeof parsed.modelID === 'string' && parsed.modelID) return parsed.modelID;
+    }
+  } catch { /* plain model name */ }
+  return raw;
+}
+
+// Local (not UTC) YYYY-MM-DD, so day buckets match the user's calendar and the
+// dashboard's own date keys. OpenCode timestamps are milliseconds.
+function localDateKey(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 ipcMain.handle('pricing:get', async () => {
   try {
     const data = await fetchModelsDev();
@@ -1698,73 +1767,62 @@ ipcMain.handle('stats:opencode', () => {
     const Database = require('better-sqlite3');
     const db = new Database(dbPath, { readonly: true, fileMustExist: true });
 
-    // Last 7 days (including today) from midnight UTC 7 days ago
-    const now = Date.now();
-    const thirtyDaysAgoMs = now - 30 * 24 * 60 * 60 * 1000;
+    // Start at local midnight 29 days ago so the dashboard always has 30 full days.
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 29);
+    const sinceMs = start.getTime();
 
-    // Group by local date and model using SQLite date function
-    const rawRows = db.prepare(`
-      SELECT
-        date(time_created / 1000, 'unixepoch', 'localtime') AS date,
-        model,
-        SUM(cost)           AS cost,
-        COUNT(*)            AS sessions,
-        SUM(tokens_input)   AS tokensIn,
-        SUM(tokens_output)  AS tokensOut
-      FROM session
-      WHERE time_created >= ?
-      GROUP BY date, model
-      ORDER BY date
-    `).all(thirtyDaysAgoMs) as any[];
-
-    db.close();
+    let sessions: StatsSessionRow[] = [];
+    try {
+      const existing = new Set(
+        (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>)
+          .map(t => t.name),
+      );
+      // Legacy v1 rows first, then v2: the same session may exist in both tables
+      // with identical totals, and v2 is the live store, so it wins.
+      const byId = new Map<string, StatsSessionRow>();
+      for (const table of ['session', 'session_v2']) {
+        if (!existing.has(table)) continue;
+        for (const row of readStatsSessions(db, table, sinceMs)) byId.set(row.id, row);
+      }
+      sessions = Array.from(byId.values());
+    } finally {
+      db.close();
+    }
 
     const daysMap = new Map<string, any>();
     let totalCost = 0;
     let totalSessions = 0;
 
-    for (const r of rawRows) {
-      if (!r.date) continue;
-      if (!daysMap.has(r.date)) {
-        daysMap.set(r.date, { date: r.date, cost: 0, sessions: 0, tokensIn: 0, tokensOut: 0, models: [] });
+    for (const row of sessions) {
+      const date = localDateKey(row.timeCreated);
+      if (!daysMap.has(date)) {
+        daysMap.set(date, { date, cost: 0, sessions: 0, tokensIn: 0, tokensOut: 0, models: [] });
       }
+      const day = daysMap.get(date);
 
-      const day = daysMap.get(r.date);
-      const rowCost = r.cost ?? 0;
-      const rowSessions = r.sessions ?? 0;
-      const rowTokensIn = r.tokensIn ?? 0;
-      const rowTokensOut = r.tokensOut ?? 0;
+      day.cost += row.cost;
+      day.sessions += 1;
+      day.tokensIn += row.tokensIn;
+      day.tokensOut += row.tokensOut;
 
-      day.cost += rowCost;
-      day.sessions += rowSessions;
-      day.tokensIn += rowTokensIn;
-      day.tokensOut += rowTokensOut;
+      totalCost += row.cost;
+      totalSessions += 1;
 
-      totalCost += rowCost;
-      totalSessions += rowSessions;
-
-      let modelId = 'unknown';
-      if (r.model) {
-        try {
-          const m = JSON.parse(r.model);
-          modelId = m.id || 'unknown';
-        } catch {
-          modelId = r.model;
-        }
+      const modelId = parseStatsModelId(row.model);
+      let model = day.models.find((m: any) => m.modelId === modelId);
+      if (!model) {
+        model = { modelId, cost: 0, sessions: 0, tokensIn: 0, tokensOut: 0 };
+        day.models.push(model);
       }
-
-      let mObj = day.models.find((m: any) => m.modelId === modelId);
-      if (!mObj) {
-        mObj = { modelId, cost: 0, sessions: 0, tokensIn: 0, tokensOut: 0 };
-        day.models.push(mObj);
-      }
-      mObj.cost += rowCost;
-      mObj.sessions += rowSessions;
-      mObj.tokensIn += rowTokensIn;
-      mObj.tokensOut += rowTokensOut;
+      model.cost += row.cost;
+      model.sessions += 1;
+      model.tokensIn += row.tokensIn;
+      model.tokensOut += row.tokensOut;
     }
 
-    const daysList = Array.from(daysMap.values());
+    const daysList = Array.from(daysMap.values()).sort((a, b) => a.date.localeCompare(b.date));
     for (const day of daysList) {
       day.models.sort((a: any, b: any) => b.cost - a.cost);
     }
@@ -1841,7 +1899,8 @@ ipcMain.handle('prs:stats', async () => {
     const dayCount = new Map<string, number>();
     for (const pr of prs) {
       if (!pr.mergedAt) continue;
-      const date = new Date(pr.mergedAt).toISOString().slice(0, 10);
+      // Local calendar day, matching the OpenCode spend buckets.
+      const date = localDateKey(new Date(pr.mergedAt).getTime());
       dayCount.set(date, (dayCount.get(date) || 0) + 1);
     }
     const days = Array.from(dayCount.entries())
