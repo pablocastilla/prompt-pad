@@ -478,7 +478,7 @@ test.describe('Provider picker navigation', () => {
     }
   });
 
-  test('numeric key 3 launches claude-code directly (no model picker)', async () => {
+  test('numeric key 3 opens the Claude Code model picker and launches the default model', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -498,15 +498,18 @@ test.describe('Provider picker navigation', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
-      // Press "3" -> claude-code -> direct launch
+      // Press "3" -> claude-code -> model picker
       await page.keyboard.press('3');
-      await page.waitForTimeout(500);
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      expect(readLaunchCalls(testDir)).toHaveLength(0);
 
-      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      await page.locator('.model-picker-list .model-picker-item').first().click();
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
 
       const calls = readLaunchCalls(testDir);
       expect(calls).toHaveLength(1);
       expect(calls[0].tool).toBe('claude-code');
+      expect(calls[0].model).toBe('default');
       expect(calls[0].prompt).toBe('test prompt');
 
       await app.close();
@@ -515,7 +518,7 @@ test.describe('Provider picker navigation', () => {
     }
   });
 
-  test('numeric key 4 launches codex directly without model picker', async () => {
+  test('numeric key 4 opens the Codex model picker and launches the default model', async () => {
     const testDir = getTestDir();
     try {
       saveTestSettings(testDir);
@@ -536,13 +539,16 @@ test.describe('Provider picker navigation', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('4');
-      await page.waitForTimeout(500);
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      expect(readLaunchCalls(testDir)).toHaveLength(0);
 
-      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      await page.locator('.model-picker-list .model-picker-item').first().click();
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
 
       const calls = readLaunchCalls(testDir);
       expect(calls).toHaveLength(1);
       expect(calls[0].tool).toBe('codex');
+      expect(calls[0].model).toBe('default');
 
       await app.close();
     } finally {
@@ -716,11 +722,12 @@ test.describe('Provider picker navigation', () => {
       const selected = page.locator('.provider-picker-item.selected');
       await expect(selected).toHaveAttribute('data-provider', 'codex');
 
-      // Press Enter to confirm
+      // Press Enter to confirm -> codex model picker
       await page.keyboard.press('Enter');
-      await page.waitForTimeout(500);
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
 
-      await expect(page.locator('.model-picker-overlay')).not.toBeVisible();
+      await page.locator('.model-picker-list .model-picker-item').first().click();
+      await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
 
       const calls = readLaunchCalls(testDir);
       expect(calls).toHaveLength(1);

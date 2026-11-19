@@ -46,12 +46,42 @@ export async function selectOpenCodeProvider(page: Page, opts: { waitForList?: b
 }
 
 /**
- * Select Claude Code in the provider picker. Claude Code launches directly
- * without a model picker, so the overlay closes immediately.
+ * Select Claude Code in the provider picker and wait for its model list.
  */
-export async function selectClaudeCodeProvider(page: Page) {
+export async function selectClaudeCodeProvider(page: Page, opts: { waitForList?: boolean } = {}) {
+  const { waitForList = true } = opts;
   await page.locator('.provider-picker-list .provider-picker-item[data-provider="claude-code"]').click();
-  await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
+  if (waitForList) {
+    await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+  } else {
+    await expect(page.locator('.provider-picker-list')).not.toBeVisible({ timeout: 5000 });
+  }
+}
+
+/**
+ * Click a model in the open model picker by its id. The row exposes the model
+ * through its label only, so callers pass the visible label (or use the first
+ * row, which is the provider's "Default" entry).
+ */
+export async function selectModelByLabel(page: Page, label: string | RegExp) {
+  const row = page.locator('.model-picker-item', {
+    has: page.locator('.model-picker-item-label', { hasText: label }),
+  }).first();
+  await expect(row).toBeVisible({ timeout: 5000 });
+  await row.click();
+}
+
+/**
+ * Select OpenAI Codex in the provider picker and wait for its model list.
+ */
+export async function selectCodexProvider(page: Page, opts: { waitForList?: boolean } = {}) {
+  const { waitForList = true } = opts;
+  await page.locator('.provider-picker-list .provider-picker-item[data-provider="codex"]').click();
+  if (waitForList) {
+    await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+  } else {
+    await expect(page.locator('.provider-picker-list')).not.toBeVisible({ timeout: 5000 });
+  }
 }
 
 /**
@@ -79,10 +109,24 @@ export async function openModelPickerForFirstLaunch(page: Page) {
 
 /**
  * Convenience: press Ctrl+Shift+1 to launch the first config, then select Claude Code.
- * Claude Code has no model picker — the overlay closes immediately.
+ * Claude Code opens its model picker; choosing the first row uses its default model.
  */
 export async function launchWithClaudeCode(page: Page) {
   await page.keyboard.press('Control+Shift+1');
   await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
   await selectClaudeCodeProvider(page);
+  await page.locator('.model-picker-list .model-picker-item').first().click();
+  await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
+}
+
+/**
+ * Convenience: press Ctrl+Shift+1 to launch the first config, then select Codex.
+ * Codex opens its model picker; choosing the first row uses its default model.
+ */
+export async function launchWithCodex(page: Page) {
+  await page.keyboard.press('Control+Shift+1');
+  await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
+  await selectCodexProvider(page);
+  await page.locator('.model-picker-list .model-picker-item').first().click();
+  await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
 }

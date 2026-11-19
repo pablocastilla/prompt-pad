@@ -49,7 +49,7 @@ test.describe('Default and free/cheap models feature', () => {
       const defaults = await page.evaluate(async () => {
         const api = (window as unknown as {
           electronAPI: {
-            getDefaultModels: () => Promise<{ copilot: string; opencode: string; antigravity: string }>;
+            getDefaultModels: () => Promise<{ copilot: string; opencode: string; antigravity: string; claudeCode: string; codex: string }>;
           };
         }).electronAPI;
         return api.getDefaultModels();
@@ -59,6 +59,8 @@ test.describe('Default and free/cheap models feature', () => {
       expect(defaults.copilot).toBe('auto');
       expect(defaults.opencode).toBe('opencode/deepseek-v4.1-flash-free');
       expect(defaults.antigravity).toBe('gemini-3.8-flash-medium');
+      expect(defaults.claudeCode).toBe('default');
+      expect(defaults.codex).toBe('default');
 
       await app.close();
     } finally {
@@ -115,10 +117,28 @@ test.describe('Default and free/cheap models feature', () => {
           prompt: 'test antigravity launch',
           mode: 'interactive',
         });
+
+        await api.executeLaunch({
+          tool: 'claude-code',
+          model: '',
+          folder: '/tmp/test-claude',
+          yolo: true,
+          prompt: 'test claude launch',
+          mode: 'interactive',
+        });
+
+        await api.executeLaunch({
+          tool: 'codex',
+          model: '',
+          folder: '/tmp/test-codex',
+          yolo: true,
+          prompt: 'test codex launch',
+          mode: 'interactive',
+        });
       });
 
       const calls = readLaunchCalls(testDir);
-      expect(calls).toHaveLength(3);
+      expect(calls).toHaveLength(5);
 
       const copilotCall = calls.find(c => c.tool === 'copilot');
       expect(copilotCall).toBeDefined();
@@ -131,6 +151,14 @@ test.describe('Default and free/cheap models feature', () => {
       const antigravityCall = calls.find(c => c.tool === 'antigravity');
       expect(antigravityCall).toBeDefined();
       expect(antigravityCall?.normalizedModel).toBe('gemini-3.8-flash-medium');
+
+      const claudeCall = calls.find(c => c.tool === 'claude-code');
+      expect(claudeCall).toBeDefined();
+      expect(claudeCall?.normalizedModel).toBe('default');
+
+      const codexCall = calls.find(c => c.tool === 'codex');
+      expect(codexCall).toBeDefined();
+      expect(codexCall?.normalizedModel).toBe('default');
 
       await app.close();
     } finally {

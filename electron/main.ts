@@ -8,10 +8,38 @@ import { findOpenCodeDb as locateOpenCodeDb, OpenCodeSessionMonitor } from './op
 import { findAntigravityDbs as locateAntigravityDb, AntigravitySessionMonitor } from './antigravitySessions';
 import { RemoteSessionsServer, qrSvg, formatRemoteSessionsUrl } from './remoteServer';
 import { promptExcerpt } from './promptExcerpt';
-import { buildOpenCodeWinScript, buildOpenCodeShScript, escapeSingleQuotePS } from './launcherScripts';
+import {
+  buildOpenCodeWinScript,
+  buildOpenCodeShScript,
+  buildClaudeCodeWinScript,
+  buildClaudeCodeShScript,
+  buildCodexWinScript,
+  buildCodexShScript,
+  escapeSingleQuotePS,
+} from './launcherScripts';
 import { DEFAULT_OPENCODE_MODEL, resolveOpenCodeLaunchModel, type OpenCodeServerOverride } from './opencodeApi';
+import {
+  CLAUDE_CODE_MODELS,
+  CODEX_MODELS,
+  DEFAULT_CLAUDE_CODE_MODEL,
+  DEFAULT_CODEX_MODEL,
+  normalizeClaudeCodeModel,
+  normalizeCodexModel,
+} from './providerModels';
 export { DEFAULT_OPENCODE_MODEL, resolveOpenCodeLaunchModel };
-export { buildOpenCodeWinScript, buildOpenCodeShScript, escapeSingleQuotePS };
+export {
+  buildOpenCodeWinScript,
+  buildOpenCodeShScript,
+  buildClaudeCodeWinScript,
+  buildClaudeCodeShScript,
+  buildCodexWinScript,
+  buildCodexShScript,
+  escapeSingleQuotePS,
+  DEFAULT_CLAUDE_CODE_MODEL,
+  DEFAULT_CODEX_MODEL,
+  normalizeClaudeCodeModel,
+  normalizeCodexModel,
+};
 
 const TEST_DIR = process.env.PROMPT_PAD_TEST_DIR || null;
 // Playwright can point the sessions integration at a fake OpenCode server so the
@@ -647,7 +675,29 @@ ipcMain.handle('models:get-defaults', () => ({
   copilot: DEFAULT_MODEL,
   opencode: DEFAULT_OPENCODE_MODEL,
   antigravity: DEFAULT_ANTIGRAVITY_MODEL,
+  claudeCode: DEFAULT_CLAUDE_CODE_MODEL,
+  codex: DEFAULT_CODEX_MODEL,
 }));
+
+// Claude Code and Codex do not expose a supported command that lists models
+// (Claude Code resolves aliases, Codex has no `codex models` yet), so Prompt Pad
+// ships a curated catalog. Users can still select "Default" to let each CLI use
+// its own configured model, and pinned full model IDs keep working.
+ipcMain.handle('models:get-claude-code', async () => {
+  if (TEST_DIR) {
+    const mock = await mockModelsFor('mock-claude-models.json');
+    if (mock) return mock;
+  }
+  return CLAUDE_CODE_MODELS;
+});
+
+ipcMain.handle('models:get-codex', async () => {
+  if (TEST_DIR) {
+    const mock = await mockModelsFor('mock-codex-models.json');
+    if (mock) return mock;
+  }
+  return CODEX_MODELS;
+});
 
 ipcMain.handle('models:get-copilot', async () => {
   if (TEST_DIR) {
@@ -806,6 +856,8 @@ ipcMain.handle('launch:execute', async (_e, config: {
       const normalizedModel =
         tool === 'opencode' ? normalizeOpenCodeModel(config.model) :
         tool === 'antigravity' ? normalizeAntigravityModel(config.model) :
+        tool === 'claude-code' ? normalizeClaudeCodeModel(config.model) :
+        tool === 'codex' ? normalizeCodexModel(config.model) :
         tool === 'copilot' ? normalizeModel(config.model) : config.model;
 
       const id = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
@@ -845,6 +897,39 @@ ipcMain.handle('launch:execute', async (_e, config: {
           title,
         });
         fs.writeFileSync(path.join(APP_DIR, 'launch-script-' + id + '.ps1'), script, 'utf-8');
+      }
+      if (tool === 'claude-code' || tool === 'codex') {
+        const tmpId = 'pp-launch-' + id;
+        const tmpDir = path.join(os.tmpdir(), tmpId);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const promptPath = path.join(tmpDir, 'pp-prompt-' + id + '.txt');
+        fs.writeFileSync(promptPath, config.prompt, 'utf-8');
+        const message = buildPromptFileMessage(promptPath, config.prompt, 'my', config.phraseRanges);
+        const model = tool === 'claude-code'
+          ? normalizeClaudeCodeModel(config.model)
+          : normalizeCodexModel(config.model);
+        const options = {
+          workDir: config.folder || 'C:\\tmp',
+          model,
+          message,
+          yolo: !!config.yolo,
+          interactive: config.mode !== 'print',
+          launchTmpDir: tmpDir,
+        };
+        const winScript = tool === 'claude-code'
+          ? buildClaudeCodeWinScript(options)
+          : buildCodexWinScript(options);
+        const shScript = tool === 'claude-code'
+          ? buildClaudeCodeShScript(options)
+          : buildCodexShScript(options);
+        fs.writeFileSync(path.join(APP_DIR, 'launch-script-' + id + '.ps1'), winScript, 'utf-8');
+        fs.writeFileSync(path.join(APP_DIR, 'launch-script-' + id + '.sh'), shScript, 'utf-8');
+        fs.writeFileSync(path.join(APP_DIR, 'launch-meta-' + id + '.json'), JSON.stringify({
+          model,
+          message,
+          promptPath,
+          interactive: options.interactive,
+        }, null, 2), 'utf-8');
       }
     } catch {
       // best-effort capture only
@@ -1107,8 +1192,10 @@ async function executeLaunchClaudeCode(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
 } & LaunchPromptExtras) {
-  const { folder, prompt, attachedFilePaths = [] } = config;
+  const { folder, yolo, prompt, mode, attachedFilePaths = [] } = config;
+  const model = normalizeClaudeCodeModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
+  const isInteractive = mode !== 'print';
   const id = Date.now().toString();
 
   const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
@@ -1137,18 +1224,11 @@ async function executeLaunchClaudeCode(config: {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
 
+  const options = { workDir, model, message, yolo, interactive: isInteractive, launchTmpDir };
+
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-claude-' + id + '.ps1');
-    const safeDir = escapeSingleQuotePS(workDir);
-    const safeMsg = escapeSingleQuotePS(message);
-    const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
-    const script = [
-      "Set-Location -LiteralPath '" + safeDir + "'",
-      "$claudeArgs = @('--dangerously-skip-permissions', '" + safeMsg + "')",
-      "& claude @claudeArgs",
-      "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
-    ].join('\n');
-    writePS1(psPath, script);
+    writePS1(psPath, buildClaudeCodeWinScript(options));
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
       'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
@@ -1162,14 +1242,7 @@ async function executeLaunchClaudeCode(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-claude-' + id + '.sh');
-    const script = [
-      '#!/bin/bash',
-      'cd ' + JSON.stringify(workDir),
-      'claude --dangerously-skip-permissions ' + JSON.stringify(message),
-      'rm -rf ' + JSON.stringify(launchTmpDir),
-      'rm -f "$0"',
-    ].join('\n');
-    fs.writeFileSync(shPath, script, { mode: 0o755 });
+    fs.writeFileSync(shPath, buildClaudeCodeShScript(options), { mode: 0o755 });
     if (process.platform === 'darwin') {
       const appleScript = [
         'tell application "Terminal"',
@@ -1194,8 +1267,10 @@ async function executeLaunchCodex(config: {
   model: string; folder: string; yolo: boolean; prompt: string; mode: string;
   attachedFilePaths?: string[];
 } & LaunchPromptExtras) {
-  const { folder, prompt, attachedFilePaths = [] } = config;
+  const { folder, yolo, prompt, mode, attachedFilePaths = [] } = config;
+  const model = normalizeCodexModel(config.model);
   const workDir = folder && fs.existsSync(folder) ? folder : os.homedir();
+  const isInteractive = mode !== 'print';
   const id = Date.now().toString();
 
   const launchTmpDir = path.join(os.tmpdir(), 'pp-launch-' + id);
@@ -1224,18 +1299,11 @@ async function executeLaunchCodex(config: {
     message += ` I have also attached: ${attachedFileNames.map(n => path.join(launchTmpDir, n)).join(', ')}.`;
   }
 
+  const options = { workDir, model, message, yolo, interactive: isInteractive, launchTmpDir };
+
   if (process.platform === 'win32') {
     const psPath = path.join(os.tmpdir(), 'pp-codex-' + id + '.ps1');
-    const safeDir = escapeSingleQuotePS(workDir);
-    const safeMsg = escapeSingleQuotePS(message);
-    const safeTmpDir = escapeSingleQuotePS(launchTmpDir);
-    const script = [
-      "Set-Location -LiteralPath '" + safeDir + "'",
-      "$codexArgs = @('--dangerously-bypass-approvals-and-sandbox', '" + safeMsg + "')",
-      "& codex @codexArgs",
-      "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
-    ].join('\n');
-    writePS1(psPath, script);
+    writePS1(psPath, buildCodexWinScript(options));
     const wt = spawn('wt.exe', [
       'new-tab', '--title', 'Prompt Pad',
       'powershell.exe', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', psPath,
@@ -1249,14 +1317,7 @@ async function executeLaunchCodex(config: {
     wt.unref();
   } else {
     const shPath = path.join(os.tmpdir(), 'pp-codex-' + id + '.sh');
-    const script = [
-      '#!/bin/bash',
-      'cd ' + JSON.stringify(workDir),
-      'codex --dangerously-bypass-approvals-and-sandbox ' + JSON.stringify(message),
-      'rm -rf ' + JSON.stringify(launchTmpDir),
-      'rm -f "$0"',
-    ].join('\n');
-    fs.writeFileSync(shPath, script, { mode: 0o755 });
+    fs.writeFileSync(shPath, buildCodexShScript(options), { mode: 0o755 });
     if (process.platform === 'darwin') {
       const appleScript = [
         'tell application "Terminal"',

@@ -43,6 +43,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOpenCodeModels: () => ipcRenderer.invoke('models:get-opencode'),
   getCopilotModels: () => ipcRenderer.invoke('models:get-copilot'),
   getAntigravityModels: () => ipcRenderer.invoke('models:get-antigravity'),
+  getClaudeCodeModels: () => ipcRenderer.invoke('models:get-claude-code'),
+  getCodexModels: () => ipcRenderer.invoke('models:get-codex'),
   getDefaultModels: () => ipcRenderer.invoke('models:get-defaults'),
   clearModelCache: () => ipcRenderer.invoke('models:clear-cache'),
 

@@ -161,3 +161,101 @@ export function buildOpenCodeShScript(opts: OpenCodeScriptOptions): string {
     'rm -f "$0"',
   ].join('\n');
 }
+
+// ── Claude Code ──────────────────────────────────────────────────────────────
+// Current CLI (Claude Code 2.x): `claude [--model <alias|id>] [--permission-mode
+// bypassPermissions] [--print] "<prompt>"`. `--dangerously-skip-permissions` is
+// still accepted as an equivalent of `bypassPermissions`, but the explicit
+// permission mode is the supported spelling and works on both current and
+// recent versions. The prompt is passed as the trailing positional argument;
+// the seed message is quote-free and the whole prompt lives in a temp file.
+export interface ClaudeCodeScriptOptions {
+  workDir: string;
+  model: string;
+  message: string;
+  yolo: boolean;
+  interactive: boolean;
+  launchTmpDir: string;
+}
+
+function claudeCodeArgs(opts: ClaudeCodeScriptOptions): string[] {
+  const args: string[] = [];
+  if (opts.model && opts.model !== 'default') args.push('--model', opts.model);
+  if (opts.yolo) args.push('--permission-mode', 'bypassPermissions');
+  if (!opts.interactive) args.push('--print');
+  args.push(opts.message);
+  return args;
+}
+
+export function buildClaudeCodeWinScript(opts: ClaudeCodeScriptOptions): string {
+  const safeDir = escapeSingleQuotePS(opts.workDir);
+  const safeTmpDir = escapeSingleQuotePS(opts.launchTmpDir);
+  const args = claudeCodeArgs(opts)
+    .map(arg => "'" + escapeSingleQuotePS(arg) + "'")
+    .join(', ');
+  return [
+    "Set-Location -LiteralPath '" + safeDir + "'",
+    '$claudeArgs = @(' + args + ')',
+    '& claude @claudeArgs',
+    "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
+  ].join('\n');
+}
+
+export function buildClaudeCodeShScript(opts: ClaudeCodeScriptOptions): string {
+  const launchLine = ['claude', ...claudeCodeArgs(opts).map(arg => JSON.stringify(arg))].join(' ');
+  return [
+    '#!/bin/bash',
+    'cd ' + JSON.stringify(opts.workDir.replace(/\\/g, '/')),
+    launchLine,
+    'rm -rf ' + JSON.stringify(opts.launchTmpDir.replace(/\\/g, '/')),
+    'rm -f "$0"',
+  ].join('\n');
+}
+
+// ── OpenAI Codex ─────────────────────────────────────────────────────────────
+// Current CLI (Codex 0.14x+): `codex [exec] [-m <model>] [--yolo] "<prompt>"`.
+// `--full-auto` was removed in 0.147.0, so Prompt Pad uses the long
+// `--dangerously-bypass-approvals-and-sandbox` spelling (alias `--yolo`), which
+// still exists in current releases. `exec` is the non-interactive mode.
+export interface CodexScriptOptions {
+  workDir: string;
+  model: string;
+  message: string;
+  yolo: boolean;
+  interactive: boolean;
+  launchTmpDir: string;
+}
+
+function codexArgs(opts: CodexScriptOptions): string[] {
+  const args: string[] = [];
+  if (!opts.interactive) args.push('exec');
+  if (opts.model && opts.model !== 'default') args.push('--model', opts.model);
+  if (opts.yolo) args.push('--dangerously-bypass-approvals-and-sandbox');
+  args.push(opts.message);
+  return args;
+}
+
+export function buildCodexWinScript(opts: CodexScriptOptions): string {
+  const safeDir = escapeSingleQuotePS(opts.workDir);
+  const safeTmpDir = escapeSingleQuotePS(opts.launchTmpDir);
+  const args = codexArgs(opts)
+    .map(arg => "'" + escapeSingleQuotePS(arg) + "'")
+    .join(', ');
+  return [
+    "Set-Location -LiteralPath '" + safeDir + "'",
+    '$codexArgs = @(' + args + ')',
+    '& codex @codexArgs',
+    "Remove-Item -LiteralPath '" + safeTmpDir + "' -Recurse -Force -ErrorAction SilentlyContinue",
+  ].join('\n');
+}
+
+export function buildCodexShScript(opts: CodexScriptOptions): string {
+  const launchLine = ['codex', ...codexArgs(opts).map(arg => JSON.stringify(arg))].join(' ');
+  return [
+    '#!/bin/bash',
+    'cd ' + JSON.stringify(opts.workDir.replace(/\\/g, '/')),
+    launchLine,
+    'rm -rf ' + JSON.stringify(opts.launchTmpDir.replace(/\\/g, '/')),
+    'rm -f "$0"',
+  ].join('\n');
+}

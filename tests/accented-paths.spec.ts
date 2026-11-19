@@ -75,6 +75,8 @@ test.describe('Launch with accented folder paths', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.locator('.provider-picker-list .provider-picker-item[data-provider="claude-code"]').click();
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
       await page.waitForTimeout(500);
 
@@ -119,6 +121,8 @@ test.describe('Launch with accented folder paths', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.locator('.provider-picker-list .provider-picker-item[data-provider="claude-code"]').click();
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
       await page.waitForTimeout(500);
 
@@ -163,6 +167,8 @@ test.describe('Launch with accented folder paths', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.locator('.provider-picker-list .provider-picker-item[data-provider="claude-code"]').click();
+      await expect(page.locator('.model-picker-list')).toBeVisible({ timeout: 5000 });
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await expect(page.locator('.model-picker-overlay')).not.toBeVisible({ timeout: 5000 });
       await page.waitForTimeout(500);
 

@@ -194,6 +194,8 @@ function findRemotePricing(modelId: string): RemotePricing | undefined {
 // or experimental entries. Tooltips will fall back to a generic label
 // until the matching ZenPricing entry is added above.
 const LEGACY_OR_GENERIC_TIER: Array<{ pattern: RegExp; tier: Exclude<CostTier, 'free'> }> = [
+  { pattern: /fable/,           tier: 5 },
+  { pattern: /best/,            tier: 5 },
   { pattern: /haiku/,           tier: 2 },
   { pattern: /flash/,           tier: 2 },
   { pattern: /mini|nano/,       tier: 1 },
@@ -203,6 +205,7 @@ const LEGACY_OR_GENERIC_TIER: Array<{ pattern: RegExp; tier: Exclude<CostTier, '
   { pattern: /max/,             tier: 4 },
   { pattern: /pro/,             tier: 5 },
   { pattern: /codex/,           tier: 3 },
+  { pattern: /gpt-6/,           tier: 5 },
   { pattern: /gpt-5/,           tier: 3 },
   { pattern: /claude/,          tier: 3 },
   { pattern: /gemini/,          tier: 3 },
@@ -364,7 +367,9 @@ export interface ElectronAPI {
   getOpenCodeModels: () => Promise<ModelOption[]>;
   getCopilotModels: () => Promise<ModelOption[]>;
   getAntigravityModels: () => Promise<ModelOption[]>;
-  getDefaultModels: () => Promise<{ copilot: string; opencode: string; antigravity: string }>;
+  getClaudeCodeModels: () => Promise<ModelOption[]>;
+  getCodexModels: () => Promise<ModelOption[]>;
+  getDefaultModels: () => Promise<{ copilot: string; opencode: string; antigravity: string; claudeCode: string; codex: string }>;
   clearModelCache: () => Promise<void>;
   readClipboardImage: () => Promise<{ name: string; path: string; size: number } | null>;
   clipboardHasImage: () => boolean;

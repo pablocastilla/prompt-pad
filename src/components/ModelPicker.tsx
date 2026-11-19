@@ -12,8 +12,10 @@ import { siNvidia } from 'simple-icons';
 // legacy launch-history entries and pinned-model settings still render.
 const ALL_TOOLS: LaunchTool[] = ['opencode', 'copilot', 'claude-code', 'codex', 'antigravity'];
 
-// Providers that expose a CLI-driven model list; others launch with the CLI's default model.
-const TOOLS_WITH_MODEL_PICKER: LaunchTool[] = ['opencode', 'copilot', 'antigravity'];
+// Providers that expose a model picker at launch time. OpenCode/Copilot/Antigravity
+// query their CLI; Claude Code/Codex use Prompt Pad's curated alias/model catalog
+// because their CLIs do not expose a supported model-list command.
+const TOOLS_WITH_MODEL_PICKER: LaunchTool[] = ['opencode', 'copilot', 'antigravity', 'claude-code', 'codex'];
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -279,6 +281,10 @@ export function ModelPicker() {
         fetched = await window.electronAPI.getCopilotModels();
       } else if (selectedTool === 'antigravity') {
         fetched = await window.electronAPI.getAntigravityModels();
+      } else if (selectedTool === 'claude-code') {
+        fetched = await window.electronAPI.getClaudeCodeModels();
+      } else if (selectedTool === 'codex') {
+        fetched = await window.electronAPI.getCodexModels();
       }
       if (!Array.isArray(fetched) || fetched.length === 0) {
         setModelError(prev => ({ ...prev, [selectedTool]: t('modelsUnavailable') }));

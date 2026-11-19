@@ -92,6 +92,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -127,6 +128,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -168,6 +170,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -207,6 +210,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -247,6 +251,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -289,6 +294,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -335,6 +341,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -380,6 +387,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -416,6 +424,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -461,6 +470,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
 
@@ -476,6 +486,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+2');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -521,6 +532,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -570,6 +582,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -614,6 +627,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -651,6 +665,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -711,6 +726,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
 
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
@@ -767,6 +783,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
 
@@ -823,6 +840,7 @@ test.describe('Git diff panel', () => {
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
 
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
 
@@ -877,6 +895,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
 
@@ -917,6 +936,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
 
@@ -972,6 +992,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+1');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
       let paths1 = await page.locator('.git-file-path').allTextContents();
@@ -985,6 +1006,7 @@ test.describe('Git diff panel', () => {
       await page.keyboard.press('Control+Shift+2');
       await expect(page.locator('.provider-picker-list')).toBeVisible({ timeout: 5000 });
       await page.keyboard.press('3');
+      await page.locator('.model-picker-list .model-picker-item').first().click();
       await page.waitForTimeout(1000);
       await expect(page.locator('.git-panel')).toBeVisible({ timeout: 5000 });
       let paths2 = await page.locator('.git-file-path').allTextContents();
