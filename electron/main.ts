@@ -6,6 +6,7 @@ import * as os from 'os';
 import { spawn } from 'child_process';
 import { findOpenCodeDb as locateOpenCodeDb, OpenCodeSessionMonitor } from './opencodeSessions';
 import { findAntigravityDbs as locateAntigravityDb, AntigravitySessionMonitor } from './antigravitySessions';
+import { findClaudeProjectsDir, findCodexSessionsDir, ClaudeSessionMonitor, CodexSessionMonitor } from './cliSessions';
 import { RemoteSessionsServer, qrSvg, formatRemoteSessionsUrl } from './remoteServer';
 import { promptExcerpt } from './promptExcerpt';
 import {
@@ -1625,6 +1626,24 @@ const antigravityMonitor = new AntigravitySessionMonitor(
 ipcMain.handle('antigravity-sessions:list', () => antigravityMonitor.read());
 ipcMain.handle('antigravity-sessions:dismiss', (_e, id: string, turnId: string) => antigravityMonitor.dismiss(id, turnId));
 ipcMain.handle('antigravity-sessions:restore', () => antigravityMonitor.restore());
+
+// Claude Code and Codex CLI transcripts (~/.claude/projects and ~/.codex/sessions).
+// Read-only: dismissing a column only hides the current turn in Prompt Pad.
+const claudeMonitor = new ClaudeSessionMonitor(
+  () => findClaudeProjectsDir(TEST_DIR),
+  path.join(APP_DIR, 'claude-sessions-hidden.json'),
+);
+ipcMain.handle('claude-sessions:list', () => claudeMonitor.read());
+ipcMain.handle('claude-sessions:dismiss', (_e, id: string, turnId: string) => claudeMonitor.dismiss(id, turnId));
+ipcMain.handle('claude-sessions:restore', () => claudeMonitor.restore());
+
+const codexMonitor = new CodexSessionMonitor(
+  () => findCodexSessionsDir(TEST_DIR),
+  path.join(APP_DIR, 'codex-sessions-hidden.json'),
+);
+ipcMain.handle('codex-sessions:list', () => codexMonitor.read());
+ipcMain.handle('codex-sessions:dismiss', (_e, id: string, turnId: string) => codexMonitor.dismiss(id, turnId));
+ipcMain.handle('codex-sessions:restore', () => codexMonitor.restore());
 
 // ── Mobile sessions (remote server) ──────────────────────────────────────────
 // Serves a read-only mobile-friendly sessions page over HTTP plus a send box

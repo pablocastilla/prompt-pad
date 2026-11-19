@@ -388,6 +388,12 @@ export interface ElectronAPI {
   getAntigravitySessions: () => Promise<OpenCodeSessionsSnapshot>;
   dismissAntigravitySession: (id: string, turnId: string) => Promise<void>;
   restoreAntigravitySessions: () => Promise<void>;
+  getClaudeSessions: () => Promise<OpenCodeSessionsSnapshot>;
+  dismissClaudeSession: (id: string, turnId: string) => Promise<void>;
+  restoreClaudeSessions: () => Promise<void>;
+  getCodexSessions: () => Promise<OpenCodeSessionsSnapshot>;
+  dismissCodexSession: (id: string, turnId: string) => Promise<void>;
+  restoreCodexSessions: () => Promise<void>;
   getOpenCodeInteractions: () => Promise<OpenCodeInteractions>;
   replyOpenCodePermission: (requestId: string, reply: 'once' | 'always' | 'reject', message?: string) => Promise<void>;
   replyOpenCodeQuestion: (requestId: string, answers: string[][]) => Promise<void>;

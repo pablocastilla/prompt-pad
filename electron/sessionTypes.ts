@@ -34,7 +34,7 @@ export interface OpenCodeSession {
   expiresAt: number | null;
   activity: OpenCodeActivity[];
   // Which product the session belongs to; defaults to OpenCode.
-  source?: 'opencode' | 'antigravity';
+  source?: 'opencode' | 'antigravity' | 'claude-code' | 'codex';
   // Pending live interactions attached by the server readers (not from SQLite).
   permissions?: OpenCodePermissionRequest[];
   questions?: OpenCodeQuestionRequest[];

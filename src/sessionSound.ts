@@ -24,6 +24,10 @@ function isTerminal(status: OpenCodeSessionStatus): boolean {
   return status === 'completed' || status === 'error';
 }
 
+function sessionKey(session: OpenCodeSession): string {
+  return `${session.source || 'opencode'}:${session.id}`;
+}
+
 /** Tool ids of OpenCode `question` calls that are still waiting for an answer. */
 function openQuestionIds(session: OpenCodeSession): string[] {
   return session.activity
@@ -56,8 +60,9 @@ export function detectSessionNotifications(
   const questions: OpenCodeSession[] = [];
   const seen = new Set<string>();
   for (const session of sessions) {
-    seen.add(session.id);
-    const previous = known.get(session.id);
+    const key = sessionKey(session);
+    seen.add(key);
+    const previous = known.get(key);
     if (isTerminal(session.status) && previous && previous.turnId === session.turnId && !isTerminal(previous.status)) {
       finished.push(session);
     }
@@ -69,7 +74,7 @@ export function detectSessionNotifications(
     if (waitingApproval.length > 0 || (previous && open.some(id => !previous.questions.has(id)))) {
       questions.push(session);
     }
-    known.set(session.id, {
+    known.set(key, {
       turnId: session.turnId,
       status: session.status,
       questions: new Set(open),
@@ -145,14 +150,18 @@ export function useSessionSound(enabled: boolean): void {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const [opencode, antigravity] = await Promise.allSettled([
+        const [opencode, antigravity, claude, codex] = await Promise.allSettled([
           window.electronAPI.getOpenCodeSessions(),
           window.electronAPI.getAntigravitySessions(),
+          window.electronAPI.getClaudeSessions(),
+          window.electronAPI.getCodexSessions(),
         ]);
         if (disposed) return;
         const sessions = [
           ...(opencode.status === 'fulfilled' ? opencode.value.sessions : []),
           ...(antigravity.status === 'fulfilled' ? antigravity.value.sessions : []),
+          ...(claude.status === 'fulfilled' ? claude.value.sessions : []),
+          ...(codex.status === 'fulfilled' ? codex.value.sessions : []),
         ];
         const { finished, questions } = detectSessionNotifications(known.current, sessions);
         if (enabledRef.current) {

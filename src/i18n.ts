@@ -94,7 +94,7 @@ const translations = {
     // Sessions (OpenCode + Antigravity)
     sessionsTitle: 'Sessions',
     sessionsSubtitle: 'One column per session · refreshes every 3 seconds · finished OpenCode turns close after 30 minutes',
-    sessionsInferenceHint: 'OpenCode status inferred from SQLite messages and tools. Antigravity shows Prompt Pad-launched conversations from the last 24 hours. Closing a column only hides it; a new prompt brings it back.',
+    sessionsInferenceHint: 'OpenCode status inferred from SQLite messages and tools. Antigravity shows Prompt Pad-launched conversations from the last 24 hours; Claude Code and Codex show local JSONL transcripts from the last 24 hours. Closing a column only hides it; a new prompt brings it back.',
     sessionsWorking: 'Working', sessionsWaiting: 'Waiting', sessionsCompleted: 'Finished',
     sessionsFailed: 'Error / interrupted', sessionsUnknown: 'Uncertain',
     sessionsDismiss: 'Close column', sessionsDismissHint: 'Hide this turn locally (does not stop the agent)',
@@ -109,6 +109,8 @@ const translations = {
     sessionsToolCommand: 'Command', sessionsToolOutput: 'Result',
     sessionsSound: 'Sound', sessionsSoundHint: 'Play a soft chime when a session finishes or asks a question',
     sessionsAntigravityBadge: 'Antigravity',
+  sessionsClaudeBadge: 'Claude Code',
+  sessionsCodexBadge: 'Codex',
     sessionsRemote: 'View on mobile',
     sessionsRemoteShow: 'Mobile access',
     sessionsRemoteCopy: 'Copy URL',
@@ -132,7 +134,7 @@ const translations = {
     sessionsAllowAlways: 'Allow always',
     sessionsReject: 'Reject',
     helpSessionsTitle: 'Sessions',
-    helpSessionsText: 'All local OpenCode sessions in live columns, including sessions launched outside Prompt Pad, plus Antigravity (Google) conversations launched from Prompt Pad during the last 24 hours. Read recent messages and tool progress, close columns yourself, or let finished OpenCode turns disappear after 30 minutes.',
+    helpSessionsText: 'All local OpenCode sessions in live columns, including sessions launched outside Prompt Pad, plus Antigravity (Google) conversations launched from Prompt Pad and local Claude Code and Codex transcripts updated during the last 24 hours. Read recent messages and tool progress, close columns yourself, or let finished OpenCode turns disappear after 30 minutes.',
     // Statistics panel
     statistics: 'Statistics',
     statsLoading: 'Loading stats…',
@@ -264,7 +266,7 @@ const translations = {
     // Sesiones (OpenCode + Antigravity)
     sessionsTitle: 'Sesiones',
     sessionsSubtitle: 'Una columna por sesión · actualización cada 3 segundos · los turnos de OpenCode se cierran 30 minutos después de finalizar',
-    sessionsInferenceHint: 'El estado de OpenCode se deduce de mensajes y herramientas en SQLite. Antigravity muestra las conversaciones lanzadas desde Prompt Pad en las últimas 24 horas. Cerrar una columna solo la oculta; un nuevo prompt la recupera.',
+    sessionsInferenceHint: 'El estado de OpenCode se deduce de mensajes y herramientas en SQLite. Antigravity muestra las conversaciones lanzadas desde Prompt Pad en las últimas 24 horas; Claude Code y Codex muestran sus transcripciones JSONL locales de las últimas 24 horas. Cerrar una columna solo la oculta; un nuevo prompt la recupera.',
     sessionsWorking: 'Trabajando', sessionsWaiting: 'En espera', sessionsCompleted: 'Finalizada',
     sessionsFailed: 'Error / interrumpida', sessionsUnknown: 'Incierta',
     sessionsDismiss: 'Cerrar columna', sessionsDismissHint: 'Ocultar este turno localmente (no detiene al agente)',
@@ -279,6 +281,8 @@ const translations = {
     sessionsToolCommand: 'Comando', sessionsToolOutput: 'Resultado',
     sessionsSound: 'Sonido', sessionsSoundHint: 'Reproducir un tono suave al finalizar una sesión o cuando haga una pregunta',
     sessionsAntigravityBadge: 'Antigravity',
+  sessionsClaudeBadge: 'Claude Code',
+  sessionsCodexBadge: 'Codex',
     sessionsRemote: 'Ver en el móvil',
     sessionsRemoteShow: 'Acceso móvil',
     sessionsRemoteCopy: 'Copiar URL',
@@ -302,7 +306,7 @@ const translations = {
     sessionsAllowAlways: 'Permitir siempre',
     sessionsReject: 'Rechazar',
     helpSessionsTitle: 'Sesiones',
-    helpSessionsText: 'Todas las sesiones locales de OpenCode en columnas en vivo, incluidas las iniciadas fuera de Prompt Pad, además de las conversaciones de Antigravity (Google) lanzadas desde Prompt Pad en las últimas 24 horas. Lee mensajes y progreso de herramientas, cierra columnas manualmente o deja que los turnos de OpenCode finalizados desaparezcan tras 30 minutos.',
+    helpSessionsText: 'Todas las sesiones locales de OpenCode en columnas en vivo, incluidas las iniciadas fuera de Prompt Pad, además de las conversaciones de Antigravity (Google) lanzadas desde Prompt Pad y de las transcripciones locales de Claude Code y Codex actualizadas durante las últimas 24 horas. Lee mensajes y progreso de herramientas, cierra columnas manualmente o deja que los turnos de OpenCode finalizados desaparezcan tras 30 minutos.',
     // Panel de estadísticas
     statistics: 'Estadísticas',
     statsLoading: 'Cargando estadísticas…',

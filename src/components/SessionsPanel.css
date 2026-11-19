@@ -14,6 +14,8 @@
 .session-heading h3 { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
 .session-source-badge { flex-shrink: 0; font-size: 10px; font-weight: 600; padding: 3px 7px; border-radius: 5px; background: var(--accent-dim); color: var(--accent); }
 .session-column-antigravity .session-source-badge { background: var(--bg3); }
+.session-column-claude-code .session-source-badge { background: rgba(217, 119, 87, .18); }
+.session-column-codex .session-source-badge { background: rgba(16, 163, 127, .18); }
 .sessions-panel .sessions-source { display: flex; flex-direction: column; gap: 3px; }
 .sessions-panel .sessions-source > div { overflow: hidden; text-overflow: ellipsis; }
 .session-close { flex-shrink: 0; border: none; background: transparent; color: var(--text2); font-size: 22px; cursor: pointer; padding: 0 5px; border-radius: 4px; }

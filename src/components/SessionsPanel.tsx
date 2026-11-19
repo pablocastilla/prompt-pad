@@ -128,11 +128,15 @@ function SessionColumn({ session, interactions, now, closing, knownSessions, onC
     }
   };
   const hasInteractions = interactions.permissions.length > 0 || interactions.questions.length > 0;
+  const sourceLabel = session.source === 'antigravity' ? t('sessionsAntigravityBadge')
+    : session.source === 'claude-code' ? t('sessionsClaudeBadge')
+    : session.source === 'codex' ? t('sessionsCodexBadge')
+    : 'OpenCode';
   return <article className={`session-column session-column-${session.source || 'opencode'}`} data-session-id={session.id} data-status={session.status} aria-label={session.title}>
     <header className="session-column-header">
       <div className="session-heading">
         <h3 title={session.title}>{session.title || session.id}</h3>
-        {session.source === 'antigravity' && <span className="session-source-badge">{t('sessionsAntigravityBadge')}</span>}
+        {session.source && session.source !== 'opencode' && <span className="session-source-badge">{sourceLabel}</span>}
         <button className="session-close" onClick={onClose} disabled={closing}
           title={t('sessionsDismissHint')} aria-label={`${t('sessionsDismiss')}: ${session.title}`}>×</button>
       </div>
@@ -163,7 +167,7 @@ function SessionColumn({ session, interactions, now, closing, knownSessions, onC
       {session.activity.length === 0 && <p className="session-meta">{t('sessionsNoActivity')}</p>}
       {session.activity.map(item => <div key={item.id} className={`session-event session-event-${item.type}`}>
         <div className="session-event-label">{item.type === 'tool' ? `${item.tool} · ${toolStatus(item.status)}` :
-          item.role === 'user' ? t('sessionsYou') : (session.source === 'antigravity' ? 'Antigravity' : item.role !== 'assistant' ? item.role : 'OpenCode')}</div>
+          item.role === 'user' ? t('sessionsYou') : (session.source && session.source !== 'opencode' ? sourceLabel : item.role !== 'assistant' ? item.role : 'OpenCode')}</div>
         {item.type === 'tool' ? <>
           {item.text && item.text !== item.input && <p>{item.text}</p>}
           {item.input && <pre className="session-event-command" title={t('sessionsToolCommand')}>{item.input}</pre>}
@@ -191,6 +195,8 @@ export function SessionsPanel() {
   const addToast = useStore(s => s.addToast);
   const [opencode, setOpencode] = useState<OpenCodeSessionsSnapshot | null>(null);
   const [antigravity, setAntigravity] = useState<OpenCodeSessionsSnapshot | null>(null);
+  const [claude, setClaude] = useState<OpenCodeSessionsSnapshot | null>(null);
+  const [codex, setCodex] = useState<OpenCodeSessionsSnapshot | null>(null);
   const [interactions, setInteractions] = useState<OpenCodeInteractions>(emptyInteractions);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -209,9 +215,11 @@ export function SessionsPanel() {
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const [oc, agy, ix] = await Promise.allSettled([
+        const [oc, agy, cc, cx, ix] = await Promise.allSettled([
           window.electronAPI.getOpenCodeSessions(),
           window.electronAPI.getAntigravitySessions(),
+          window.electronAPI.getClaudeSessions(),
+          window.electronAPI.getCodexSessions(),
           window.electronAPI.getOpenCodeInteractions(),
         ]);
         if (disposed) return;
@@ -220,13 +228,17 @@ export function SessionsPanel() {
         else setOpencode(oc.value);
         if (agy.status === 'rejected') errors.push(String(agy.reason));
         else setAntigravity(agy.value);
+        if (cc.status === 'rejected') errors.push(String(cc.reason));
+        else setClaude(cc.value);
+        if (cx.status === 'rejected') errors.push(String(cx.reason));
+        else setCodex(cx.value);
         if (ix.status === 'fulfilled') setInteractions(ix.value);
         setError(errors.join(' · '));
         // Gaudy flair: kitschy toasts when a watched turn reaches a final state.
         if (gaudyRef.current) {
           const seen = new Set<string>();
           const messages: string[] = [];
-          for (const snapshot of [oc, agy]) {
+          for (const snapshot of [oc, agy, cc, cx]) {
             if (snapshot.status !== 'fulfilled') continue;
             for (const session of snapshot.value.sessions) {
               const key = `${session.source || 'opencode'}:${session.id}`;
@@ -277,6 +289,18 @@ export function SessionsPanel() {
           sessions: prev.sessions.filter(s => s.id !== session.id),
           hiddenCount: prev.hiddenCount + 1,
         } : null);
+      } else if (session.source === 'claude-code') {
+        setClaude(prev => prev ? {
+          ...prev,
+          sessions: prev.sessions.filter(s => s.id !== session.id),
+          hiddenCount: prev.hiddenCount + 1,
+        } : null);
+      } else if (session.source === 'codex') {
+        setCodex(prev => prev ? {
+          ...prev,
+          sessions: prev.sessions.filter(s => s.id !== session.id),
+          hiddenCount: prev.hiddenCount + 1,
+        } : null);
       } else {
         setOpencode(prev => prev ? {
           ...prev,
@@ -288,11 +312,15 @@ export function SessionsPanel() {
     try {
       if (session) {
         if (session.source === 'antigravity') await window.electronAPI.dismissAntigravitySession(session.id, session.turnId);
+        else if (session.source === 'claude-code') await window.electronAPI.dismissClaudeSession(session.id, session.turnId);
+        else if (session.source === 'codex') await window.electronAPI.dismissCodexSession(session.id, session.turnId);
         else await window.electronAPI.dismissOpenCodeSession(session.id, session.turnId);
       } else {
         await Promise.all([
           window.electronAPI.restoreOpenCodeSessions(),
           window.electronAPI.restoreAntigravitySessions(),
+          window.electronAPI.restoreClaudeSessions(),
+          window.electronAPI.restoreCodexSessions(),
         ]);
       }
       setRevision(v => v + 1);
@@ -333,7 +361,12 @@ export function SessionsPanel() {
   };
   const query = search.trim().toLocaleLowerCase();
   const keyOf = (session: OpenCodeSession) => `${session.source || 'opencode'}-${session.id}`;
-  const allSessions = [...(opencode?.sessions || []), ...(antigravity?.sessions || [])]
+  const allSessions = [
+    ...(opencode?.sessions || []),
+    ...(antigravity?.sessions || []),
+    ...(claude?.sessions || []),
+    ...(codex?.sessions || []),
+  ]
     .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
   const live = new Set(allSessions.map(keyOf));
   const kept = orderKeys.current.filter(key => live.has(key));
@@ -347,11 +380,14 @@ export function SessionsPanel() {
   const sessions = allSessions
     .filter(s => `${s.title} ${s.directory} ${s.model}`.toLocaleLowerCase().includes(query))
     .sort((a, b) => (position.get(keyOf(a)) ?? 0) - (position.get(keyOf(b)) ?? 0));
-  const interactionsFor = (session: OpenCodeSession): OpenCodeInteractions => ({
-    permissions: interactions.permissions.filter(p => p.sessionID === session.id),
-    questions: interactions.questions.filter(q => q.sessionID === session.id),
-  });
-  const hiddenCount = (opencode?.hiddenCount || 0) + (antigravity?.hiddenCount || 0);
+  const interactionsFor = (session: OpenCodeSession): OpenCodeInteractions => session.source && session.source !== 'opencode'
+    ? emptyInteractions()
+    : {
+        permissions: interactions.permissions.filter(p => p.sessionID === session.id),
+        questions: interactions.questions.filter(q => q.sessionID === session.id),
+      };
+  const hiddenCount = (opencode?.hiddenCount || 0) + (antigravity?.hiddenCount || 0) +
+    (claude?.hiddenCount || 0) + (codex?.hiddenCount || 0);
   const knownSessions = new Set(sessions.map(session => session.id));
   const focusSession = (id: string) => {
     const target = board.current?.querySelector<HTMLElement>(`[data-session-id="${id.replace(/"/g, '\\"')}"]`);
@@ -394,18 +430,20 @@ export function SessionsPanel() {
       </div>}
     </div>
     {error && <div className="sessions-error" role="alert">{t('sessionsError')} <span>{error}</span></div>}
-    {loading && !opencode && !antigravity && <p className="sessions-empty" role="status">{t('sessionsLoading')}</p>}
-    {!loading && !error && !opencode?.dbPath && !antigravity?.dbPath && <p className="sessions-empty">{t('statsDbNotFound')}</p>}
-    {(opencode?.dbPath || antigravity?.dbPath) && sessions.length === 0 && <p className="sessions-empty">{query ? t('sessionsNoMatches') : t('sessionsEmpty')}</p>}
+    {loading && !opencode && !antigravity && !claude && !codex && <p className="sessions-empty" role="status">{t('sessionsLoading')}</p>}
+    {!loading && !error && !opencode?.dbPath && !antigravity?.dbPath && !claude?.dbPath && !codex?.dbPath && <p className="sessions-empty">{t('statsDbNotFound')}</p>}
+    {(opencode?.dbPath || antigravity?.dbPath || claude?.dbPath || codex?.dbPath) && sessions.length === 0 && <p className="sessions-empty">{query ? t('sessionsNoMatches') : t('sessionsEmpty')}</p>}
     <div className="sessions-board" ref={board}>
       {sessions.map(session => <SessionColumn key={`${session.source || 'opencode'}-${session.id}`} session={session}
-        interactions={interactionsFor(session)} now={opencode?.checkedAt || antigravity?.checkedAt || Date.now()}
+        interactions={interactionsFor(session)} now={opencode?.checkedAt || claude?.checkedAt || codex?.checkedAt || antigravity?.checkedAt || Date.now()}
         closing={closing !== null} knownSessions={knownSessions} onClose={() => void changeVisibility(session)} onSend={sendToSession}
         onReplyPermission={replyPermission} onAnswerQuestion={answerQuestion} onFocusSession={focusSession} />)}
     </div>
-    {(opencode?.dbPath || antigravity?.dbPath) && <footer className="sessions-source">
+    {(opencode?.dbPath || antigravity?.dbPath || claude?.dbPath || codex?.dbPath) && <footer className="sessions-source">
       {opencode?.dbPath && <div title={opencode.dbPath}>SQLite · {opencode.dbPath} · {t('sessionsLastCheck')} {new Date(opencode.checkedAt).toLocaleTimeString()}</div>}
       {antigravity?.dbPath && <div title={antigravity.dbPath}>Antigravity · {antigravity.dbPath} · {t('sessionsLastCheck')} {new Date(antigravity.checkedAt).toLocaleTimeString()}</div>}
+      {claude?.dbPath && <div title={claude.dbPath}>Claude Code · {claude.dbPath} · {t('sessionsLastCheck')} {new Date(claude.checkedAt).toLocaleTimeString()}</div>}
+      {codex?.dbPath && <div title={codex.dbPath}>Codex · {codex.dbPath} · {t('sessionsLastCheck')} {new Date(codex.checkedAt).toLocaleTimeString()}</div>}
     </footer>}
   </section>;
 }
