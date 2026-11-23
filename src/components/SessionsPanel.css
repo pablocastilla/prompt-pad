@@ -57,12 +57,19 @@
 .session-event-label { font-size: 11px; color: var(--accent); font-weight: 600; margin-bottom: 5px; }
 .session-event p { white-space: pre-wrap; font-size: 12px; line-height: 1.65; }
 .session-event-tool p { color: var(--text2); }
+.session-event-role-system .session-event-text { color: var(--text2); font-size: 11px; }
 .session-event-command, .session-event-output { font-family: var(--mono, monospace); font-size: 11px; line-height: 1.55;
   white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
   padding: 8px 10px; margin: 6px 0 0; max-height: 320px; overflow: auto; }
 .session-event-command { color: var(--text); }
 .session-event-output { color: var(--text2); }
 .session-event-output-error { color: var(--danger); border-color: var(--danger); }
+.session-event-fold { margin-top: 6px; }
+.session-event-fold > summary { cursor: pointer; font-size: 11px; color: var(--text2); padding: 3px 0; }
+.session-event-fold > summary:hover { color: var(--accent); }
+.session-event-reasoning { margin: 0 0 8px; }
+.session-event-reasoning > summary { cursor: pointer; font-size: 11px; color: var(--accent); font-weight: 600; }
+.session-event-reasoning > .session-event-text { margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--border); color: var(--text2); }
 .session-subagent-link { margin-top: 6px; padding: 4px 9px; font-size: 11px; font-weight: 600; cursor: pointer;
   background: var(--accent-dim); color: var(--accent); border: 1px solid var(--border); border-radius: 6px; }
 .session-subagent-link:hover { border-color: var(--accent); }

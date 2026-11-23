@@ -26,6 +26,13 @@ const TOOL_RESULT_TYPES = new Set([
 ]);
 
 const MAX_TOOL_OUTPUT = 6000;
+const MAX_USER_TEXT = 6000;
+const MAX_REASONING = 4000;
+const MAX_ACTIVITY = 80;
+// Live conversations grow to thousands of steps, so only the transcript tail is
+// parsed on every poll. The opening prompt is added back so a long autonomous
+// run still shows what it was asked to do.
+const TRANSCRIPT_WINDOW = 300;
 
 // Antigravity often quotes its tool arguments ("\"git status\""); strip the
 // wrapping quotes so the command reads naturally on the board.
@@ -40,12 +47,90 @@ function unwrapArg(value: unknown): string {
   return text;
 }
 
-// Drop the "Created At / Completed At" envelope to keep just the payload.
+function trimText(value: string, max: number): string {
+  const text = String(value || '').trim();
+  return text.length > max ? text.slice(0, max - 1).trimEnd() + '…' : text;
+}
+
+function trimTailText(value: string, max: number): string {
+  const text = String(value || '').trim();
+  return text.length > max ? '…' + text.slice(-(max - 1)).trimStart() : text;
+}
+
+// Antigravity repeats the "Created At / Completed At" envelope (sometimes twice)
+// in front of every tool result. Drop every copy so the board shows the payload.
 function cleanToolResult(content: string): string {
-  return content
-    .replace(/^Created At:[^\n]*\r?\n/, '')
-    .replace(/^Completed At:[^\n]*\r?\n/, '')
-    .trim();
+  const lines = String(content || '').replace(/\r\n?/g, '\n').split('\n');
+  let start = 0;
+  while (start < lines.length) {
+    const line = lines[start].trim();
+    if (!line || /^(Created At|Completed At):/.test(line)) { start++; continue; }
+    break;
+  }
+  return lines.slice(start).join('\n').trim();
+}
+
+// Machine-only blocks Antigravity appends to the visible user request.
+const MACHINE_BLOCKS = ['ADDITIONAL_METADATA', 'USER_SETTINGS_CHANGE', 'EPHEMERAL_MESSAGE'];
+
+// <USER_REQUEST> holds what the user typed; everything else in a USER_INPUT
+// entry (time, model changes, reminders) is machine noise for the board.
+function cleanUserPrompt(content: unknown): string {
+  const raw = typeof content === 'string' ? content : '';
+  if (!raw.trim()) return '';
+  const requests = [...raw.matchAll(/<USER_REQUEST\b[^>]*>([\s\S]*?)<\/USER_REQUEST>/gi)]
+    .map(match => match[1].trim())
+    .filter(Boolean);
+  let text = requests.length > 0 ? requests.join('\n\n') : raw;
+  if (requests.length === 0) {
+    for (const tag of MACHINE_BLOCKS) {
+      text = text.replace(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}>`, 'gi'), '');
+    }
+    text = text.replace(/<\/?[A-Z][A-Z0-9_]*\b[^>]*>/g, '');
+  }
+  // The launch seed carries a one-line summary of the prompt file; show that
+  // instead of the "Read the file at …" envelope.
+  if (text.includes(MARKER)) {
+    const summary = text.match(/Summary of the file content:\s*"?([\s\S]*?)"?\s*$/);
+    if (summary && summary[1].trim()) text = summary[1].trim();
+  }
+  return trimText(text, MAX_USER_TEXT);
+}
+
+// A subagent conversation starts with a SYSTEM_MESSAGE carrying the task its
+// parent handed over; keep the task, not the boilerplate around it.
+function cleanSystemMessage(content: unknown): string {
+  const raw = typeof content === 'string' ? content : '';
+  if (!raw.trim()) return '';
+  const body = raw.replace(/^\s*The following is a <SYSTEM_MESSAGE>[\s\S]*?\n\s*\n/i, '');
+  const inner = body.match(/<SYSTEM_MESSAGE\b[^>]*>([\s\S]*?)<\/SYSTEM_MESSAGE>/i);
+  return trimText(inner ? inner[1] : body, MAX_USER_TEXT);
+}
+
+interface TranscriptEntry {
+  step_index?: number;
+  type?: string;
+  status?: string;
+  created_at?: string;
+  content?: unknown;
+  thinking?: unknown;
+  model?: unknown;
+  tool_calls?: Array<{ name?: string; args?: unknown; function?: { name?: string } }>;
+}
+
+function parseTranscriptEntry(line: string): TranscriptEntry | null {
+  try {
+    const value = JSON.parse(line);
+    return value && typeof value === 'object' ? value as TranscriptEntry : null;
+  } catch {
+    return null;
+  }
+}
+
+// `invoke_subagent` results embed the child conversation that was created.
+function childConversationId(value: string): string {
+  const match = value.match(/"?conversationId"?\s*[:=]\s*"?([0-9a-fA-F]{8}-[0-9a-fA-F-]{20,})"?/);
+  return match ? match[1] : '';
 }
 
 // The command (or path/query) a call ran with, regardless of the tool used.
@@ -255,17 +340,43 @@ export class AntigravitySessionMonitor {
       // CLI (agy) conversations carry no workspace URIs; the CLI history log
       // maps conversation ids to the working directory instead.
       const historyDirs = this.historyDirs(path.join(path.dirname(dbPath), 'history.jsonl'));
-      for (const row of rows) {
+
+      const recent = rows.filter(row => {
         const createdAt = parseAntigravityTime(row.last_modified_time);
-        if (!createdAt || now - createdAt > RECENT_MS) continue;
+        return createdAt > 0 && now - createdAt <= RECENT_MS;
+      });
+      const conversationDbFor = (id: string) => path.join(conversationsDir, `${id}.db`);
+      // Only Prompt Pad-launched conversations are shown. Antigravity stores its
+      // summaries in more than one place and mirrors rows between them, so the
+      // marker (and not the database) decides.
+      const visible = new Set<string>();
+      for (const row of recent) {
+        if (this.isPromptPadLaunched(dbPath, row.conversation_id, conversationDbFor(row.conversation_id))) {
+          visible.add(row.conversation_id);
+        }
+      }
+      // Subagents run their own conversation without the seed marker, so they
+      // stay visible while the conversation that spawned them is visible.
+      for (let changed = visible.size > 0; changed;) {
+        changed = false;
+        for (const row of recent) {
+          if (visible.has(row.conversation_id) || !row.parent_conversation_id) continue;
+          if (visible.has(row.parent_conversation_id)) {
+            visible.add(row.conversation_id);
+            changed = true;
+          }
+        }
+      }
+
+      for (const row of recent) {
         if (result.sessions.length >= MAX_CONVERSATIONS) break;
+        if (!visible.has(row.conversation_id)) continue;
         if (result.sessions.some(s => s.id === row.conversation_id)) continue;
-        const convDbPath = path.join(conversationsDir, `${row.conversation_id}.db`);
-        if (!this.isPromptPadLaunched(dbPath, row.conversation_id, convDbPath)) continue;
+        const createdAt = parseAntigravityTime(row.last_modified_time);
         const turnId = row.conversation_id;
         if (hidden[turnId] === turnId) { result.hiddenCount++; continue; }
 
-        const { activity, latestActivityTime } = this.readActivity(dbPath, row.conversation_id);
+        const { activity, latestActivityTime, model } = this.readActivity(dbPath, row.conversation_id);
         const updatedAt = Math.max(createdAt, latestActivityTime);
 
         const isKilled = Boolean(row.killed);
@@ -297,10 +408,12 @@ export class AntigravitySessionMonitor {
         result.sessions.push({
           id: row.conversation_id,
           turnId,
-          title: row.title || row.preview || (activity.find(a => a.role === 'user')?.text?.slice(0, 80)) || 'Antigravity',
+          title: row.title || row.preview || row.agent_name ||
+            (activity.find(a => a.role === 'user')?.text?.slice(0, 80)) || 'Antigravity',
           directory: decodeWorkspaceDir(row.workspace_uris) || historyDirs.get(row.conversation_id) || '',
           parentId: row.parent_conversation_id || (row.nesting_depth > 0 ? 'nested' : null),
-          model: row.agent_name || '',
+          agent: row.agent_name || undefined,
+          model: model || '',
           status: working ? 'working' : 'completed',
           createdAt,
           updatedAt,
@@ -313,11 +426,86 @@ export class AntigravitySessionMonitor {
     } finally { db.close(); }
   }
 
-  private readActivity(dbPath: string, conversationId: string): { activity: OpenCodeActivity[]; latestActivityTime: number } {
+  private readActivity(dbPath: string, conversationId: string): { activity: OpenCodeActivity[]; latestActivityTime: number; model: string } {
     const activity: OpenCodeActivity[] = [];
+    const head: OpenCodeActivity[] = [];
     let latestActivityTime = 0;
+    let model = '';
     const rootDir = path.dirname(dbPath);
     const transcriptPath = path.join(rootDir, 'brain', conversationId, '.system_generated', 'logs', 'transcript.jsonl');
+
+    // Parse the transcript entries in order, pairing each tool result with the
+    // call still waiting for it so commands and their output stay together.
+    const collect = (lines: string[], target: OpenCodeActivity[]) => {
+      const pendingTools: OpenCodeActivity[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        const entry = parseTranscriptEntry(lines[i]);
+        if (!entry) continue;
+        const stepIdx = typeof entry.step_index === 'number' ? entry.step_index : i;
+        if (entry.created_at) {
+          const entryTime = parseAntigravityTime(entry.created_at);
+          if (entryTime > latestActivityTime) latestActivityTime = entryTime;
+        }
+        if (entry.type === 'USER_INPUT') {
+          const text = cleanUserPrompt(entry.content);
+          if (text) {
+            target.push({ id: `agy-${conversationId}-input-${stepIdx}`, role: 'user', type: 'text', text });
+          }
+        } else if (entry.type === 'SYSTEM_MESSAGE') {
+          const text = cleanSystemMessage(entry.content);
+          if (text) {
+            target.push({ id: `agy-${conversationId}-system-${stepIdx}`, role: 'system', type: 'text', text });
+          }
+        } else if (entry.type === 'PLANNER_RESPONSE') {
+          if (typeof entry.model === 'string' && entry.model.trim()) model = entry.model.trim();
+          const thinking = typeof entry.thinking === 'string' ? entry.thinking.trim() : '';
+          const content = typeof entry.content === 'string' ? entry.content.trim() : '';
+          // The visible answer precedes the calls it triggers, so it is pushed first.
+          if (content || thinking) {
+            target.push({
+              id: `agy-${conversationId}-text-${stepIdx}`,
+              role: 'assistant',
+              type: 'text',
+              text: content ? trimTailText(content, MAX_USER_TEXT) : '',
+              reasoning: thinking ? trimText(thinking, MAX_REASONING) : undefined,
+            });
+          }
+          if (Array.isArray(entry.tool_calls) && entry.tool_calls.length > 0) {
+            for (let t = 0; t < entry.tool_calls.length; t++) {
+              const call = entry.tool_calls[t];
+              const toolName = call.name || call.function?.name || 'tool';
+              let args = call.args;
+              if (typeof args === 'string') {
+                try { args = JSON.parse(args); } catch {}
+              }
+              const record = args && typeof args === 'object' ? args as Record<string, unknown> : {};
+              const command = antigravityToolInput(args);
+              const description = unwrapArg(record.toolAction) || unwrapArg(record.toolSummary);
+              const toolActivity: OpenCodeActivity = {
+                id: `agy-${conversationId}-tool-${stepIdx}-${t}`,
+                role: 'assistant',
+                type: 'tool',
+                tool: String(toolName),
+                status: 'completed',
+                text: description.slice(0, 1000),
+                input: command.slice(0, 1000),
+              };
+              target.push(toolActivity);
+              pendingTools.push(toolActivity);
+            }
+          }
+        } else if (typeof entry.type === 'string' && TOOL_RESULT_TYPES.has(entry.type) && typeof entry.content === 'string') {
+          const tool = pendingTools.shift();
+          const result = cleanToolResult(entry.content);
+          if (tool && result) {
+            tool.output = result.slice(0, MAX_TOOL_OUTPUT);
+            tool.status = String(entry.status || '').toUpperCase() === 'ERROR' ? 'error' : 'completed';
+            const child = childConversationId(result);
+            if (child && child !== conversationId) tool.childId = child;
+          }
+        }
+      }
+    };
 
     if (fs.existsSync(transcriptPath)) {
       try {
@@ -325,76 +513,22 @@ export class AntigravitySessionMonitor {
         if (stat.mtimeMs > latestActivityTime) latestActivityTime = stat.mtimeMs;
         const content = fs.readFileSync(transcriptPath, 'utf8');
         const lines = content.split(/\r?\n/).filter(line => line.trim());
-        const recentLines = lines.slice(-80);
-        // Tool calls awaiting their result entry, so output can be attached.
-        const pendingTools: OpenCodeActivity[] = [];
-        for (let i = 0; i < recentLines.length; i++) {
-          try {
-            const entry = JSON.parse(recentLines[i]);
-            const stepIdx = entry.step_index ?? i;
-            if (entry.created_at) {
-              const entryTime = parseAntigravityTime(entry.created_at);
-              if (entryTime > latestActivityTime) latestActivityTime = entryTime;
-            }
-            if (entry.type === 'USER_INPUT' && typeof entry.content === 'string') {
-              let text = entry.content.replace(/<\/?USER_REQUEST>/g, '').trim();
-              const seedMatch = text.match(/Summary of the file content:\s*"?([^"]+)"?/);
-              if (seedMatch) text = seedMatch[1].trim();
-              if (text) {
-                activity.push({
-                  id: `agy-${conversationId}-input-${stepIdx}`,
-                  role: 'user',
-                  type: 'text',
-                  text: text.slice(-6000),
-                });
-              }
-            } else if (entry.type === 'PLANNER_RESPONSE') {
-              if (Array.isArray(entry.tool_calls) && entry.tool_calls.length > 0) {
-                for (let t = 0; t < entry.tool_calls.length; t++) {
-                  const call = entry.tool_calls[t];
-                  const toolName = call.name || call.function?.name || 'tool';
-                  let args = call.args;
-                  if (typeof args === 'string') {
-                    try { args = JSON.parse(args); } catch {}
-                  }
-                  const record = args && typeof args === 'object' ? args as Record<string, unknown> : {};
-                  const command = antigravityToolInput(args);
-                  const description = unwrapArg(record.toolAction) || unwrapArg(record.toolSummary);
-                  const toolActivity: OpenCodeActivity = {
-                    id: `agy-${conversationId}-tool-${stepIdx}-${t}`,
-                    role: 'assistant',
-                    type: 'tool',
-                    tool: String(toolName),
-                    status: 'completed',
-                    text: description.slice(0, 1000),
-                    input: command.slice(0, 1000),
-                  };
-                  activity.push(toolActivity);
-                  pendingTools.push(toolActivity);
-                }
-              }
-              if (typeof entry.content === 'string' && entry.content.trim()) {
-                activity.push({
-                  id: `agy-${conversationId}-text-${stepIdx}`,
-                  role: 'assistant',
-                  type: 'text',
-                  text: entry.content.slice(-6000),
-                });
-              }
-            } else if (TOOL_RESULT_TYPES.has(entry.type) && typeof entry.content === 'string') {
-              const tool = pendingTools.shift();
-              const result = cleanToolResult(entry.content);
-              if (tool && result) {
-                tool.output = result.slice(0, MAX_TOOL_OUTPUT);
-                tool.status = String(entry.status || '').toUpperCase() === 'ERROR' ? 'error' : 'completed';
-              }
-            }
-          } catch {}
+        const windowLines = lines.slice(-TRANSCRIPT_WINDOW);
+        if (windowLines.length < lines.length) {
+          // Long autonomous runs push the original request out of the window; it
+          // stays as the first entry so the conversation keeps its context.
+          const first = parseTranscriptEntry(lines[0]);
+          if (first && (first.type === 'USER_INPUT' || first.type === 'SYSTEM_MESSAGE')) collect([lines[0]], head);
+        }
+        collect(windowLines, activity);
+        if (!model) {
+          const models = [...content.matchAll(/"model"\s*:\s*"([^"]+)"/g)];
+          if (models.length > 0) model = models[models.length - 1][1];
         }
       } catch {}
     }
 
-    if (activity.length === 0) {
+    if (activity.length === 0 && head.length === 0) {
       const convDbPath = path.join(conversationsDirFor(dbPath), `${conversationId}.db`);
       if (fs.existsSync(convDbPath)) {
         try {
@@ -431,7 +565,18 @@ export class AntigravitySessionMonitor {
       }
     }
 
-    return { activity: activity.slice(-80), latestActivityTime };
+    const tailLimit = Math.max(0, MAX_ACTIVITY - head.length);
+    let tail = activity.slice(-tailLimit);
+    // The task that started the conversation stays visible even when a long run
+    // pushes it out of the activity window.
+    if (head.length === 0) {
+      const firstUser = activity.find(a => a.role === 'user' || a.role === 'system');
+      if (firstUser && !tail.includes(firstUser)) {
+        tail = [firstUser, ...tail];
+        if (tail.length > tailLimit) tail = [tail[0], ...tail.slice(tail.length - (tailLimit - 1))];
+      }
+    }
+    return { activity: [...head, ...tail], latestActivityTime, model };
   }
 
   private historyDirs(historyPath: string): Map<string, string> {

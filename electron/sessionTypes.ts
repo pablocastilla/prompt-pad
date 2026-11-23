@@ -15,6 +15,9 @@ export interface OpenCodeActivity {
   // Subagent calls only: the child session that ran it, so the board can jump
   // to the subagent's own column and messages.
   childId?: string;
+  // Model reasoning captured before the visible answer (Antigravity `thinking`).
+  // Shown collapsed so it never crowds the conversation.
+  reasoning?: string;
 }
 
 export interface OpenCodeSession {

@@ -88,11 +88,19 @@ __THEME_CSS__
   .event p { white-space: pre-wrap; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
   .event-tool { padding: 8px; border-left: 2px solid var(--border); background: var(--bg); border-radius: 4px; }
   .event-tool p { color: var(--text2); }
+  .event-role-system .event-text { color: var(--text2); font-size: 11px; }
   .event-code { font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.55; white-space: pre-wrap;
     overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
     padding: 8px 10px; margin: 6px 0 0; max-height: 320px; overflow: auto; color: var(--text); }
   .event-output { color: var(--text2); }
   .event-output.error { color: var(--danger); border-color: var(--danger); }
+  .event-fold { margin-top: 6px; }
+  .event-fold > summary { cursor: pointer; font-size: 11px; color: var(--text2); padding: 3px 0; }
+  .event-reasoning { margin-bottom: 8px; }
+  .event-reasoning > summary { cursor: pointer; font-size: 11px; color: var(--accent); font-weight: 600; }
+  .event-reasoning .event-text { margin-top: 4px; padding-left: 10px; border-left: 2px solid var(--border); color: var(--text2); }
+  .source-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 5px;
+    background: var(--accent-dim); color: var(--accent); margin-left: 6px; flex-shrink: 0; }
   .event-goto { margin-top: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
     background: var(--accent-dim); color: var(--accent); font-weight: 600; cursor: pointer; font-size: 12px; }
   .event-text { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
@@ -155,7 +163,15 @@ const $ = id => document.getElementById(id);
 const KEY = new URLSearchParams(location.search).get('key') || '';
 const withKey = path => path + (path.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(KEY);
 const state = { sessions: [], open: new Set(JSON.parse(sessionStorage.getItem('pp-open') || '[]')), filter: '',
-  notes: {}, sendEnabled: false };
+  details: new Set(JSON.parse(sessionStorage.getItem('pp-details') || '[]')), notes: {}, sendEnabled: false };
+const detailOpen = key => state.details.has(key) ? ' open' : '';
+document.addEventListener('toggle', event => {
+  const el = event.target;
+  const key = el && el.getAttribute ? el.getAttribute('data-dk') : '';
+  if (!key) return;
+  if (el.open) state.details.add(key); else state.details.delete(key);
+  sessionStorage.setItem('pp-details', JSON.stringify([...state.details]));
+}, true);
 const pill = s => '<span class="status-pill status-' + s + '">' + s + '</span>';
 const NL = String.fromCharCode(10);
 function esc(text) { const d = document.createElement('div'); d.textContent = text == null ? '' : String(text); return d.innerHTML; }
@@ -216,19 +232,39 @@ function render() {
   });
   $('sessions').innerHTML = shown.map(s => {
     const isOpen = state.open.has(s.id);
-    const events = (s.activity || []).map(a => {
+    const sourceLabel = s.source === 'antigravity' ? 'Antigravity'
+      : s.source === 'claude-code' ? 'Claude Code'
+      : s.source === 'codex' ? 'Codex' : 'OpenCode';
+    const events = (s.activity || []).map((a, ai) => {
       const label = a.type === 'tool' ? (a.tool || 'tool')
-        : (a.role === 'user' ? 'You' : (a.role && a.role !== 'assistant' ? a.role : 'OpenCode'));
+        : (a.role === 'user' ? 'You' : a.role === 'system' ? 'System'
+        : (a.role && a.role !== 'assistant' ? a.role : sourceLabel));
+      const eventKey = s.id + ':' + (a.id || '#' + ai);
       let body = '';
       if (a.type === 'text') {
-        body = a.html ? '<div class="event-text">' + a.html + '</div>' : (a.text ? '<p>' + esc(a.text) + '</p>' : '');
+        if (a.reasoning) {
+          const reasonKey = eventKey + ':reason';
+          body += '<details class="event-reasoning" data-dk="' + esc(reasonKey) + '"' + detailOpen(reasonKey) +
+            '><summary>Reasoning</summary><div class="event-text">' + (a.reasoningHtml || esc(a.reasoning)) + '</div></details>';
+        }
+        if (a.text) body += a.html ? '<div class="event-text">' + a.html + '</div>' : '<p>' + esc(a.text) + '</p>';
       } else {
         if (a.text && a.text !== a.input) body += '<p>' + esc(a.text) + '</p>';
         if (a.input) body += '<pre class="event-code">' + esc(a.input) + '</pre>';
-        if (a.output) body += '<pre class="event-code event-output' + (a.status === 'error' ? ' error' : '') + '">' + esc(a.output) + '</pre>';
+        if (a.output) {
+          const code = '<pre class="event-code event-output' + (a.status === 'error' ? ' error' : '') + '">' + esc(a.output) + '</pre>';
+          const lines = String(a.output).split(NL).length;
+          if (String(a.output).length > 600 || lines > 10) {
+            const outKey = eventKey + ':out';
+            body += '<details class="event-fold" data-dk="' + esc(outKey) + '"' + detailOpen(outKey) +
+              '><summary>Result · ' + lines + ' lines</summary>' + code + '</details>';
+          } else {
+            body += code;
+          }
+        }
         if (a.childId) body += '<button type="button" class="event-goto" data-goto="' + esc(a.childId) + '">↳ Open sub-session</button>';
       }
-      return '<div class="event ' + (a.type === 'tool' ? 'event-tool' : '') + '"><div class="event-label">' +
+      return '<div class="event ' + (a.type === 'tool' ? 'event-tool' : '') + ' event-role-' + esc(a.role || 'none') + '"><div class="event-label">' +
         esc(label) + '</div>' + body + '</div>';
     }).join('');
     const composer = state.sendEnabled && s.source === 'opencode' ?
@@ -236,7 +272,8 @@ function render() {
       '<button type="submit">Send</button></form>' + noteLine(s.id) : '';
     return '<article class="session' + (isOpen ? ' open' : '') + '" data-id="' + esc(s.id) + '">' +
       '<div class="session-header" onclick="toggle(this.parentElement)"><div class="session-title"><h3>' +
-      esc(s.title || s.id) + '</h3><span class="chevron">▼</span></div>' +
+      esc(s.title || s.id) + '</h3>' + (s.source && s.source !== 'opencode'
+        ? '<span class="source-badge">' + esc(sourceLabel) + '</span>' : '') + '<span class="chevron">▼</span></div>' +
       '<div class="session-meta" title="' + esc(s.directory) + '">' + esc(s.directory) + '</div>' +
       (s.parentId ? '<div class="session-meta" title="' + esc(s.parentId) + '"><span class="child-badge">Sub-session</span>' +
         (s.agent ? '<span class="agent-name">' + esc(s.agent) + '</span>' : '') + '</div>' : '') +
@@ -475,7 +512,11 @@ export class RemoteSessionsServer {
           updatedAt: s.updatedAt, createdAt: s.createdAt, source: s.source,
           agent: s.agent, parentId: s.parentId,
           permissions: permissions.get(s.id) || [], questions: questions.get(s.id) || [],
-          activity: s.activity.map(a => ({ ...a, html: a.type === 'text' ? renderMarkdown(a.text) : '' })),
+          activity: s.activity.map(a => ({
+            ...a,
+            html: a.type === 'text' ? renderMarkdown(a.text) : '',
+            reasoningHtml: a.reasoning ? renderMarkdown(a.reasoning) : '',
+          })),
         })), sendEnabled: true });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(body);

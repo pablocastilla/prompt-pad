@@ -15,6 +15,21 @@ const statusKeys = {
 
 const emptyInteractions = (): OpenCodeInteractions => ({ permissions: [], questions: [] });
 
+// Long tool results (file reads, command output) would otherwise fill a whole
+// column, so they start folded; the command and the conversation stay visible.
+const isLongOutput = (value: string) => value.length > 600 || value.split('\n').length > 10;
+
+function ToolOutput({ text, failed }: { text: string; failed?: boolean }) {
+  const className = `session-event-output${failed ? ' session-event-output-error' : ''}`;
+  if (!isLongOutput(text)) {
+    return <pre className={className} title={t('sessionsToolOutput')}>{text}</pre>;
+  }
+  return <details className="session-event-fold">
+    <summary>{t('sessionsToolOutput')} · {text.split('\n').length} {t('sessionsLines')}</summary>
+    <pre className={className} title={t('sessionsToolOutput')}>{text}</pre>
+  </details>;
+}
+
 function PermissionBlock({ request, onReply }: {
   request: OpenCodePermissionRequest;
   onReply: (reply: 'once' | 'always' | 'reject') => Promise<void>;
@@ -165,18 +180,25 @@ function SessionColumn({ session, interactions, now, closing, knownSessions, onC
     <div className="session-activity" ref={body} tabIndex={0} aria-label={t('sessionsActivity')}
       onScroll={() => { if (body.current) follow.current = body.current.scrollHeight - body.current.scrollTop - body.current.clientHeight < 40; }}>
       {session.activity.length === 0 && <p className="session-meta">{t('sessionsNoActivity')}</p>}
-      {session.activity.map(item => <div key={item.id} className={`session-event session-event-${item.type}`}>
+      {session.activity.map(item => <div key={item.id} className={`session-event session-event-${item.type} session-event-role-${item.role}`}>
         <div className="session-event-label">{item.type === 'tool' ? `${item.tool} · ${toolStatus(item.status)}` :
-          item.role === 'user' ? t('sessionsYou') : (session.source && session.source !== 'opencode' ? sourceLabel : item.role !== 'assistant' ? item.role : 'OpenCode')}</div>
+          item.role === 'user' ? t('sessionsYou') :
+          item.role === 'system' ? t('sessionsSystem') :
+          (session.source && session.source !== 'opencode' ? sourceLabel : item.role !== 'assistant' ? item.role : 'OpenCode')}</div>
         {item.type === 'tool' ? <>
           {item.text && item.text !== item.input && <p>{item.text}</p>}
           {item.input && <pre className="session-event-command" title={t('sessionsToolCommand')}>{item.input}</pre>}
-          {item.output && <pre className={`session-event-output${item.status === 'error' ? ' session-event-output-error' : ''}`}
-            title={t('sessionsToolOutput')}>{item.output}</pre>}
+          {item.output && <ToolOutput text={item.output} failed={item.status === 'error'} />}
           {item.childId && knownSessions.has(item.childId) && <button type="button" className="session-subagent-link"
             data-child-session={item.childId} title={`${t('sessionsOpenSubagent')}: ${item.childId}`}
             onClick={() => onFocusSession(item.childId!)}>↳ {t('sessionsOpenSubagent')}</button>}
-        </> : item.text && <div className="session-event-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }} />}
+        </> : <>
+          {item.reasoning && <details className="session-event-reasoning">
+            <summary>{t('sessionsReasoning')}</summary>
+            <div className="session-event-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(item.reasoning) }} />
+          </details>}
+          {item.text && <div className="session-event-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }} />}
+        </>}
       </div>)}
     </div>
     {session.source === 'opencode' && <form className="session-compose" onSubmit={e => { e.preventDefault(); void send(); }}>
