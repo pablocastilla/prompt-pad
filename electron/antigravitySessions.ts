@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import log from 'electron-log';
 import type { OpenCodeActivity, OpenCodeSession, OpenCodeSessionsSnapshot } from './sessionTypes';
 
 // Show Prompt Pad-launched Antigravity conversations updated within the last day.
@@ -148,15 +149,18 @@ function antigravityToolInput(args: unknown): string {
 // Antigravity has two stores, each with a global index (titles, workspaces,
 // status) plus one SQLite database per conversation: the IDE under
 // ~/.gemini/antigravity and the CLI (agy) under ~/.gemini/antigravity-cli.
-// An explicit PROMPT_PAD_ANTIGRAVITY_DB override wins in every mode; test mode
-// otherwise uses the test directory and never the user's real data.
+// An explicit PROMPT_PAD_ANTIGRAVITY_DB override wins in every mode and may
+// list several stores separated by ';' (IDE plus CLI, or custom locations);
+// test mode otherwise uses the test directory and never the user's real data.
 export function findAntigravityDbs(testDir: string | null = null): string[] {
-  const candidates = process.env.PROMPT_PAD_ANTIGRAVITY_DB ? [process.env.PROMPT_PAD_ANTIGRAVITY_DB] :
-    testDir ? [path.join(testDir, 'conversation_summaries.db')] :
-    [
-      path.join(os.homedir(), '.gemini', 'antigravity', 'conversation_summaries.db'),
-      path.join(os.homedir(), '.gemini', 'antigravity-cli', 'conversation_summaries.db'),
-    ];
+  const candidates = process.env.PROMPT_PAD_ANTIGRAVITY_DB
+    ? process.env.PROMPT_PAD_ANTIGRAVITY_DB.split(';').map(p => p.trim()).filter(Boolean)
+    : testDir
+      ? [path.join(testDir, 'conversation_summaries.db'), path.join(testDir, 'antigravity-cli', 'conversation_summaries.db')]
+      : [
+          path.join(os.homedir(), '.gemini', 'antigravity', 'conversation_summaries.db'),
+          path.join(os.homedir(), '.gemini', 'antigravity-cli', 'conversation_summaries.db'),
+        ];
   return candidates.filter(p => fs.existsSync(p));
 }
 
@@ -305,18 +309,64 @@ export class AntigravitySessionMonitor {
     const result: OpenCodeSessionsSnapshot = { dbPath: dbPaths[0] || null, sessions: [], hiddenCount: 0, checkedAt: now };
     if (dbPaths.length === 0) return result;
     const hidden = this.hidden();
+    // The IDE store mirrors CLI conversations (same conversation id, often an
+    // empty title, a stale status and no transcript of its own). Each store is
+    // read separately and candidates merge per conversation id, so the store
+    // that actually owns the conversation data always wins over its mirror.
+    const merged = new Map<string, OpenCodeSession>();
+    const hiddenIds = new Set<string>();
     for (const dbPath of dbPaths) {
       try {
-        this.readRoot(dbPath, now, result, hidden);
-      } catch {
+        for (const session of this.readRoot(dbPath, now, hidden, hiddenIds)) {
+          merged.set(session.id, merged.has(session.id) ? this.mergeSession(merged.get(session.id)!, session) : session);
+        }
+        this.readFailures.delete(dbPath);
+      } catch (err) {
+        this.noteReadFailure(dbPath, err);
         // An unreadable store is skipped; the other one still contributes.
       }
     }
-    result.sessions.sort((a, b) => b.updatedAt - a.updatedAt);
+    result.sessions = [...merged.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+    result.hiddenCount = hiddenIds.size;
     return result;
   }
 
-  private readRoot(dbPath: string, now: number, result: OpenCodeSessionsSnapshot, hidden: Record<string, string>): void {
+  // Two stores can hold the same conversation (the IDE mirrors CLI rows with
+  // an empty title, a stale status and no transcript). The candidate that
+  // carries the conversation's data wins; the other only fills missing
+  // labels, and a "working" signal from either side is trusted so a stale
+  // mirror never marks a live run as finished.
+  private mergeSession(a: OpenCodeSession, b: OpenCodeSession): OpenCodeSession {
+    const primary = b.activity.length > a.activity.length ? b : a;
+    const other = primary === a ? b : a;
+    const filled = (value?: string) => value && value.trim() ? value : '';
+    const working = primary.status === 'working' || other.status === 'working';
+    return {
+      ...primary,
+      title: filled(primary.title) || filled(other.title) || primary.title,
+      directory: filled(primary.directory) || filled(other.directory) || primary.directory,
+      agent: primary.agent || other.agent,
+      model: filled(primary.model) || filled(other.model) || primary.model,
+      parentId: primary.parentId || other.parentId,
+      status: working ? 'working' : primary.status,
+      createdAt: Math.max(primary.createdAt, other.createdAt),
+      updatedAt: Math.max(primary.updatedAt, other.updatedAt),
+      completedAt: working ? null : (primary.completedAt ?? other.completedAt),
+    };
+  }
+
+  // Read failures used to disappear silently, leaving the board empty with no
+  // trace. Log each new failure (deduplicated per store, cleared on recovery).
+  private readFailures = new Map<string, string>();
+
+  private noteReadFailure(dbPath: string, err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err);
+    if (this.readFailures.get(dbPath) === message) return;
+    this.readFailures.set(dbPath, message);
+    log.warn(`Antigravity store unreadable (${dbPath}): ${message}`);
+  }
+
+  private readRoot(dbPath: string, now: number, hidden: Record<string, string>, hiddenIds: Set<string>): OpenCodeSession[] {
     const db = new Database(dbPath, { readonly: true, fileMustExist: true, timeout: 1000 });
     try {
       const tableCols = new Set(
@@ -368,28 +418,35 @@ export class AntigravitySessionMonitor {
         }
       }
 
+      const sessions: OpenCodeSession[] = [];
       for (const row of recent) {
-        if (result.sessions.length >= MAX_CONVERSATIONS) break;
+        if (sessions.length >= MAX_CONVERSATIONS) break;
         if (!visible.has(row.conversation_id)) continue;
-        if (result.sessions.some(s => s.id === row.conversation_id)) continue;
+        if (sessions.some(s => s.id === row.conversation_id)) continue;
         const createdAt = parseAntigravityTime(row.last_modified_time);
         const turnId = row.conversation_id;
-        if (hidden[turnId] === turnId) { result.hiddenCount++; continue; }
+        if (hidden[turnId] === turnId) { hiddenIds.add(turnId); continue; }
 
-        const { activity, latestActivityTime, model } = this.readActivity(dbPath, row.conversation_id);
+        const { activity, latestActivityTime, model, running } = this.readActivity(dbPath, row.conversation_id);
         const updatedAt = Math.max(createdAt, latestActivityTime);
 
         const isKilled = Boolean(row.killed);
         const hasExplicitRunning = (row.status === 'CASCADE_RUN_STATUS_RUNNING') || Boolean(row.not_fully_idle);
         const hasExplicitIdle = (row.status === 'CASCADE_RUN_STATUS_IDLE') && !row.not_fully_idle;
 
+        // Antigravity reports IDLE between turns of a session that is still
+        // running in the terminal (observed flips every 30-60 s), so IDLE alone
+        // must not finish a conversation: fresh transcript activity keeps it
+        // Working for a short grace window, and a tool that has not captured a
+        // result yet (or a background task marked RUNNING) keeps it Working up
+        // to the same 30-minute cap as the explicit running status.
         let working = false;
         if (isKilled) {
           working = false;
         } else if (hasExplicitRunning) {
           working = (now - updatedAt < STALE_RUNNING_MS);
         } else if (hasExplicitIdle) {
-          working = false;
+          working = (now - updatedAt < ACTIVE_MS) || (running && now - updatedAt < STALE_RUNNING_MS);
         } else {
           working = (now - updatedAt < ACTIVE_MS);
         }
@@ -405,7 +462,7 @@ export class AntigravitySessionMonitor {
           }
         }
 
-        result.sessions.push({
+        sessions.push({
           id: row.conversation_id,
           turnId,
           title: row.title || row.preview || row.agent_name ||
@@ -423,14 +480,17 @@ export class AntigravitySessionMonitor {
           source: 'antigravity',
         });
       }
+      return sessions;
     } finally { db.close(); }
   }
 
-  private readActivity(dbPath: string, conversationId: string): { activity: OpenCodeActivity[]; latestActivityTime: number; model: string } {
+  private readActivity(dbPath: string, conversationId: string): { activity: OpenCodeActivity[]; latestActivityTime: number; model: string; running: boolean } {
     const activity: OpenCodeActivity[] = [];
     const head: OpenCodeActivity[] = [];
     let latestActivityTime = 0;
     let model = '';
+    let running = false;
+    let lastStatus = '';
     const rootDir = path.dirname(dbPath);
     const transcriptPath = path.join(rootDir, 'brain', conversationId, '.system_generated', 'logs', 'transcript.jsonl');
 
@@ -446,6 +506,7 @@ export class AntigravitySessionMonitor {
           const entryTime = parseAntigravityTime(entry.created_at);
           if (entryTime > latestActivityTime) latestActivityTime = entryTime;
         }
+        lastStatus = String(entry.status || '');
         if (entry.type === 'USER_INPUT') {
           const text = cleanUserPrompt(entry.content);
           if (text) {
@@ -505,6 +566,10 @@ export class AntigravitySessionMonitor {
           }
         }
       }
+      // Execution is still in flight when the transcript ends on a step marked
+      // RUNNING (e.g. a background task) or a tool call has not received its
+      // result yet. The head call runs first and is overwritten by the window.
+      running = pendingTools.length > 0 || lastStatus.toUpperCase() === 'RUNNING';
     };
 
     if (fs.existsSync(transcriptPath)) {
@@ -576,7 +641,7 @@ export class AntigravitySessionMonitor {
         if (tail.length > tailLimit) tail = [tail[0], ...tail.slice(tail.length - (tailLimit - 1))];
       }
     }
-    return { activity: [...head, ...tail], latestActivityTime, model };
+    return { activity: [...head, ...tail], latestActivityTime, model, running };
   }
 
   private historyDirs(historyPath: string): Map<string, string> {

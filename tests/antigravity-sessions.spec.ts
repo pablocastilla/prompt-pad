@@ -26,15 +26,19 @@ const test = base.extend<{ sandbox: { app: ElectronApplication; page: Page; dir:
 // Antigravity keeps a global summary database plus one SQLite database per
 // conversation; Prompt Pad-launched conversations embed the pp-prompt marker
 // in the tool steps or prompt payload. Fixtures are written through Electron's own better-sqlite3.
+// `storeRoot` selects which store the rows land in: <storeRoot>/conversation_summaries.db
+// plus <storeRoot>/conversations/<id>.db (the default mirrors the IDE layout;
+// passing <test-dir>/antigravity-cli seeds the CLI store the same way).
 async function seedAntigravity(app: ElectronApplication, dir: string, conversations: Array<{
   id: string; title: string; ageMinutes: number; marked?: boolean; status?: string;
-  payloadMarker?: boolean; parent?: string; agent?: string;
+  payloadMarker?: boolean; parent?: string; agent?: string; markerBlob?: boolean;
 }>) {
   await app.evaluate(({}, { dir, conversations }) => {
     const require = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json');
     const Database = require('better-sqlite3');
     const path = require('path');
     const fs = require('fs');
+    fs.mkdirSync(dir, { recursive: true });
     const db = new Database(path.join(dir, 'conversation_summaries.db'));
     try {
       db.exec(`
@@ -76,11 +80,22 @@ async function seedAntigravity(app: ElectronApplication, dir: string, conversati
               toolAction: 'Reading prompt file',
             });
             conv.prepare('INSERT INTO steps (idx, metadata) VALUES (?, ?)').run(2, Buffer.from(marker, 'utf8'));
+          } else if (conversation.markerBlob) {
+            // The IDE caches a mirrored CLI conversation's marker in the
+            // metadata blob without any steps of its own: the row is visible
+            // but carries no activity data.
+            conv.prepare('INSERT INTO trajectory_metadata_blob (id, data) VALUES (?, ?)')
+              .run('mirror', Buffer.from(JSON.stringify({ prompt: 'C:\\tmp\\pp-launch-1\\pp-prompt-1.txt' }), 'utf8'));
           } else if (conversation.payloadMarker) {
             const promptPayload = Buffer.from('Read the file at C:\\tmp\\pp-launch-2\\pp-prompt-2.txt as prompt', 'utf8');
             conv.prepare('INSERT INTO steps (idx, step_payload) VALUES (?, ?)').run(0, promptPayload);
           }
         } finally { conv.close(); }
+        // Antigravity keeps the conversation database's mtime in sync with the
+        // conversation's last step; a fixture created "now" must not look
+        // like fresh activity for a conversation seeded minutes in the past.
+        const convStamp = new Date(Date.now() - conversation.ageMinutes * 60000);
+        fs.utimesSync(path.join(convDir, `${conversation.id}.db`), convStamp, convStamp);
       }
     } finally { db.close(); }
   }, { dir, conversations });
@@ -88,10 +103,21 @@ async function seedAntigravity(app: ElectronApplication, dir: string, conversati
 
 // Antigravity writes one JSON object per step to
 // brain/<conversation>/.system_generated/logs/transcript.jsonl.
-function writeTranscript(dir: string, id: string, entries: unknown[]) {
+// ageMinutes backdates both the entry timestamps and the file mtime so a
+// fixture can represent a conversation whose last activity really was that
+// long ago (freshly written files would otherwise count as live activity).
+function writeTranscript(dir: string, id: string, entries: unknown[], ageMinutes = 0) {
   const logDir = path.join(dir, 'brain', id, '.system_generated', 'logs');
   fs.mkdirSync(logDir, { recursive: true });
-  fs.writeFileSync(path.join(logDir, 'transcript.jsonl'), entries.map(entry => JSON.stringify(entry)).join('\n'), 'utf8');
+  const stamp = new Date(Date.now() - ageMinutes * 60000);
+  const lines = entries.map(entry => {
+    const value = { ...(entry as Record<string, unknown>) };
+    if (!value.created_at) value.created_at = stamp.toISOString().replace(/(\.\d{3})Z$/, 'Z');
+    return JSON.stringify(value);
+  });
+  const file = path.join(logDir, 'transcript.jsonl');
+  fs.writeFileSync(file, lines.join('\n'), 'utf8');
+  fs.utimesSync(file, stamp, stamp);
 }
 
 async function open(page: Page) {
@@ -121,6 +147,40 @@ test('antigravity conversations launched from Prompt Pad show in the sessions bo
   await expect(column(page, 'agy-old')).toHaveCount(0);
   await expect(page.locator('.session-source-badge')).toHaveCount(2);
   await expect(page.locator('.sessions-source')).toContainText('Antigravity ·');
+});
+
+test('an IDE mirror row never shadows the live CLI conversation it mirrors', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  // The IDE store mirrors CLI conversation rows: same id, empty title, a stale
+  // IDLE status and no transcript of its own — only a cached marker blob. The
+  // CLI store owns the real conversation. The board must show the CLI's
+  // messages and status, never the empty mirror.
+  const id = 'agy-mirrored';
+  await seedAntigravity(app, dir, [
+    { id, title: '', ageMinutes: 0, markerBlob: true, status: 'CASCADE_RUN_STATUS_IDLE' },
+  ]);
+  await seedAntigravity(app, path.join(dir, 'antigravity-cli'), [
+    { id, title: 'Visiom PR testing', ageMinutes: 0, marked: true, status: 'CASCADE_RUN_STATUS_IDLE' },
+  ]);
+  writeTranscript(path.join(dir, 'antigravity-cli'), id, [
+    { step_index: 0, type: 'USER_INPUT', content: '<USER_REQUEST>Test the pull request end to end</USER_REQUEST>' },
+    { step_index: 1, type: 'PLANNER_RESPONSE', content: 'Starting the verification suite.', tool_calls: [{ name: 'run_command', args: { CommandLine: '"pytest -q"' } }] },
+    {
+      step_index: 2, type: 'GENERIC', status: 'DONE',
+      content: 'Created At: x\nCompleted At: y\nCommand exited with code 0.\n\nCommand output:\n42 passed',
+    },
+  ]);
+  await open(page);
+  // One merged column, not one per store.
+  await expect(column(page, id)).toHaveCount(1);
+  // The CLI candidate wins: real title, live messages, working status.
+  await expect(column(page, id)).toBeVisible({ timeout: 8000 });
+  await expect(column(page, id).locator('h3')).toHaveText('Visiom PR testing');
+  await expect(column(page, id)).toHaveAttribute('data-status', 'working');
+  await expect(column(page, id)).toContainText('Test the pull request end to end');
+  await expect(column(page, id)).toContainText('Starting the verification suite.');
+  await expect(column(page, id).locator('.session-event-command')).toHaveText('pytest -q');
+  await expect(column(page, id).locator('.session-event-output')).toContainText('42 passed');
 });
 
 test('antigravity columns can be hidden and restored independently of OpenCode', async ({ sandbox }) => {
@@ -193,12 +253,46 @@ test('antigravity session actively running stays in working status beyond 90 sec
   // ageMinutes: 10 is well beyond the old 90s cutoff; with status CASCADE_RUN_STATUS_RUNNING it must remain working
   await seedAntigravity(app, dir, [
     { id: 'agy-long-run', title: 'Active long refactoring', ageMinutes: 10, marked: true, status: 'CASCADE_RUN_STATUS_RUNNING' },
-    { id: 'agy-done-run', title: 'Quick finished task', ageMinutes: 1, marked: true, status: 'CASCADE_RUN_STATUS_IDLE' },
+    { id: 'agy-done-run', title: 'Quick finished task', ageMinutes: 5, marked: true, status: 'CASCADE_RUN_STATUS_IDLE' },
   ]);
   await open(page);
   await expect(column(page, 'agy-long-run')).toBeVisible({ timeout: 8000 });
   await expect(column(page, 'agy-long-run')).toHaveAttribute('data-status', 'working');
   await expect(column(page, 'agy-done-run')).toHaveAttribute('data-status', 'completed');
+});
+
+test('antigravity IDLE mid-run no longer marks the session as finished', async ({ sandbox }) => {
+  const { app, page, dir } = sandbox;
+  // The CLI alternates RUNNING/IDLE every 30-60 seconds while a session is
+  // still working in the terminal. IDLE alone must not finish the column:
+  // fresh transcript activity keeps it Working, and so does a step still
+  // marked RUNNING (a background task) even when the transcript went quiet.
+  await seedAntigravity(app, dir, [
+    { id: 'agy-boundary', title: 'Mid-run boundary', ageMinutes: 0, marked: true, status: 'CASCADE_RUN_STATUS_IDLE' },
+    { id: 'agy-background', title: 'Background task running', ageMinutes: 10, marked: true, status: 'CASCADE_RUN_STATUS_IDLE' },
+    { id: 'agy-quite-done', title: 'Truly finished', ageMinutes: 10, marked: true, status: 'CASCADE_RUN_STATUS_IDLE' },
+  ]);
+  // Boundary: row says IDLE seconds ago, no open tools — the grace window keeps it Working.
+  writeTranscript(dir, 'agy-boundary', [
+    { step_index: 0, type: 'USER_INPUT', content: '<USER_REQUEST>Keep refactoring</USER_REQUEST>' },
+    { step_index: 1, type: 'PLANNER_RESPONSE', content: 'Continuing with the next module.' },
+  ]);
+  // Background: transcript quiet for 10 minutes but its last step is still RUNNING.
+  writeTranscript(dir, 'agy-background', [
+    { step_index: 0, type: 'USER_INPUT', content: '<USER_REQUEST>Run the long suite</USER_REQUEST>' },
+    { step_index: 1, type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'run_command', args: { CommandLine: 'pytest -q' } }] },
+    { step_index: 2, type: 'GENERIC', status: 'RUNNING', content: 'Tool is running as a background task with task id: agy-background/task-2' },
+  ], 10);
+  // Done: quiet for 10 minutes and everything completed.
+  writeTranscript(dir, 'agy-quite-done', [
+    { step_index: 0, type: 'USER_INPUT', content: '<USER_REQUEST>Write the docs</USER_REQUEST>' },
+    { step_index: 1, type: 'PLANNER_RESPONSE', content: 'Documentation updated.' },
+  ], 10);
+  await open(page);
+  await expect(column(page, 'agy-boundary')).toBeVisible({ timeout: 8000 });
+  await expect(column(page, 'agy-boundary')).toHaveAttribute('data-status', 'working');
+  await expect(column(page, 'agy-background')).toHaveAttribute('data-status', 'working');
+  await expect(column(page, 'agy-quite-done')).toHaveAttribute('data-status', 'completed');
 });
 
 test('antigravity session detects prompt pad launch from step_payload at step 0', async ({ sandbox }) => {
@@ -329,7 +423,7 @@ test('antigravity subagent conversations join the board and link from the parent
       content: 'Created At: x\nCompleted At: y\nCreated the following subagent:\n' +
         JSON.stringify({ conversationId: childId, logAbsoluteUri: `file:///C:/tmp/brain/${childId}` }),
     },
-  ]);
+  ], 6);
   writeTranscript(dir, childId, [
     {
       step_index: 0, type: 'SYSTEM_MESSAGE', status: 'DONE',
@@ -337,7 +431,7 @@ test('antigravity subagent conversations join the board and link from the parent
         '<SYSTEM_MESSAGE>\nAdversarially review PR #2109 and report findings.\n</SYSTEM_MESSAGE>',
     },
     { step_index: 1, type: 'PLANNER_RESPONSE', content: 'Verdict: BLOCK until the migration is tested.' },
-  ]);
+  ], 5);
   await open(page);
 
   const child = column(page, childId);
